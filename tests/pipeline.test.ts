@@ -3,6 +3,7 @@ import autoData from '../src/data/balance/auto.json';
 import farmData from '../src/data/balance/farms.json';
 import gradeData from '../src/data/balance/grades.json';
 import planData from '../src/data/balance/plans.json';
+import scaleData from '../src/data/balance/scales.json';
 import sourceData from '../src/data/balance/sources.json';
 import tuningData from '../src/data/tuning/pipeline.json';
 import type { Plan } from '../src/systems/plan/plan';
@@ -10,19 +11,21 @@ import {
   backlogCap,
   buyFarm,
   buyGrade,
-  buyLlc,
+  buyScale,
   buyNoAsk,
   buyPlan,
   buySource,
   buySubagent,
   claudeRate,
   createPipe,
+  farmPrice,
   inflowOf,
   payOf,
   pressPipe,
   sessionsOf,
   sourcePrice,
   stepPipe,
+  type Farm,
   type PipeConfig,
   type PipeState,
   type Source,
@@ -33,7 +36,8 @@ const cfg: PipeConfig = {
   plans: planData as Plan[],
   sources: sourceData as Source[],
   grades: gradeData,
-  farms: farmData,
+  farms: farmData as Farm[],
+  scales: scaleData,
   auto: autoData,
 };
 const DT = 1 / 60;
@@ -149,7 +153,7 @@ describe('pipeline', () => {
     pressPipe(s, cfg);
     expect(s.money - before).toBe(cfg.tuning.pay * cfg.grades[1].mult);
     expect(payOf(s, cfg)).toBeGreaterThan(junior);
-    s.money = 1e12;
+    s.money = 1e18;
     for (let i = 0; i < cfg.grades.length; i++) buyGrade(s, cfg);
     expect(s.grade).toBe(cfg.grades.length - 1); // the ladder ends
     expect(buyGrade(s, cfg)).toBe(false);
@@ -157,10 +161,11 @@ describe('pipeline', () => {
 
   it('test_pipe_city_companies_are_hired_once_and_farms_add_sessions', () => {
     const s = rich();
-    expect(buyLlc(s, cfg)).toBe(false); // the company comes after the terminal agrees by itself
+    expect(buyScale(s, cfg)).toBe(false); // the company comes after the terminal agrees by itself
     buyNoAsk(s, cfg);
-    expect(buyLlc(s, cfg)).toBe(true);
-    expect(buyLlc(s, cfg)).toBe(false);
+    expect(buyScale(s, cfg)).toBe(true);
+    expect(s.scale).toBe(1);
+    expect(buyScale(s, cfg)).toBe(false); // the next scale costs far more than a million
     const company = cfg.sources.find((x) => x.screen === 3)!;
     const before = inflowOf(s, cfg);
     expect(buySource(s, cfg, company.id)).toBe(true);
@@ -176,6 +181,20 @@ describe('pipeline', () => {
     const expected = Math.min(inflowOf(s, cfg), claudeRate(s, cfg) * (1 + cfg.auto.subagent.share * sessionsOf(s, cfg)));
     expect(perSec).toBeGreaterThan(expected * 0.97);
     expect(perSec).toBeLessThan(expected * 1.05);
+  });
+
+  it('test_pipe_shortage_raises_the_price_and_eases_off', () => {
+    const s = rich();
+    s.money = 1e18;
+    const gpu = cfg.farms.find((f) => f.surge)!;
+    const calm = farmPrice(gpu, 0);
+    expect(buyFarm(s, cfg, gpu.id)).toBe(true);
+    expect(farmPrice(gpu, 1, s.surge[gpu.id])).toBeGreaterThan(calm * 1.3); // bought out: dearer at once
+    run(s, gpu.surge!.halfLife * 8, 0);
+    expect(farmPrice(gpu, 1, s.surge[gpu.id])).toBeLessThan(calm * 1.1); // the market cooled down
+    const capped = cfg.farms.find((f) => f.max)!;
+    for (let i = 0; i < capped.max! + 3; i++) buyFarm(s, cfg, capped.id);
+    expect(s.farms[capped.id]).toBe(capped.max); // nothing is sold above the limit
   });
 
   it('test_pipe_prices_grow_and_money_is_required', () => {

@@ -9,6 +9,8 @@ export interface Plan {
   price: number;
   /** requests per second Claude sends on this plan */
   rate: number;
+  /** the screen it appears in the shop from; absent — from the start */
+  screen?: number;
   note: string;
 }
 

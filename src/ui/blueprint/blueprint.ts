@@ -84,7 +84,9 @@ export function createBlueprint(layer: HTMLElement): BlueprintUi {
     },
     render(m) {
       // the counter jumps a few times a second at most: restarting the animation forces a layout
-      if (set('money', `$${fmt.format(Math.floor(m.money))}`, money) && performance.now() - lastPop > 150) {
+      // the counter keeps every digit while it fits the page
+      const text = m.money < 1e10 ? fmt.format(Math.floor(m.money)) : short(m.money, 3);
+      if (set('money', `$${text}`, money) && performance.now() - lastPop > 150) {
         lastPop = performance.now();
         money.classList.remove('pop');
         void money.offsetWidth; // restart the CSS animation
@@ -108,7 +110,7 @@ export function createBlueprint(layer: HTMLElement): BlueprintUi {
       for (const shelf of m.shelves) {
         html += `<h2 class="${shelf.hot ? 'hot' : ''}">${esc(shelf.title)}${shelf.hot ? '<em>← сейчас поможет</em>' : ''}</h2>`;
         for (const r of shelf.rows) {
-          html += `<div class="bl-item ${r.state}"${r.state === 'can' && r.buy ? ` data-buy="${r.buy}"` : ''}>
+          html += `<div class="bl-item ${r.state}${r.count ? '' : ' wide'}"${r.state === 'can' && r.buy ? ` data-buy="${r.buy}"` : ''}>
             <b>${esc(r.title)}</b><span class="cnt">${esc(r.count)}</span>
             <small>${esc(r.sub)}</small><span class="price">${esc(r.price)}</span></div>`;
         }

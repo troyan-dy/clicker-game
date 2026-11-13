@@ -1,11 +1,17 @@
 const int = new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 0 });
-const dec = new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 2 });
+const UNITS: readonly [number, string][] = [
+  [1e15, 'квдрлн'],
+  [1e12, 'трлн'],
+  [1e9, 'млрд'],
+  [1e6, 'млн'],
+];
 
-/** 950 → «950», 12 400 → «12 400», 1 240 000 → «1,24 млн», 2 500 000 000 → «2,5 млрд» */
-export function short(n: number): string {
+/** 950 → «950», 12 400 → «12 400», 1 240 000 → «1,24 млн», 2 500 000 000 → «2,5 млрд»; `digits` — after the comma */
+export function short(n: number, digits = 2): string {
   const a = Math.abs(n);
-  if (a >= 1e9) return `${dec.format(n / 1e9)} млрд`;
-  if (a >= 1e6) return `${dec.format(n / 1e6)} млн`;
+  for (const [size, word] of UNITS) {
+    if (a >= size) return `${(n / size).toLocaleString('ru-RU', { maximumFractionDigits: digits })} ${word}`;
+  }
   return int.format(n);
 }
 

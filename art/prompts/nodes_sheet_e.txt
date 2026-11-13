@@ -1,0 +1,8 @@
+A sheet of three separate isometric line-drawn objects standing in one row, with wide empty margins between them. No text, no letters, no numbers, no arrows, no connecting lines between the objects, no frame, no people.
+
+STYLE: a deadpan-serious technical infographic, like icons for an architecture diagram in an engineering report. Plain warm ivory paper background (#F0EEE6), completely empty between the objects. Thin precise charcoal lines (#262624) of one fine, even weight. Flat muted fills used sparingly: terracotta (#D97757) as the single strong accent, plus a little soft sage (#BCD1CA), dusty blue (#6A9BCC) and sand (#D4A27F). No thick outlines, no chunky cartoon shapes, no candy colours, no gradients, no shadows on the paper. All three objects are drawn from the same isometric angle, with the same line weight, each about the same size.
+
+LEFT TO RIGHT:
+1. A wooden shipping pallet stacked with boxed graphics cards; one graphics card with two fans lies on top.
+2. A compact city block on a square plot: five small buildings of different heights standing close together, one small tree.
+3. A small island-shaped piece of land on a flat base with a few tiny buildings, a road and one flagpole with a plain blank flag.

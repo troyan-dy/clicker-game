@@ -1,0 +1,8 @@
+A sheet of three separate isometric line-drawn buildings standing in one row, with wide empty margins between them. No text, no letters, no numbers, no arrows, no connecting lines between the buildings, no frame, no people.
+
+STYLE: a deadpan-serious technical infographic, like icons for an architecture diagram in an engineering report. Plain warm ivory paper background (#F0EEE6), completely empty between the buildings. Thin precise charcoal lines (#262624) of one fine, even weight. Flat muted fills used sparingly: terracotta (#D97757) as the single strong accent, plus a little soft sage (#BCD1CA), dusty blue (#6A9BCC) and sand (#D4A27F). No thick outlines, no chunky cartoon shapes, no candy colours, no gradients, no shadows on the paper. All three buildings are drawn from the same isometric angle, with the same line weight, each about the same size.
+
+LEFT TO RIGHT:
+1. A parliament building with a central dome, columns and wide steps.
+2. A low fortified military headquarters building with a radar dish on the roof and a small antenna mast.
+3. A space agency launch pad with one small rocket standing next to a service tower.

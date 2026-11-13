@@ -1,6 +1,6 @@
 /**
  * The core loop as a conveyor of tasks (M01 «Согласие», M02 sources, M03 plan, M05 «не спрашивай» and subagents,
- * M15 promotions, M16 the city: companies as one-off sources, server farms as packs of sessions):
+ * M15 promotions, M16–M18 the scales — city, state, planet: one-off employers as sources, farms as packs of sessions):
  *
  *   sources ──► backlog ──► Claude (plan rate) ──► waiting for «Да» ──► $ per task
  *                  └──────► subagents: their own sessions, no «Да» needed ──► $
@@ -24,7 +24,7 @@ export interface Source {
   /** units owned at the start */
   start: number;
   max: number;
-  /** the screen it is sold from: 1 — the terminal, 2 — the blueprint, 3 — the city (a company: max 1) */
+  /** the screen it is sold from: 1 — the terminal, 2 — the blueprint, 3–5 — the city, the state, the planet (one-off: max 1) */
   screen: number;
 }
 
@@ -37,14 +37,32 @@ export interface Grade {
   note: string;
 }
 
-/** Server capacity sold in the city: one unit is a pack of Claude sessions. */
+/** Capacity sold on the big screens: one unit is a pack of Claude sessions. */
 export interface Farm {
   id: string;
   name: string;
+  /** short plural name for the caption on the map */
+  tag: string;
   note: string;
   sessions: number;
   price: number;
   growth: number;
+  /** the screen it is sold from: 3–5 */
+  screen: number;
+  /** how many can be bought at most; absent — no limit */
+  max?: number;
+  /** a shortage: every purchase multiplies the price by `step`, the surcharge halves every `halfLife` seconds */
+  surge?: { step: number; halfLife: number };
+  /** percent of the provider's revenue one unit adds (the planet) */
+  share?: number;
+}
+
+/** A step up in scale: a one-off purchase that pulls the camera back to the next screen. */
+export interface Scale {
+  id: string;
+  name: string;
+  note: string;
+  price: number;
 }
 
 export interface AutoConfig {
@@ -52,8 +70,6 @@ export interface AutoConfig {
   noAsk: { name: string; note: string; price: number };
   /** scalable: a session of its own; `share` — the part of the plan's speed it gets */
   subagent: { name: string; note: string; price: number; growth: number; share: number };
-  /** one-off: the player becomes a contractor; opens the city */
-  llc: { name: string; note: string; price: number };
 }
 
 export interface PipeTuning {
@@ -63,6 +79,8 @@ export interface PipeTuning {
   backlogMax: number;
   /** …or this many seconds of inflow, whichever is more: the tray grows with the business */
   backlogSeconds: number;
+  /** percent of the provider's revenue the player is on reaching the last screen */
+  shareBase: number;
   /** finished tasks that can wait for a «Да»; Claude pauses above this */
   readyMax: number;
   /** «Да» that can be given in advance */
@@ -76,6 +94,8 @@ export interface PipeConfig {
   sources: readonly Source[];
   grades: readonly Grade[];
   farms: readonly Farm[];
+  /** in the order they are bought: the city, the state, the planet */
+  scales: readonly Scale[];
   auto: AutoConfig;
 }
 
@@ -91,9 +111,12 @@ export interface PipeState {
   owned: Record<string, number>;
   noAsk: boolean;
   subagents: number;
-  llc: boolean;
+  /** how many steps up in scale are bought */
+  scale: number;
   /** units owned per farm id */
   farms: Record<string, number>;
+  /** current price surcharge per farm id, 1 — none */
+  surge: Record<string, number>;
   /** index in cfg.grades */
   grade: number;
   presses: number;
@@ -120,8 +143,9 @@ export function createPipe(cfg: PipeConfig): PipeState {
     owned,
     noAsk: false,
     subagents: 0,
-    llc: false,
+    scale: 0,
     farms: {},
+    surge: {},
     grade: 0,
     presses: 0,
     wasted: 0,
@@ -161,8 +185,27 @@ export function backlogCap(s: PipeState, cfg: PipeConfig): number {
   return Math.max(cfg.tuning.backlogMax, Math.round(inflowOf(s, cfg) * cfg.tuning.backlogSeconds));
 }
 
-export function farmPrice(f: Farm, owned: number): number {
-  return Math.round(f.price * f.growth ** owned);
+export function farmPrice(f: Farm, owned: number, surge = 1): number {
+  return Math.round(f.price * f.growth ** owned * surge);
+}
+
+/** percent of the provider's revenue that comes from the player; counted from the last screen on */
+export function shareOf(s: PipeState, cfg: PipeConfig): number {
+  if (s.scale < cfg.scales.length) return 0;
+  let share = cfg.tuning.shareBase;
+  for (const f of cfg.farms) share += (f.share ?? 0) * (s.farms[f.id] ?? 0);
+  return Math.min(100, share);
+}
+
+/** the end of the game: every employer of the last screen hired and no other customers left */
+export function finished(s: PipeState, cfg: PipeConfig): boolean {
+  const last = 2 + cfg.scales.length;
+  return shareOf(s, cfg) >= 100 && cfg.sources.every((x) => x.screen !== last || (s.owned[x.id] ?? 0) >= x.max);
+}
+
+/** the screen the player is on: 1 — the terminal, 2 — the blueprint, 3… — the scales */
+export function screenOf(s: PipeState): number {
+  return s.noAsk ? 2 + s.scale : 1;
 }
 
 export function sourcePrice(src: Source, owned: number): number {
@@ -192,6 +235,12 @@ export function stepPipe(
 ): { arrived: number; here: number; subagents: number } {
   const t = cfg.tuning;
   const out = { arrived: 0, here: 0, subagents: 0 };
+
+  // shortages ease off
+  for (const f of cfg.farms) {
+    const m = s.surge[f.id];
+    if (f.surge && m > 1) s.surge[f.id] = 1 + (m - 1) * 0.5 ** (dt / f.surge.halfLife);
+  }
 
   // tasks arrive
   const cap = backlogCap(s, cfg);
@@ -300,15 +349,19 @@ export function buyNoAsk(s: PipeState, cfg: PipeConfig): boolean {
 
 export function buyFarm(s: PipeState, cfg: PipeConfig, id: string): boolean {
   const f = cfg.farms.find((x) => x.id === id);
-  if (!f || !spend(s, farmPrice(f, s.farms[id] ?? 0))) return false;
-  s.farms[id] = (s.farms[id] ?? 0) + 1;
+  if (!f) return false;
+  const owned = s.farms[id] ?? 0;
+  if (owned >= (f.max ?? Infinity) || !spend(s, farmPrice(f, owned, s.surge[id] ?? 1))) return false;
+  s.farms[id] = owned + 1;
+  if (f.surge) s.surge[id] = (s.surge[id] ?? 1) * f.surge.step;
   return true;
 }
 
-/** The company of one: from now on work comes from whole companies. */
-export function buyLlc(s: PipeState, cfg: PipeConfig): boolean {
-  if (s.llc || !s.noAsk || !spend(s, cfg.auto.llc.price)) return false;
-  s.llc = true;
+/** The next step up in scale; the first one needs a terminal that agrees by itself. */
+export function buyScale(s: PipeState, cfg: PipeConfig): boolean {
+  const next = cfg.scales[s.scale];
+  if (!next || !s.noAsk || !spend(s, next.price)) return false;
+  s.scale++;
   return true;
 }
 

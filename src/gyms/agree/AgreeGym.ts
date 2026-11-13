@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { FINALE, HUB_TEXT, SCALE_SHELF } from '../../content/screens';
 import { promptAt } from '../../content/tickets';
 import { logEvent, metrics } from '../../core/metrics';
 import type { Rng } from '../../core/rng';
@@ -7,9 +8,10 @@ import autoData from '../../data/balance/auto.json';
 import farmData from '../../data/balance/farms.json';
 import gradeData from '../../data/balance/grades.json';
 import planData from '../../data/balance/plans.json';
+import scaleData from '../../data/balance/scales.json';
 import sourceData from '../../data/balance/sources.json';
 import { BP, deskScreen } from '../../data/layout/blueprint';
-import { CITY } from '../../data/layout/city';
+import { HUBS } from '../../data/layout/hubs';
 import tuningData from '../../data/tuning/pipeline.json';
 import { createOverlay, type Overlay } from '../../debug/overlay';
 import { createTuningPanel, type TuningPanel } from '../../debug/tuningPanel';
@@ -18,22 +20,25 @@ import {
   backlogCap,
   buyFarm,
   buyGrade,
-  buyLlc,
   buyNoAsk,
   buyPlan,
+  buyScale,
   buySource,
   buySubagent,
   claudeRate,
   createPipe,
   farmPrice,
+  finished,
   inflowOf,
   payOf,
   pressPipe,
   sessionsOf,
+  shareOf,
   sourcePrice,
   stepPipe,
   subagentPrice,
   subagentRate,
+  type Farm,
   type PipeConfig,
   type PipeState,
   type Source,
@@ -49,7 +54,7 @@ import {
   type TerminalUi,
 } from '../../ui/terminal/terminal';
 import { BlueprintView, VISIBLE_SUBAGENTS } from '../../view/blueprintView';
-import { CityView, type CityTopology } from '../../view/cityView';
+import { HubView } from '../../view/hubView';
 import { preloadNodes } from '../../view/nodeTextures';
 import { Squares, type Rect } from '../../view/squares';
 
@@ -59,15 +64,12 @@ const MONEY_ON_PAPER = 0x3f7d58;
 const SMOOTH = 1.5; // seconds: how slowly the bottleneck reading and the income follow the moment
 const GYM_KEYS = new Set(['KeyR', 'Tab', 'KeyO', 'KeyP', 'KeyT', 'KeyM']);
 const GYM_GIFT = 100;
-const NEWS = [
-  '',
-  'Местный разработчик третий день не открывал редактор. Коллеги ничего не заметили',
-  'HR заметил, что новый сотрудник отвечает в чате за 0,2 секунды и всегда согласен',
-  'В городе закрыты все вакансии разработчика. Кадровики подозревают одного и того же человека',
-];
+const NEWS_TERMINAL = 'Местный разработчик третий день не открывал редактор. Коллеги ничего не заметили';
+const NEWS_BLUEPRINT = 'HR заметил, что новый сотрудник отвечает в чате за 0,2 секунды и всегда согласен';
 const SESSION_FORMS = ['сессия', 'сессии', 'сессий'] as const;
 const MONEY_SPOT: Rect = { x: BP.money.x - 80, y: BP.money.y - 20, w: 160, h: 40 };
-const HOME_SPOT: [number, number] = [CITY.home.x, CITY.home.y - 60];
+/** a big screen shrinks to this share of its size when it becomes a node of the next one */
+const HUB_SHRINK = 0.14;
 const fmt1 = new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 1 });
 
 /** «3,75 задачи», «26 задач», «34 600 задач», «1,2 млн задач» */
@@ -89,10 +91,11 @@ const HELP = `
 const HELP_PAPER = `<p>ГИМ · <kbd>M</kbd>деньги <kbd>R</kbd>заново <kbd>T</kbd>замедление <kbd>Tab</kbd>настройки</p>`;
 
 /**
- * Gym of the core loop, three screens of one conveyor of tasks.
- * 1 — the terminal: «Да», sources, plan (M01–M03). Buying «Да, и больше не спрашивай» pulls the camera
- *     back to 2 — the blueprint: subagents, new kinds of work, promotions (M04, M05, M15). «Открыть ООО»
- *     pulls it back again to 3 — the city: companies hire the player, server farms run the sessions (M16).
+ * Gym of the core loop: one conveyor of tasks seen from further and further away.
+ * 1 — the terminal: «Да», sources, plan (M01–M03). «Да, и больше не спрашивай» pulls the camera back to
+ * 2 — the blueprint: subagents, new kinds of work, promotions (M04, M05, M15). Every step up in scale
+ * pulls it back again: 3 — the city, 4 — the state, 5 — the planet (M16–M18), where employers hire the
+ * player once and farms run the sessions.
  */
 export class AgreeGym extends Phaser.Scene {
   private readonly rng: Rng;
@@ -105,16 +108,18 @@ export class AgreeGym extends Phaser.Scene {
     plans: planData as Plan[],
     sources: (sourceData as Source[]).map((s) => ({ ...s })),
     grades: gradeData,
-    farms: farmData,
-    auto: { noAsk: { ...autoData.noAsk }, subagent: { ...autoData.subagent }, llc: { ...autoData.llc } },
+    farms: farmData as Farm[],
+    scales: scaleData,
+    auto: { noAsk: { ...autoData.noAsk }, subagent: { ...autoData.subagent } },
   };
   private state!: PipeState;
   private view!: BlueprintView;
-  private city!: CityView;
+  private readonly hubs = new Map<number, HubView>();
   private squares!: Squares;
   private panel!: TuningPanel;
   private overlay!: Overlay;
-  private stage: 1 | 2 | 3 = 1;
+  /** 1 — the terminal, 2 — the blueprint, 3… — the big screens */
+  private stage = 1;
   private acc = 0;
   private clock = 0;
   private slow = false;
@@ -125,6 +130,7 @@ export class AgreeGym extends Phaser.Scene {
   private income = 0;
   private avgBacklog = 0;
   private avgReady = 0;
+  private won = false;
   private pressTimes: number[] = [];
   /** squares owed to the connectors: tasks move faster than squares may be drawn */
   private owed = { in: 0, me: 0, sub: 0 };
@@ -144,8 +150,11 @@ export class AgreeGym extends Phaser.Scene {
   create(): void {
     this.view = new BlueprintView(this, this.rng);
     this.view.onDelivered = (x, y) => this.delivered(x, y);
-    this.city = new CityView(this);
-    this.city.onDelivered = (x, y) => this.delivered(x, y);
+    for (const [screen, layout] of Object.entries(HUBS)) {
+      const hub = new HubView(this, layout);
+      hub.onDelivered = (x, y) => this.delivered(x, y);
+      this.hubs.set(Number(screen), hub);
+    }
     this.squares = new Squares(this, this.rng, 700);
     this.term.extra.innerHTML = HELP;
     this.paper.extra.innerHTML = HELP_PAPER;
@@ -182,7 +191,7 @@ export class AgreeGym extends Phaser.Scene {
     }
     if (this.stage === 1) this.drawTerminal();
     else if (this.stage === 2) this.drawBlueprint();
-    else this.drawCity();
+    else this.drawHub();
     this.drawOverlay();
   }
 
@@ -207,9 +216,9 @@ export class AgreeGym extends Phaser.Scene {
     this.lastMoney += dollars;
   }
 
-  /** what this screen sells: the city deals only in companies */
+  /** what this screen sells: a big screen deals only in its own employers */
   private onSale(src: Source): boolean {
-    return this.stage === 3 ? src.screen === 3 : src.screen <= this.stage;
+    return this.stage >= 3 ? src.screen === this.stage : src.screen <= this.stage;
   }
 
   private buy(what: string): boolean {
@@ -221,18 +230,20 @@ export class AgreeGym extends Phaser.Scene {
     if (what.startsWith('src:')) {
       const src = cfg.sources.find((x) => x.id === what.slice(4));
       ok = !!src && this.onSale(src) && buySource(s, cfg, src.id);
-    } else if (what.startsWith('farm:')) ok = this.stage === 3 && buyFarm(s, cfg, what.slice(5));
-    else if (what === 'plan') ok = buyPlan(s, cfg);
+    } else if (what.startsWith('farm:')) {
+      const farm = cfg.farms.find((x) => x.id === what.slice(5));
+      ok = !!farm && farm.screen === this.stage && buyFarm(s, cfg, farm.id);
+    } else if (what === 'plan') ok = buyPlan(s, cfg);
     else if (what === 'noask') ok = this.stage === 1 && buyNoAsk(s, cfg);
     else if (what === 'sub') ok = this.stage === 2 && buySubagent(s, cfg);
     else if (what === 'grade') ok = this.stage >= 2 && buyGrade(s, cfg);
-    else if (what === 'llc') ok = this.stage === 2 && buyLlc(s, cfg);
+    else if (what === 'scale') ok = this.stage >= 2 && buyScale(s, cfg);
     if (!ok) return false;
     this.lastMoney -= before - s.money; // a purchase is not negative income
     playSound('buy');
     logEvent(`buy_${what}`);
     if (what === 'noask') this.pullBack();
-    else if (what === 'llc') this.toCity();
+    else if (what === 'scale') this.scaleUp();
     return true;
   }
 
@@ -256,14 +267,19 @@ export class AgreeGym extends Phaser.Scene {
     logEvent('pull_back');
   }
 
-  /** «Открыть ООО»: the whole blueprint shrinks into one desk in the middle of the city. */
-  private toCity(): void {
-    this.stage = 3;
+  /** A step up in scale: the whole current screen shrinks into the node in the middle of the next one. */
+  private scaleUp(): void {
+    const next = this.stage + 1;
+    const home = HUBS[next].home;
+    // the desk of the blueprint lands exactly on the desk in the middle of the city
+    if (this.stage === 2) this.view.shrinkTo(home.x, home.y, home.h / (BP.desk.h * BP.desk.scale), 900);
+    else this.hubs.get(this.stage)!.shrinkTo(home.x, home.y, HUB_SHRINK, 900);
+    this.stage = next;
     this.owed = { in: 0, me: 0, sub: 0 };
-    this.view.shrinkTo(CITY.home.x, CITY.home.y, CITY.home.scale, 900);
-    this.city.sync(this.cityTopology());
-    this.city.show(450);
-    logEvent('pull_back_city');
+    const hub = this.hubs.get(next)!;
+    hub.sync({ owned: this.state.owned, farms: this.state.farms });
+    hub.show(450);
+    logEvent(`scale_${next}`);
   }
 
   private press(): void {
@@ -275,7 +291,7 @@ export class AgreeGym extends Phaser.Scene {
       playSound('yes', this.yesStreak++ % 5);
       if (this.stage === 1) this.squares.fly(TERMINAL_SPOTS.ask, TERMINAL_SPOTS.money, 5, MONEY_ON_DARK, 220, [0.35, 0.6]);
       else if (this.stage === 2) this.delivered(...this.deskSpot(), 3);
-      else this.delivered(...HOME_SPOT, 3);
+      else this.delivered(...this.homeSpot(), 3);
     } else if (result === 'buffered') playSound('buffer');
     else playSound('waste');
     metrics.presses = this.state.presses;
@@ -287,6 +303,12 @@ export class AgreeGym extends Phaser.Scene {
     return [(q.tr[0] + q.bl[0]) / 2, (q.tr[1] + q.bl[1]) / 2];
   }
 
+  /** the middle of the node in the middle of the current big screen */
+  private homeSpot(): [number, number] {
+    const home = HUBS[this.stage].home;
+    return [home.x, home.y - home.h * 0.42];
+  }
+
   /** a task was closed at a session: a square flies from there into the money */
   private delivered(x: number, y: number, count = 1): void {
     if (count === 1 && this.clock - this.lastDelivery < 0.07) return; // not more than ~14 squares a second
@@ -294,18 +316,14 @@ export class AgreeGym extends Phaser.Scene {
     this.squares.fly({ x: x - 6, y: y - 6, w: 12, h: 12 }, MONEY_SPOT, count, MONEY_ON_PAPER, 160, [0.45, 0.75]);
   }
 
-  /** sessions bought as farms of one kind */
-  private farmSessions(id: string): number {
-    const f = this.cfg.farms.find((x) => x.id === id);
-    return f ? (this.state.farms[id] ?? 0) * f.sessions : 0;
+  /** sessions bought as farms of the given kinds */
+  private farmSessions(ids: readonly string[]): number {
+    let n = 0;
+    for (const f of this.cfg.farms) if (ids.includes(f.id)) n += (this.state.farms[f.id] ?? 0) * f.sessions;
+    return n;
   }
 
-  private cityTopology(): CityTopology {
-    const f = this.state.farms;
-    return { owned: this.state.owned, racks: f.rack ?? 0, halls: f.hall ?? 0, datacentres: f.dc ?? 0 };
-  }
-
-  /** a source on sale picked by its share of the incoming flow */
+  /** a source picked by its share of the incoming flow */
   private pickSource(sources: readonly Source[]): Source | undefined {
     const s = this.state;
     let total = 0;
@@ -342,26 +360,33 @@ export class AgreeGym extends Phaser.Scene {
         this.view.flow(this.view.randomSession(s.subagents));
       }
       this.view.step(dt);
-    } else if (this.stage === 3) {
+    } else if (this.stage >= 3) {
+      const hub = this.hubs.get(this.stage)!;
       this.owed.in = Math.min(this.owed.in + done.arrived, 3);
       if (this.rng.next() < dt * 16 && this.owed.in >= 1) {
         this.owed.in--;
-        const src = this.pickSource(this.cfg.sources.filter((x) => x.screen === 3));
-        if (src) this.city.flow(src.id);
+        const src = this.pickSource(this.cfg.sources.filter((x) => x.screen === this.stage));
+        if (src) hub.flow(src.id);
       }
-      // the desk hands tasks to the servers by their share of the sessions; the laptops inside it keep the rest
+      // the middle hands tasks to the farms of this screen by their share of the sessions; what is inside it keeps the rest
       this.owed.sub = Math.min(this.owed.sub + done.subagents, 3);
       if (this.rng.next() < dt * 14 && this.owed.sub >= 1) {
         this.owed.sub--;
-        const dc = this.farmSessions('dc');
-        const servers = this.farmSessions('rack') + this.farmSessions('hall');
-        const pick = this.rng.range(0, sessionsOf(s, this.cfg) + 1);
-        if (pick < dc) this.city.flow('dc');
-        else if (pick < dc + servers) this.city.flow('servers');
-        else this.delivered(...HOME_SPOT);
+        let pick = this.rng.range(0, sessionsOf(s, this.cfg) + 1);
+        let sent = false;
+        for (const [node, farm] of Object.entries(HUBS[this.stage].farms)) {
+          const n = this.farmSessions(farm.ids);
+          pick -= n;
+          if (n > 0 && pick < 0) {
+            hub.flow(`farm:${node}`);
+            sent = true;
+            break;
+          }
+        }
+        if (!sent) this.delivered(...this.homeSpot());
       }
-      this.city.step(dt);
-      if (done.here > 0) this.delivered(...HOME_SPOT);
+      hub.step(dt);
+      if (done.here > 0) this.delivered(...this.homeSpot());
     } else if (done.here > 0) {
       this.term.hit('auto');
       this.squares.fly(TERMINAL_SPOTS.ask, TERMINAL_SPOTS.money, Math.min(done.here, 3) * 2, MONEY_ON_DARK, 220, [0.35, 0.6]);
@@ -370,6 +395,11 @@ export class AgreeGym extends Phaser.Scene {
     if (done.here > 0 && !s.noAsk && this.clock - this.lastAutoSound > 0.16) {
       this.lastAutoSound = this.clock;
       playSound('auto');
+    }
+    if (!this.won && finished(s, this.cfg)) {
+      this.won = true;
+      playSound('buy');
+      logEvent('finale');
     }
 
     // smoothed readings: what is slowest, how much comes in per second
@@ -407,27 +437,35 @@ export class AgreeGym extends Phaser.Scene {
     });
   }
 
-  /** the next two companies of the city, in the order of the map */
-  private companyRows(): ShopRow[] {
-    const left = this.cfg.sources.filter((src) => src.screen === 3 && !this.state.owned[src.id]);
-    if (!left.length) return [{ buy: '', title: 'Город твой', sub: 'ты числишься во всех компаниях', count: '', price: '', state: 'owned' }];
+  /** the next two employers of a big screen, in the order of the map */
+  private employerRows(): ShopRow[] {
+    const left = this.cfg.sources.filter((src) => src.screen === this.stage && !this.state.owned[src.id]);
+    const t = HUB_TEXT[this.stage];
+    if (!left.length) return [{ buy: '', title: t.doneTitle, sub: t.doneSub, count: '', price: '', state: 'owned' }];
     return left.slice(0, 2).map((src) => this.row(src.name, `+${flowText(src.inflow)}/с · ${src.note}`, '', `src:${src.id}`, src.price));
   }
 
   private farmRows(): ShopRow[] {
     const s = this.state;
     const perSession = claudeRate(s, this.cfg) * this.cfg.auto.subagent.share;
-    return this.cfg.farms.map((f) => {
+    return this.cfg.farms.filter((f) => f.screen === this.stage).map((f) => {
       const owned = s.farms[f.id] ?? 0;
-      return this.row(f.name, `+${flowText(f.sessions * perSession)}/с · ${f.note}`, owned ? `×${owned}` : '', `farm:${f.id}`, farmPrice(f, owned));
+      const count = owned ? (f.max ? `×${owned} из ${f.max}` : `×${owned}`) : '';
+      if (owned >= (f.max ?? Infinity)) return { buy: '', title: f.name, sub: 'выкуплено всё', count, price: '', state: 'owned' };
+      const surge = s.surge[f.id] ?? 1;
+      // a shortage is said in the row itself: the price has gone up and will come down
+      const note = surge > 1.02 ? `дефицит: +${Math.round((surge - 1) * 100)}% к цене, остывает` : f.note;
+      return this.row(f.name, `+${flowText(f.sessions * perSession)}/с · ${note}`, count, `farm:${f.id}`, farmPrice(f, owned, surge));
     });
   }
 
-  /** `always` — show the row even when the fastest plan is bought (the terminal does) */
+  /** `always` — show the row even when there is nothing faster to buy (the terminal does) */
   private planRows(always: boolean): ShopRow[] {
     const s = this.state;
     const next = this.cfg.plans[s.plan.index + 1];
-    if (next) return [this.row(`Тариф ${next.name}`, `${tasksPhrase(next.rate)}/с · ${next.note}`, '', 'plan', next.price)];
+    if (next && (next.screen ?? 1) <= this.stage) {
+      return [this.row(`Тариф ${next.name}`, `${tasksPhrase(next.rate)}/с · ${next.note}`, '', 'plan', next.price)];
+    }
     if (!always) return [];
     const cur = this.cfg.plans[s.plan.index];
     return [{ buy: '', title: `Тариф ${cur.name}`, sub: 'быстрее тарифа нет', count: 'максимум', price: '', state: 'owned' }];
@@ -438,7 +476,16 @@ export class AgreeGym extends Phaser.Scene {
     const next = this.cfg.grades[this.state.grade + 1];
     if (!next) return [{ buy: '', title: cur.name, sub: 'выше некуда', count: 'максимум', price: '', state: 'owned' }];
     const pay = fmt1.format(this.cfg.tuning.pay * next.mult);
-    return [this.row(`Повышение: ${next.name.toLowerCase()}`, `$${pay} за задачу · ${next.note}`, cur.name.toLowerCase(), 'grade', next.price)];
+    // long titles of the late grades do not fit after «Повышение:»
+    const title = next.name.length > 14 ? next.name : `Повышение: ${next.name.toLowerCase()}`;
+    return [this.row(title, `$${pay} за задачу · ${next.note}`, '', 'grade', next.price)];
+  }
+
+  /** the shelf of the next step up in scale; nothing once the last one is bought */
+  private scaleShelf(): ShopShelf[] {
+    const next = this.cfg.scales[this.state.scale];
+    if (!next) return [];
+    return [{ title: SCALE_SHELF[this.state.scale], hot: false, rows: [this.row(next.name, next.note, '', 'scale', next.price)] }];
   }
 
   private terminalShelves(neck: Neck): ShopShelf[] {
@@ -468,15 +515,17 @@ export class AgreeGym extends Phaser.Scene {
       { title: 'СЕССИИ · больше рук', hot: neck === 'claude', rows: [sub] },
       { title: 'РАБОТЫ · больше задач', hot: neck === 'tasks', rows: this.sourceRows() },
       { title: 'УЛУЧШЕНИЯ · быстрее и дороже', hot: false, rows: [...this.planRows(false), ...this.gradeRows()] },
-      { title: 'МАСШТАБ · дальше — город', hot: false, rows: [this.row(a.llc.name, a.llc.note, '', 'llc', a.llc.price)] },
+      ...this.scaleShelf(),
     ];
   }
 
-  private cityShelves(neck: Neck, hired: number, total: number): ShopShelf[] {
+  private hubShelves(neck: Neck, hired: number, total: number): ShopShelf[] {
+    const t = HUB_TEXT[this.stage];
     return [
-      { title: `КОМПАНИИ · ${hired} из ${total}`, hot: neck === 'tasks' && hired < total, rows: this.companyRows() },
-      { title: 'МОЩНОСТИ · больше сессий', hot: neck === 'claude', rows: this.farmRows() },
+      { title: `${t.employers} · ${hired} из ${total}`, hot: neck === 'tasks' && hired < total, rows: this.employerRows() },
+      { title: t.farms, hot: neck === 'claude', rows: this.farmRows() },
       { title: 'УЛУЧШЕНИЯ · быстрее и дороже', hot: false, rows: [...this.planRows(false), ...this.gradeRows()] },
+      ...this.scaleShelf(),
     ];
   }
 
@@ -505,14 +554,17 @@ export class AgreeGym extends Phaser.Scene {
       subRate: subagentRate(s, cfg),
       neck,
       shelves: this.terminalShelves(neck),
-      news: NEWS[1],
+      news: NEWS_TERMINAL,
     });
   }
 
   /** the line under the money: the grade and what one task pays */
   private payLine(): string {
     const s = this.state;
-    return `${this.cfg.grades[s.grade].name.toLowerCase()}: $${fmt1.format(payOf(s, this.cfg))} за задачу`;
+    const pay = `$${fmt1.format(payOf(s, this.cfg))} за задачу`;
+    const share = shareOf(s, this.cfg);
+    // on the planet the line also carries the share of the provider's revenue, so the grade gives way
+    return share > 0 ? `${pay} · твоя доля в выручке Anthropic: ${share}%` : `${this.cfg.grades[s.grade].name.toLowerCase()}: ${pay}`;
   }
 
   private drawBlueprint(): void {
@@ -552,62 +604,64 @@ export class AgreeGym extends Phaser.Scene {
             : 'узких мест нет — можно просить повышение'),
       tags,
       shelves: this.blueprintShelves(neck),
-      news: NEWS[2],
+      news: NEWS_BLUEPRINT,
       hint: 'Enter — подогнать Клода: +1 задача',
     });
   }
 
-  private drawCity(): void {
+  /** a big screen: the city, the state or the planet */
+  private drawHub(): void {
     const s = this.state;
     const cfg = this.cfg;
+    const layout = HUBS[this.stage];
+    const t = HUB_TEXT[this.stage];
     const neck = this.neck();
     const capacity = claudeRate(s, cfg) + subagentRate(s, cfg);
-    this.city.sync(this.cityTopology());
+    this.hubs.get(this.stage)!.sync({ owned: s.owned, farms: s.farms });
 
-    const sessions = sessionsOf(s, cfg) + 1; // and the player's own
-    // the numbers of the desk live in the line under the money: connectors arrive at it from every side
-    const tags: BlueprintTag[] = [{ x: CITY.home.x, y: CITY.home.y + 4, mid: true, small: true, html: 'ты' }];
-    const companies = cfg.sources.filter((src) => src.screen === 3);
+    // the numbers of the middle live in the line under the money: connectors arrive at it from every side
+    const tags: BlueprintTag[] = [{ x: layout.home.x, y: layout.home.y + 4, mid: true, small: true, html: t.home }];
+    const employers = cfg.sources.filter((src) => src.screen === this.stage);
     let hired = 0;
-    for (const src of companies) {
-      const lot = CITY.lots[src.id];
+    for (const src of employers) {
       if (!s.owned[src.id]) continue;
       hired++;
+      const lot = layout.lots[src.id];
       if (lot) tags.push({ x: lot.x, y: lot.y + 4, mid: true, small: true, html: `${src.tag}<br><b>+${short(src.inflow)}/с</b>` });
     }
-
-    const racks = s.farms.rack ?? 0;
-    const halls = s.farms.hall ?? 0;
-    const dcs = s.farms.dc ?? 0;
-    if (racks + halls > 0) {
-      const n = this.farmSessions('rack') + this.farmSessions('hall');
-      const what = [racks ? `стойки ×${racks}` : '', halls ? `залы ×${halls}` : ''].filter(Boolean).join(' · ');
-      tags.push({ x: CITY.farms.servers.x, y: CITY.farms.servers.y + 4, mid: true, small: true, html: `${what}<br><b>${short(n)} ${plural(n, SESSION_FORMS)}</b>` });
-    }
-    if (dcs > 0) {
-      const n = this.farmSessions('dc');
-      const d = CITY.farms.dc; // its caption sits above: the connector from the desk arrives from below
-      tags.push({ x: d.x, y: d.y - d.h - 44, mid: true, small: true, html: `датацентры ×${dcs}<br><b>${short(n)} ${plural(n, SESSION_FORMS)}</b>` });
+    for (const node of Object.values(layout.farms)) {
+      const n = this.farmSessions(node.ids);
+      if (!n) continue;
+      const what = cfg.farms
+        .filter((f) => node.ids.includes(f.id) && s.farms[f.id])
+        .map((f) => `${f.tag} ×${s.farms[f.id]}`)
+        .join(' · ');
+      // the caption of a node above the middle sits on top of it: the connector arrives from below
+      const y = node.above ? node.y - node.h - 44 : node.y + 4;
+      tags.push({ x: node.x, y, mid: true, small: true, html: `${what}<br><b>${short(n)} ${plural(n, SESSION_FORMS)}</b>` });
     }
 
-    const all = hired === companies.length;
+    const sessions = sessionsOf(s, cfg) + 1; // and the player's own
+    const all = hired === employers.length;
     this.paper.render({
       money: s.money,
       income: Math.max(0, this.income),
       summary: this.payLine(),
       neck:
         `приходит ${flowText(inflowOf(s, cfg))}/с · ${short(sessions)} ${plural(sessions, SESSION_FORMS)} Клода успевают ${flowText(capacity)}/с<br>` +
-        (neck === 'claude'
-          ? 'узкое место: <b>сессии</b> — нужны серверы'
-          : all
-            ? 'город твой: ты числишься во всех компаниях'
-            : neck === 'tasks'
-              ? 'узкое место: <b>задачи</b> — сессии простаивают, нужны ещё компании'
-              : 'узких мест нет — можно просить повышение'),
+        (this.won
+          ? FINALE
+          : neck === 'claude'
+            ? `узкое место: <b>сессии</b> — ${t.needFarms}`
+            : all
+              ? t.done
+              : neck === 'tasks'
+                ? `узкое место: <b>задачи</b> — сессии простаивают, ${t.needEmployers}`
+                : 'узких мест нет — можно просить повышение'),
       tags,
-      shelves: this.cityShelves(neck, hired, companies.length),
-      news: NEWS[3],
-      hint: `город: ${hired} из ${companies.length} компаний`,
+      shelves: this.hubShelves(neck, hired, employers.length),
+      news: t.news,
+      hint: `${t.place}: ${hired} из ${employers.length} ${t.unit}`,
     });
   }
 

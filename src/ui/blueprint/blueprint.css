@@ -132,7 +132,7 @@
 }
 .bl-item {
   display: grid;
-  grid-template-columns: 1fr auto;
+  grid-template-columns: minmax(0, 1fr) auto;
   gap: 0 16px;
   margin-bottom: 10px;
   padding: 11px 20px 13px;
@@ -144,6 +144,19 @@
 .bl-item b {
   font-size: 26px;
   font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* a row without a counter gives its whole width to the title */
+.bl-item.wide b {
+  grid-column: 1 / -1;
+}
+.bl-item.wide .cnt {
+  display: none;
+}
+.bl-item .cnt,
+.bl-item .price {
   white-space: nowrap;
 }
 .bl-item .cnt {
