@@ -20,7 +20,7 @@ files: CONCEPT.md
 - [x] 3–5 falsifiable pillars and anti-pillars — check: manual
 - [x] story skeleton in STORY.md (or decided there is no story) — check: manual
 - [x] draft mechanics in DESIGN.md and scale in SCOPE.md — check: manual
-- [ ] game designer proposed signature hooks, the user chose — check: user
+- [x] game designer proposed signature hooks, the user chose — check: user
 - [x] user approved the pitch card — check: user
 
 ## Phase 2 — Style

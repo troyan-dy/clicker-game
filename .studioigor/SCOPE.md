@@ -15,7 +15,8 @@ Cookie Clicker: 20 зданий, 700+ улучшений, 600+ ачивок, п�
 - [ ] источники задач: 10 шт — count: manual: after phase 4
 - [ ] тарифы подписки: 5 шт — count: manual: after phase 4
 - [ ] улучшения: 40 шт — count: manual: after phase 4
-- [ ] состояния диорамы: 10 шт — count: manual: after phase 4
+- [ ] масштабы сцены: 6 шт — count: manual: after phase 4
+- [ ] легендарные тикеты: 15 шт — count: manual: after phase 4
 - [ ] реплики Клода: 60 шт — count: manual: after phase 4
 - [ ] новости: 60 шт — count: manual: after phase 4
 - [ ] ачивки: 30 шт — count: manual: after phase 4

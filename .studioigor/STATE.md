@@ -2,10 +2,10 @@
 
 PROJECT: Да, Клод
 PHASE: 1 — Idea
-UPDATED: 2026-11-13
+UPDATED: 2026-11-13 22:20
 
 ## Now
-Project created. Next: phase 1, the idea interview.
+фаза 2: направления стиля, референсы, доска
 
 ## Open questions
 - none
@@ -13,3 +13,4 @@ Project created. Next: phase 1, the idea interview.
 ## Session log
 | date | phase | done | next |
 |---|---|---|---|
+| 2026-11-13 22:20 | 1 — Idea | концепт и фишки утверждены: кликер про овер-эмплоймент, M01–M14 в DESIGN.md | фаза 2: направления стиля, референсы, доска |
