@@ -1,0 +1,13 @@
+A sheet of six separate isometric line-drawn objects arranged in a neat grid of 3 columns and 2 rows, with wide empty margins between them. No text, no letters, no numbers, no arrows, no connecting lines between the objects, no frame.
+
+STYLE: a deadpan-serious technical infographic, like icons for an architecture diagram in an engineering report. Plain warm ivory paper background (#F0EEE6), completely empty between the objects. Thin precise charcoal lines (#262624) of one fine, even weight. Flat muted fills used sparingly: terracotta (#D97757) as the single strong accent, plus a little soft sage (#BCD1CA), dusty blue (#6A9BCC) and sand (#D4A27F). No thick outlines, no chunky cartoon shapes, no candy colours, no gradients, no shadows on the paper. All six objects are drawn from the same isometric angle, with the same line weight.
+
+TOP ROW, left to right:
+1. A desk with an open laptop and a programmer leaning back in an office chair, hands behind his head, a mug on the desk. The laptop screen is one flat dark charcoal rectangle (#262624) with nothing on it.
+2. A small table with an open laptop on it; the laptop screen is dusty blue. No person.
+3. A small three-storey office building with dusty-blue windows and two small trees next to it.
+
+BOTTOM ROW, left to right:
+4. An office inbox tray holding a tall stack of paper cards; the top card is terracotta.
+5. A notice board standing on two legs with several small paper cards pinned to it.
+6. A server rack cabinet with several sage-coloured server units.
