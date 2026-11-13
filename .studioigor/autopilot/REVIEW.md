@@ -1,0 +1,8 @@
+# Решения, принятые за пользователя на автопилоте
+
+Старт 2026-11-14 02:18, цель — полная игра (фазы до 9-й), время — 10 часов (до 12:18).
+Штатный запуск `autopilot.py` на Windows не работает («the autopilot runs on macOS and Linux; on Windows — via WSL»),
+поэтому тот же цикл идёт внутри открытой сессии Claude Code: расписание CronCreate будит сессию, решения — `--by proxy`.
+
+| phase | decided | alternative | why | commit |
+|---|---|---|---|---|
