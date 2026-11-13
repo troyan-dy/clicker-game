@@ -105,7 +105,7 @@ export class AgreeGym extends Phaser.Scene {
     this.plan = createPlan();
     this.applyPlan();
     this.state = createAgree(this.tuning);
-    this.shownMoney = 0;
+    this.shownMoney = this.state.money;
     this.payouts = [];
     this.pressTimes = [];
     this.approveTimes = [];

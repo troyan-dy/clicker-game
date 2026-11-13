@@ -7,7 +7,15 @@ import {
   type AgreeTuning,
 } from '../src/systems/agree/agree';
 
-const base: AgreeTuning = { mode: 'queue', rate: 3, stepsPerTask: 5, pay: 5, buffer: 1, queueMax: 8 };
+const base: AgreeTuning = {
+  mode: 'queue',
+  rate: 3,
+  stepsPerTask: 5,
+  pay: 5,
+  buffer: 1,
+  queueMax: 8,
+  startMoney: 0,
+};
 
 /** Mash the key `pressesPerSec` times a second for `seconds`, on the game's fixed step. */
 function mash(t: AgreeTuning, pressesPerSec: number, seconds: number): AgreeState {

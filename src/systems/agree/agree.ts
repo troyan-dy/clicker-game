@@ -14,6 +14,8 @@ export interface AgreeTuning {
   buffer: number;
   /** Claude stops sending when this many requests are waiting */
   queueMax: number;
+  /** dollars in the pocket at the start */
+  startMoney: number;
 }
 
 export interface AgreeState {
@@ -44,7 +46,7 @@ export function createAgree(tuning: AgreeTuning): AgreeState {
     buffered: 0,
     pips: 0,
     tasks: 0,
-    money: 0,
+    money: tuning.startMoney,
     presses: 0,
     approved: 0,
     wasted: 0,
