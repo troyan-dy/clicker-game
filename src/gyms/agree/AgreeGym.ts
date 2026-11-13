@@ -49,7 +49,7 @@ import {
   type TerminalUi,
 } from '../../ui/terminal/terminal';
 import { BlueprintView, VISIBLE_SUBAGENTS } from '../../view/blueprintView';
-import { CityView } from '../../view/cityView';
+import { CityView, type CityTopology } from '../../view/cityView';
 import { preloadNodes } from '../../view/nodeTextures';
 import { Squares, type Rect } from '../../view/squares';
 
@@ -261,7 +261,7 @@ export class AgreeGym extends Phaser.Scene {
     this.stage = 3;
     this.owed = { in: 0, me: 0, sub: 0 };
     this.view.shrinkTo(CITY.home.x, CITY.home.y, CITY.home.scale, 900);
-    this.city.sync(this.state.owned);
+    this.city.sync(this.cityTopology());
     this.city.show(450);
     logEvent('pull_back_city');
   }
@@ -292,6 +292,17 @@ export class AgreeGym extends Phaser.Scene {
     if (count === 1 && this.clock - this.lastDelivery < 0.07) return; // not more than ~14 squares a second
     this.lastDelivery = this.clock;
     this.squares.fly({ x: x - 6, y: y - 6, w: 12, h: 12 }, MONEY_SPOT, count, MONEY_ON_PAPER, 160, [0.45, 0.75]);
+  }
+
+  /** sessions bought as farms of one kind */
+  private farmSessions(id: string): number {
+    const f = this.cfg.farms.find((x) => x.id === id);
+    return f ? (this.state.farms[id] ?? 0) * f.sessions : 0;
+  }
+
+  private cityTopology(): CityTopology {
+    const f = this.state.farms;
+    return { owned: this.state.owned, racks: f.rack ?? 0, halls: f.hall ?? 0, datacentres: f.dc ?? 0 };
   }
 
   /** a source on sale picked by its share of the incoming flow */
@@ -338,9 +349,19 @@ export class AgreeGym extends Phaser.Scene {
         const src = this.pickSource(this.cfg.sources.filter((x) => x.screen === 3));
         if (src) this.city.flow(src.id);
       }
+      // the desk hands tasks to the servers by their share of the sessions; the laptops inside it keep the rest
+      this.owed.sub = Math.min(this.owed.sub + done.subagents, 3);
+      if (this.rng.next() < dt * 14 && this.owed.sub >= 1) {
+        this.owed.sub--;
+        const dc = this.farmSessions('dc');
+        const servers = this.farmSessions('rack') + this.farmSessions('hall');
+        const pick = this.rng.range(0, sessionsOf(s, this.cfg) + 1);
+        if (pick < dc) this.city.flow('dc');
+        else if (pick < dc + servers) this.city.flow('servers');
+        else this.delivered(...HOME_SPOT);
+      }
       this.city.step(dt);
-      // the sessions inside the desk keep closing tasks: money leaves it even before the first contract
-      if (done.here + done.subagents > 0) this.delivered(...HOME_SPOT);
+      if (done.here > 0) this.delivered(...HOME_SPOT);
     } else if (done.here > 0) {
       this.term.hit('auto');
       this.squares.fly(TERMINAL_SPOTS.ask, TERMINAL_SPOTS.money, Math.min(done.here, 3) * 2, MONEY_ON_DARK, 220, [0.35, 0.6]);
@@ -541,7 +562,7 @@ export class AgreeGym extends Phaser.Scene {
     const cfg = this.cfg;
     const neck = this.neck();
     const capacity = claudeRate(s, cfg) + subagentRate(s, cfg);
-    this.city.sync(s.owned);
+    this.city.sync(this.cityTopology());
 
     const sessions = sessionsOf(s, cfg) + 1; // and the player's own
     // the numbers of the desk live in the line under the money: connectors arrive at it from every side
@@ -553,6 +574,20 @@ export class AgreeGym extends Phaser.Scene {
       if (!s.owned[src.id]) continue;
       hired++;
       if (lot) tags.push({ x: lot.x, y: lot.y + 4, mid: true, small: true, html: `${src.tag}<br><b>+${short(src.inflow)}/с</b>` });
+    }
+
+    const racks = s.farms.rack ?? 0;
+    const halls = s.farms.hall ?? 0;
+    const dcs = s.farms.dc ?? 0;
+    if (racks + halls > 0) {
+      const n = this.farmSessions('rack') + this.farmSessions('hall');
+      const what = [racks ? `стойки ×${racks}` : '', halls ? `залы ×${halls}` : ''].filter(Boolean).join(' · ');
+      tags.push({ x: CITY.farms.servers.x, y: CITY.farms.servers.y + 4, mid: true, small: true, html: `${what}<br><b>${short(n)} ${plural(n, SESSION_FORMS)}</b>` });
+    }
+    if (dcs > 0) {
+      const n = this.farmSessions('dc');
+      const d = CITY.farms.dc; // its caption sits above: the connector from the desk arrives from below
+      tags.push({ x: d.x, y: d.y - d.h - 44, mid: true, small: true, html: `датацентры ×${dcs}<br><b>${short(n)} ${plural(n, SESSION_FORMS)}</b>` });
     }
 
     const all = hired === companies.length;
