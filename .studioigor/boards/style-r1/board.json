@@ -1,0 +1,299 @@
+{
+  "title": "Стиль — раунд 1",
+  "subtitle": "Да, Клод: 4 направления",
+  "question": "Какое направление ближе? Отметь картинки «Нравится» / «Не то» и напиши, что взять",
+  "mode": "single",
+  "options": [
+    {
+      "id": "startup-landing",
+      "title": "Лендинг стартапа, который слишком старается",
+      "text": "Правило: мир нарисован как корпоративная иллюстрация с сайта стартапа — плоские фигуры без контура, огромные руки и ноги, лиц нет. Настроение: фальшиво-бодрый оптимизм «мы меняем мир», ровный свет без источника, ирония в деталях. Форма: круги, капсулы, скруглённые прямоугольники; никаких текстур и объёма. Цвет: пастельная база и 2–3 кислотных пятна; оранжево-коралловый — только Клод и кнопка «Да».",
+      "palette": [],
+      "tags": [
+        "2D",
+        "вектор",
+        "плоский",
+        "сатира"
+      ],
+      "pros": [
+        "стиль сам шутит про тему игры",
+        "самый дешёвый — процедурный SVG",
+        "камера-зум = смена масштаба иллюстрации"
+      ],
+      "cons": [
+        "без движения выглядит как сток",
+        "нужна сильная анимация, иначе получится презентация"
+      ],
+      "media": [
+        {
+          "src": "..\\..\\refs\\startup-landing\\steam-1ef019a6.jpg",
+          "caption": "кислотные пятна на пастельной базе, мебель-колбаски, ни одного контура — офис стартапа как игрушка",
+          "source": "https://store.steampowered.com/app/1154810/",
+          "credit": "Aggro Crab",
+          "license": "© Aggro Crab — moodboard only",
+          "generated": false
+        },
+        {
+          "src": "..\\..\\refs\\startup-landing\\steam-87a83cb4.jpg",
+          "caption": "плоский постер города на стене — готовый масштаб «город» для отъезда камеры; реплики в цветных пузырях",
+          "source": "https://store.steampowered.com/app/1154810/",
+          "credit": "Aggro Crab",
+          "license": "© Aggro Crab — moodboard only",
+          "generated": false
+        },
+        {
+          "src": "..\\..\\refs\\startup-landing\\steam-b42d0daa.jpg",
+          "caption": "офис как коробка-диорама сверху; команды-стикеры — так могут выглядеть тикеты",
+          "source": "https://store.steampowered.com/app/375820/",
+          "credit": "Tomorrow Corporation",
+          "license": "© Tomorrow Corporation — moodboard only",
+          "generated": false
+        },
+        {
+          "src": "..\\..\\refs\\startup-landing\\steam-b25ce9f1.jpg",
+          "caption": "десятки одинаковых работников в одном кадре читаются — наши тысячи Клодов",
+          "source": "https://store.steampowered.com/app/792100/",
+          "credit": "Tomorrow Corporation",
+          "license": "© Tomorrow Corporation — moodboard only",
+          "generated": false
+        },
+        {
+          "src": "..\\..\\refs\\startup-landing\\wikimedia-bbb2f7ee.png",
+          "caption": "человек с гигантским предметом, тонкая линия и плоская заливка, один цвет фона: чистый «корпоративный» приём",
+          "source": "https://commons.wikimedia.org/wiki/File:Corporate_Memphis_-_Generalitat_de_Catalunya_(2024),_2.png",
+          "credit": "Govern de Catalunya",
+          "license": "Attribution",
+          "generated": false
+        },
+        {
+          "src": "..\\..\\refs\\startup-landing\\wikimedia-e2e53b4f.png",
+          "caption": "люди на шаре планеты — готовый масштаб «планета»; узоры вместо теней",
+          "source": "https://commons.wikimedia.org/wiki/File:Corporate_Memphis_-_Generalitat_de_Catalunya_(2024),_1.png",
+          "credit": "Departament d'Acció Exterior i Unió Europea de la Generalitat de Catalunya",
+          "license": "Attribution",
+          "generated": false
+        },
+        {
+          "src": "..\\..\\refs\\startup-landing\\openverse-c93a2aa4.jpg",
+          "caption": "ноутбук видом сверху как плоский натюрморт: удалёнка с пляжа",
+          "source": "https://www.flickr.com/photos/115887883@N05/14752992054",
+          "credit": "LILAWA.COM",
+          "license": "CC BY-NC 2.0",
+          "generated": false
+        }
+      ]
+    },
+    {
+      "id": "cartoon-gum",
+      "title": "Мультяшная жвачка",
+      "text": "Правило: всё пружинит — у каждого объекта толстый тёмный контур, одна сочная заливка и блик. Настроение: субботнее утро с мультиками, ровный дневной свет без теней, азарт. Форма: пухлые скруглённые блоки, большие головы, ничего тонкого и острого. Цвет: конфетная радуга на голубом небе; золотой — только деньги.",
+      "palette": [],
+      "tags": [
+        "2D",
+        "вектор",
+        "контур",
+        "день"
+      ],
+      "pros": [
+        "привычно для кликеров, читается с первого кадра",
+        "дёшево: SVG/Canvas, анимация сжатием и растяжением"
+      ],
+      "cons": [
+        "похоже на сотни мобильных кликеров",
+        "сатира звучит слабее"
+      ],
+      "media": [
+        {
+          "src": "..\\..\\refs\\cartoon-gum\\steam-10dcc15e.jpg",
+          "caption": "толстый тёмный контур и плоские заливки; покупки — крупные оранжевые ценники; герой сбоку оживляет экран с цифрами",
+          "source": "https://store.steampowered.com/app/346900/",
+          "credit": "Hyper Hippo Entertainment",
+          "license": "© Hyper Hippo Entertainment — moodboard only",
+          "generated": false
+        },
+        {
+          "src": "..\\..\\refs\\cartoon-gum\\steam-4abe81cd.jpg",
+          "caption": "каждый источник дохода — персонаж с лицом и именем-шуткой; так могут выглядеть наши «работы»",
+          "source": "https://store.steampowered.com/app/346900/",
+          "credit": "Hyper Hippo Entertainment",
+          "license": "© Hyper Hippo Entertainment — moodboard only",
+          "generated": false
+        },
+        {
+          "src": "..\\..\\refs\\cartoon-gum\\steam-c66e8ab5.jpg",
+          "caption": "лучи за главным объектом клика и вылетающие +1: отклик на нажатие виден сразу",
+          "source": "https://store.steampowered.com/app/1454400/",
+          "credit": "Orteil, DashNet",
+          "license": "© Orteil, DashNet — moodboard only",
+          "generated": false
+        },
+        {
+          "src": "..\\..\\refs\\cartoon-gum\\steam-40b3c9b3.jpg",
+          "caption": "купленное видно рядами в сцене, сверху лента новостей, закрытые ярусы — силуэты с ???",
+          "source": "https://store.steampowered.com/app/1454400/",
+          "credit": "Orteil, DashNet",
+          "license": "© Orteil, DashNet — moodboard only",
+          "generated": false
+        },
+        {
+          "src": "..\\..\\refs\\cartoon-gum\\steam-be1a1ebe.jpg",
+          "caption": "сочные заливки с бликом на каждом объекте, голубое небо, пухлые формы",
+          "source": "https://store.steampowered.com/app/3590/",
+          "credit": "PopCap Games, Inc.",
+          "license": "© PopCap Games, Inc. — moodboard only",
+          "generated": false
+        },
+        {
+          "src": "..\\..\\refs\\cartoon-gum\\steam-f5f9a455.jpg",
+          "caption": "меню — предмет внутри сцены, а не панель поверх: наш магазин может быть вещью в комнате",
+          "source": "https://store.steampowered.com/app/3590/",
+          "credit": "PopCap Games, Inc.",
+          "license": "© PopCap Games, Inc. — moodboard only",
+          "generated": false
+        }
+      ]
+    },
+    {
+      "id": "clay-mini",
+      "title": "Пластилиновая миниатюра на столе",
+      "text": "Правило: всё будто слеплено руками и снято макросъёмкой — отпечатки пальцев, мягкие края, малая глубина резкости. Настроение: уютный абсурд, тёплый студийный свет сбоку, мягкие длинные тени. Форма: пухлые неровные объёмы, игрушечные пропорции; ни одной идеально прямой линии. Цвет: картон и дерево как база, яркий пластилин — всё купленное; оранжевый — только Клод.",
+      "palette": [],
+      "tags": [
+        "2.5D",
+        "пререндер",
+        "тёплый свет",
+        "tilt-shift"
+      ],
+      "pros": [
+        "самое запоминающееся",
+        "зум-аут как вложенные макеты: стол → комната → макет города",
+        "каждую покупку хочется потрогать"
+      ],
+      "cons": [
+        "самое дорогое: модели в Blender с рендером в спрайты",
+        "6 масштабов = много рендеров"
+      ],
+      "media": [
+        {
+          "src": "..\\..\\refs\\clay-mini\\steam-926633bb.jpg",
+          "caption": "бумажные домики на макете — масштаб «город» как настольная модель",
+          "source": "https://store.steampowered.com/app/205020/",
+          "credit": "State of Play",
+          "license": "© State of Play — moodboard only",
+          "generated": false
+        },
+        {
+          "src": "..\\..\\refs\\clay-mini\\steam-17d0fc80.jpg",
+          "caption": "комната-коробка, заваленная вещами; тёплая лампа внутри тёмной рамы — наша стартовая комната",
+          "source": "https://store.steampowered.com/app/924750/",
+          "credit": "Slow Bros.",
+          "license": "© Slow Bros. — moodboard only",
+          "generated": false
+        },
+        {
+          "src": "..\\..\\refs\\clay-mini\\steam-316c325f.jpg",
+          "caption": "терминал как настоящий предмет рядом с блокнотом: экран Клода может быть вещью на столе",
+          "source": "https://store.steampowered.com/app/924750/",
+          "credit": "Slow Bros.",
+          "license": "© Slow Bros. — moodboard only",
+          "generated": false
+        },
+        {
+          "src": "..\\..\\refs\\clay-mini\\steam-3e99b601.jpg",
+          "caption": "пластилин с отпечатками пальцев, глаза-шарики, фон размыт: персонажа хочется потрогать",
+          "source": "https://store.steampowered.com/app/334120/",
+          "credit": "Pencil Test Studios",
+          "license": "© Pencil Test Studios — moodboard only",
+          "generated": false
+        },
+        {
+          "src": "..\\..\\refs\\clay-mini\\wikimedia-039c30e8.jpg",
+          "caption": "яркий пластилин и цветной свет: рукотворное может быть сочным, а не блёклым",
+          "source": "https://commons.wikimedia.org/wiki/File:Animacion-con-plastilina-y-clay-animation-pelicula-Kuzmich-153.jpg",
+          "credit": "Sviridov, Max",
+          "license": "Public domain",
+          "generated": false
+        },
+        {
+          "src": "..\\..\\refs\\clay-mini\\wikimedia-a28242d9.jpg",
+          "caption": "целый город как макет на столе в зале: при отъезде камеры прошлый масштаб становится игрушкой",
+          "source": "https://commons.wikimedia.org/wiki/File:Miniature_Kingdom_2019_Stockholm_1.jpg",
+          "credit": "Dependability",
+          "license": "CC BY-SA 4.0",
+          "generated": false
+        }
+      ]
+    },
+    {
+      "id": "neon-server",
+      "title": "Неоновая серверная в три часа ночи",
+      "text": "Правило: светится только то, что зарабатывает; всё остальное — тёмный силуэт. Настроение: ночной азарт и лёгкая паранойя, холодный свет мониторов и тёплые лампочки стоек. Форма: тонкие линии, сетки, прямоугольники стоек и окон; никаких мягких пятен. Цвет: сине-чёрная база, бирюза и маджента — потоки задач, зелёный — только деньги.",
+      "palette": [],
+      "tags": [
+        "2D",
+        "ночь",
+        "свечение",
+        "нужен bloom"
+      ],
+      "pros": [
+        "числа и потоки задач смотрятся эффектно",
+        "рост виден как зажигающиеся огни",
+        "зум до ночной планеты в огнях"
+      ],
+      "cons": [
+        "ярко, но темно — спорит с запросом «яркая графика»",
+        "нужен WebGL с bloom, на слабых ноутбуках тяжелее"
+      ],
+      "media": [
+        {
+          "src": "..\\..\\refs\\neon-server\\steam-522e6af6.jpg",
+          "caption": "дерево улучшений из светящихся узлов и линий вместо списка магазина",
+          "source": "https://store.steampowered.com/app/3107330/",
+          "credit": "Goblobin",
+          "license": "© Goblobin — moodboard only",
+          "generated": false
+        },
+        {
+          "src": "..\\..\\refs\\neon-server\\steam-22934a67.jpg",
+          "caption": "светящиеся фигуры на чёрном, каждое попадание — вспышка; яркость = важность",
+          "source": "https://store.steampowered.com/app/3107330/",
+          "credit": "Goblobin",
+          "license": "© Goblobin — moodboard only",
+          "generated": false
+        },
+        {
+          "src": "..\\..\\refs\\neon-server\\steam-35dc127b.jpg",
+          "caption": "терминал как сцена: текст бежит сам, окна-панели, кликер внутри хакерского интерфейса",
+          "source": "https://store.steampowered.com/app/365450/",
+          "credit": "Team Fractal Alligator",
+          "license": "© Team Fractal Alligator — moodboard only",
+          "generated": false
+        },
+        {
+          "src": "..\\..\\refs\\neon-server\\steam-863e7c9b.jpg",
+          "caption": "ночной город: каждое окно — огонёк; масштаб «город», где огни = твои аккаунты",
+          "source": "https://store.steampowered.com/app/746850/",
+          "credit": "ION LANDS",
+          "license": "© ION LANDS — moodboard only",
+          "generated": false
+        },
+        {
+          "src": "..\\..\\refs\\neon-server\\wikimedia-d9d55713.jpg",
+          "caption": "планета в огнях — последний масштаб камеры: каждый огонёк — Клод, работающий за тебя",
+          "source": "https://commons.wikimedia.org/wiki/File:Earth%27s_City_Lights_by_DMSP,_1994-1995_(large).jpg",
+          "credit": "Data: Marc Imhoff/NASA GSFC, Christopher Elvidge/NOAA NGDC; Image: Craig Mayhew and Robert Simmon/NASA GSFC",
+          "license": "Public domain",
+          "generated": false
+        },
+        {
+          "src": "..\\..\\refs\\neon-server\\wikimedia-32ab1526.jpg",
+          "caption": "настоящая стойка: синие огоньки и жгуты проводов — деталь для яруса «серверы»",
+          "source": "https://commons.wikimedia.org/wiki/File:Rear_of_rack_at_NERSC_data_center_-_closeup.jpg",
+          "credit": "Derrick Coetzee from Berkeley, CA, USA",
+          "license": "CC0",
+          "generated": false
+        }
+      ]
+    }
+  ]
+}

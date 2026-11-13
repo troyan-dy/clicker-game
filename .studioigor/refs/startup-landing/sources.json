@@ -8,7 +8,115 @@
     "плоский",
     "сатира"
   ],
-  "items": [],
+  "items": [
+    {
+      "file": "steam-1ef019a6.jpg",
+      "url": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1154810/ss_dbdad08719ba5c5506c9bc198c776ba1a6a75b29.1920x1080.jpg?t=1785949110",
+      "page": "https://store.steampowered.com/app/1154810/",
+      "title": "Going Under — screenshot 2",
+      "credit": "Aggro Crab",
+      "license": "© Aggro Crab — moodboard only",
+      "api": "steam",
+      "query": "Going Under",
+      "generated": false,
+      "note": "кислотные пятна на пастельной базе, мебель-колбаски, ни одного контура — офис стартапа как игрушка",
+      "w": 1920,
+      "h": 1080,
+      "sha1": "1ef019a612c97e83b20197157a854cc6e044c457"
+    },
+    {
+      "file": "steam-87a83cb4.jpg",
+      "url": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1154810/ss_44c45c7d011aa70f34bb7cdcbd925311fc9069d2.1920x1080.jpg?t=1785949110",
+      "page": "https://store.steampowered.com/app/1154810/",
+      "title": "Going Under — screenshot 3",
+      "credit": "Aggro Crab",
+      "license": "© Aggro Crab — moodboard only",
+      "api": "steam",
+      "query": "Going Under",
+      "generated": false,
+      "note": "плоский постер города на стене — готовый масштаб «город» для отъезда камеры; реплики в цветных пузырях",
+      "w": 1920,
+      "h": 1080,
+      "sha1": "87a83cb46658c0e4dcbd878e0f20947d7c6a6b6a"
+    },
+    {
+      "file": "steam-b42d0daa.jpg",
+      "url": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/375820/ss_5de238ca62f67dc97c940bd6af61c03a4320c981.1920x1080.jpg?t=1692721273",
+      "page": "https://store.steampowered.com/app/375820/",
+      "title": "Human Resource Machine — screenshot 1",
+      "credit": "Tomorrow Corporation",
+      "license": "© Tomorrow Corporation — moodboard only",
+      "api": "steam",
+      "query": "Human Resource Machine",
+      "generated": false,
+      "note": "офис как коробка-диорама сверху; команды-стикеры — так могут выглядеть тикеты",
+      "w": 1920,
+      "h": 1080,
+      "sha1": "b42d0daa7b30721b82172d5c466442035a5e9c87"
+    },
+    {
+      "file": "steam-b25ce9f1.jpg",
+      "url": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/792100/ss_a9863d36d08c6022ba9efcf77ebeba1bf66a0fb6.1920x1080.jpg?t=1667105092",
+      "page": "https://store.steampowered.com/app/792100/",
+      "title": "7 Billion Humans — screenshot 2",
+      "credit": "Tomorrow Corporation",
+      "license": "© Tomorrow Corporation — moodboard only",
+      "api": "steam",
+      "query": "7 Billion Humans",
+      "generated": false,
+      "note": "десятки одинаковых работников в одном кадре читаются — наши тысячи Клодов",
+      "w": 1920,
+      "h": 1080,
+      "sha1": "b25ce9f1d6d2a6838cf0083f44c66a760709369d"
+    },
+    {
+      "file": "wikimedia-bbb2f7ee.png",
+      "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/5/5f/Corporate_Memphis_-_Generalitat_de_Catalunya_%282024%29%2C_2.png/1280px-Corporate_Memphis_-_Generalitat_de_Catalunya_%282024%29%2C_2.png?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+      "page": "https://commons.wikimedia.org/wiki/File:Corporate_Memphis_-_Generalitat_de_Catalunya_(2024),_2.png",
+      "title": "Corporate Memphis - Generalitat de Catalunya (2024), 2",
+      "credit": "Govern de Catalunya",
+      "license": "Attribution",
+      "api": "wikimedia",
+      "query": "Corporate Memphis",
+      "generated": false,
+      "note": "человек с гигантским предметом, тонкая линия и плоская заливка, один цвет фона: чистый «корпоративный» приём",
+      "w": 1280,
+      "h": 720,
+      "sha1": "bbb2f7ee69ae1705559949672dec456d7fd15585"
+    },
+    {
+      "file": "wikimedia-e2e53b4f.png",
+      "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/4/46/Corporate_Memphis_-_Generalitat_de_Catalunya_%282024%29%2C_1.png/1280px-Corporate_Memphis_-_Generalitat_de_Catalunya_%282024%29%2C_1.png?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+      "page": "https://commons.wikimedia.org/wiki/File:Corporate_Memphis_-_Generalitat_de_Catalunya_(2024),_1.png",
+      "title": "Corporate Memphis - Generalitat de Catalunya (2024), 1",
+      "credit": "Departament d'Acció Exterior i Unió Europea de la Generalitat de Catalunya",
+      "license": "Attribution",
+      "api": "wikimedia",
+      "query": "Corporate Memphis",
+      "generated": false,
+      "note": "люди на шаре планеты — готовый масштаб «планета»; узоры вместо теней",
+      "w": 1280,
+      "h": 720,
+      "sha1": "e2e53b4f74432c09716c0f077fb49b22bb1efd86"
+    },
+    {
+      "file": "openverse-c93a2aa4.jpg",
+      "url": "https://live.staticflickr.com/3839/14752992054_f129236959_b.jpg",
+      "page": "https://www.flickr.com/photos/115887883@N05/14752992054",
+      "title": "beach_workspace",
+      "credit": "LILAWA.COM",
+      "license": "CC BY-NC 2.0",
+      "api": "openverse",
+      "query": "flat vector illustration office",
+      "generated": false,
+      "note": "ноутбук видом сверху как плоский натюрморт: удалёнка с пляжа",
+      "w": 985,
+      "h": 1023,
+      "sha1": "c93a2aa4d5950a94ea656e6beb9e68ddcad8d587",
+      "source": "flickr",
+      "attribution": "\"beach_workspace\" by LILAWA.COM is licensed under CC BY-NC 2.0. To view a copy of this license, visit https://creativecommons.org/licenses/by-nc/2.0/."
+    }
+  ],
   "pros": [
     "стиль сам шутит про тему игры",
     "самый дешёвый — процедурный SVG",
@@ -17,5 +125,32 @@
   "cons": [
     "без движения выглядит как сток",
     "нужна сильная анимация, иначе получится презентация"
+  ],
+  "dropped": [
+    {
+      "file": "steam-c7755c07.jpg",
+      "url": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1154810/ss_8f0a8f20fc5b04639f5b7d95c879298eb17202d2.1920x1080.jpg?t=1785949110",
+      "sha1": "c7755c0725ec2aff1ef35683c4584656b772d987"
+    },
+    {
+      "file": "steam-1cad5ccd.jpg",
+      "url": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/375820/ss_5b2cf252a11583639ba0eb958fa961e502e04de4.1920x1080.jpg?t=1692721273",
+      "sha1": "1cad5ccd632cc237779234c6e1b4a4031f2a7f96"
+    },
+    {
+      "file": "steam-d9c0af84.jpg",
+      "url": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/792100/ss_84773301712e356120ef6ea03132db15b28e289d.1920x1080.jpg?t=1667105092",
+      "sha1": "d9c0af8476078040426de472b168927f06be29d9"
+    },
+    {
+      "file": "wikimedia-439998e3.jpg",
+      "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/c/c5/Corporate_Memphis_-_Diada_de_Sant_Jordi_-_Ajuntament_de_Barcelona.jpg/1280px-Corporate_Memphis_-_Diada_de_Sant_Jordi_-_Ajuntament_de_Barcelona.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+      "sha1": "439998e31687ca64f762c629f097a25864aec526"
+    },
+    {
+      "file": "openverse-6e17cfca.jpg",
+      "url": "https://live.staticflickr.com/2008/2332002965_e7baedb09d_b.jpg",
+      "sha1": "6e17cfca07bcc6c7f9a25954211b2bf1afe8d72a"
+    }
   ]
 }

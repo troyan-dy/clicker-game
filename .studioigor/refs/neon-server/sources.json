@@ -8,7 +8,98 @@
     "свечение",
     "нужен bloom"
   ],
-  "items": [],
+  "items": [
+    {
+      "file": "steam-522e6af6.jpg",
+      "url": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/3107330/ss_1ef930c97f414df2135f121fbb6c4a82c262fb8a.1920x1080.jpg?t=1746551295",
+      "page": "https://store.steampowered.com/app/3107330/",
+      "title": "Nodebuster — screenshot 1",
+      "credit": "Goblobin",
+      "license": "© Goblobin — moodboard only",
+      "api": "steam",
+      "query": "Nodebuster",
+      "generated": false,
+      "note": "дерево улучшений из светящихся узлов и линий вместо списка магазина",
+      "w": 1920,
+      "h": 1080,
+      "sha1": "522e6af6e795261387f24c8ff9f43eb57290f7ab"
+    },
+    {
+      "file": "steam-22934a67.jpg",
+      "url": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/3107330/ss_1d341bdf6f45eb492a3e1aa75c24a241668e319f.1920x1080.jpg?t=1746551295",
+      "page": "https://store.steampowered.com/app/3107330/",
+      "title": "Nodebuster — screenshot 2",
+      "credit": "Goblobin",
+      "license": "© Goblobin — moodboard only",
+      "api": "steam",
+      "query": "Nodebuster",
+      "generated": false,
+      "note": "светящиеся фигуры на чёрном, каждое попадание — вспышка; яркость = важность",
+      "w": 1920,
+      "h": 1080,
+      "sha1": "22934a67736da094c50ea39c8b304b0ec6c023a7"
+    },
+    {
+      "file": "steam-35dc127b.jpg",
+      "url": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/365450/ss_cb37cc7d09a1b4439a7799cc9ceb407a99731069.1920x1080.jpg?t=1758156718",
+      "page": "https://store.steampowered.com/app/365450/",
+      "title": "Hacknet — screenshot 2",
+      "credit": "Team Fractal Alligator",
+      "license": "© Team Fractal Alligator — moodboard only",
+      "api": "steam",
+      "query": "Hacknet",
+      "generated": false,
+      "note": "терминал как сцена: текст бежит сам, окна-панели, кликер внутри хакерского интерфейса",
+      "w": 1920,
+      "h": 1079,
+      "sha1": "35dc127bbf4fa91d39d6d56dbabb0cc990d1887b"
+    },
+    {
+      "file": "steam-863e7c9b.jpg",
+      "url": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/746850/ss_a9eb3100c970170f9b5526fdc88ffd8a3c9b6d11.1920x1080.jpg?t=1729027817",
+      "page": "https://store.steampowered.com/app/746850/",
+      "title": "Cloudpunk — screenshot 1",
+      "credit": "ION LANDS",
+      "license": "© ION LANDS — moodboard only",
+      "api": "steam",
+      "query": "Cloudpunk",
+      "generated": false,
+      "note": "ночной город: каждое окно — огонёк; масштаб «город», где огни = твои аккаунты",
+      "w": 1920,
+      "h": 1080,
+      "sha1": "863e7c9b1c6aac236c2b327fc11ba77620874048"
+    },
+    {
+      "file": "wikimedia-d9d55713.jpg",
+      "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/e/e1/Earth%27s_City_Lights_by_DMSP%2C_1994-1995_%28large%29.jpg/1280px-Earth%27s_City_Lights_by_DMSP%2C_1994-1995_%28large%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+      "page": "https://commons.wikimedia.org/wiki/File:Earth%27s_City_Lights_by_DMSP,_1994-1995_(large).jpg",
+      "title": "Earth's City Lights by DMSP, 1994-1995 (large)",
+      "credit": "Data: Marc Imhoff/NASA GSFC, Christopher Elvidge/NOAA NGDC; Image: Craig Mayhew and Robert Simmon/NASA GSFC",
+      "license": "Public domain",
+      "api": "wikimedia",
+      "query": "Earth city lights at night from space",
+      "generated": false,
+      "note": "планета в огнях — последний масштаб камеры: каждый огонёк — Клод, работающий за тебя",
+      "w": 1280,
+      "h": 640,
+      "sha1": "d9d5571337a67d5b582c214582c059a1704cd847"
+    },
+    {
+      "file": "wikimedia-32ab1526.jpg",
+      "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/f/ff/Rear_of_rack_at_NERSC_data_center_-_closeup.jpg/1280px-Rear_of_rack_at_NERSC_data_center_-_closeup.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+      "page": "https://commons.wikimedia.org/wiki/File:Rear_of_rack_at_NERSC_data_center_-_closeup.jpg",
+      "title": "Rear of rack at NERSC data center - closeup",
+      "credit": "Derrick Coetzee from Berkeley, CA, USA",
+      "license": "CC0",
+      "api": "wikimedia",
+      "query": "data center server racks LED",
+      "generated": false,
+      "note": "настоящая стойка: синие огоньки и жгуты проводов — деталь для яруса «серверы»",
+      "w": 1280,
+      "h": 1926,
+      "sha1": "32ab152691e6d5864de0622a6ce75d6bdf9de03e"
+    }
+  ],
   "pros": [
     "числа и потоки задач смотрятся эффектно",
     "рост виден как зажигающиеся огни",
@@ -17,5 +108,27 @@
   "cons": [
     "ярко, но темно — спорит с запросом «яркая графика»",
     "нужен WebGL с bloom, на слабых ноутбуках тяжелее"
+  ],
+  "dropped": [
+    {
+      "file": "steam-de7325f2.jpg",
+      "url": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/3107330/ss_3476fa389d59f133ea70e60393295cc7a567668e.1920x1080.jpg?t=1746551295",
+      "sha1": "de7325f2cab4d8aad1086b6765546a8e2f1960fd"
+    },
+    {
+      "file": "steam-fd62f448.jpg",
+      "url": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/365450/ss_182ebf5aa570fc0ad0d1d974d43137e858ddeb54.1920x1080.jpg?t=1758156718",
+      "sha1": "fd62f4483682272ba4c71861b823c55e10478125"
+    },
+    {
+      "file": "steam-8614e8cd.jpg",
+      "url": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/746850/ss_8cf1fbcf2ef97ded1d32516ac15d294d0e8586c5.1920x1080.jpg?t=1729027817",
+      "sha1": "8614e8cd99665460576a464789c2dd74a8ea1e84"
+    },
+    {
+      "file": "wikimedia-5bd7e88d.webp",
+      "url": "https://upload.wikimedia.org/wikipedia/commons/4/49/DALL%C2%B7E_2025-01-31_21.58.22_-_A_realistic_image_of_the_interior_of_a_modern_data_center._The_scene_features_long_rows_of_tall%2C_sleek_server_racks_filled_with_blinking_LED_lights._T.webp?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail_unscaled",
+      "sha1": "5bd7e88daa83af5b5145ab94cf829f07d76df005"
+    }
   ]
 }

@@ -19,7 +19,7 @@
       "api": "steam",
       "query": "AdVenture Capitalist",
       "generated": false,
-      "note": "",
+      "note": "толстый тёмный контур и плоские заливки; покупки — крупные оранжевые ценники; герой сбоку оживляет экран с цифрами",
       "w": 1328,
       "h": 829,
       "sha1": "10dcc15e7fea4fbe69416676236347dbf429559c"
@@ -34,25 +34,10 @@
       "api": "steam",
       "query": "AdVenture Capitalist",
       "generated": false,
-      "note": "",
+      "note": "каждый источник дохода — персонаж с лицом и именем-шуткой; так могут выглядеть наши «работы»",
       "w": 1328,
       "h": 829,
       "sha1": "4abe81cdbea0bd3d684222b114907bb5cf9cf5d2"
-    },
-    {
-      "file": "steam-da386f33.jpg",
-      "url": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/346900/ss_24fbcd72d11e70c34a041ab3c6e4fe661f111ccd.1920x1080.jpg?t=1793831377",
-      "page": "https://store.steampowered.com/app/346900/",
-      "title": "AdVenture Capitalist — screenshot 3",
-      "credit": "Hyper Hippo Entertainment",
-      "license": "© Hyper Hippo Entertainment — moodboard only",
-      "api": "steam",
-      "query": "AdVenture Capitalist",
-      "generated": false,
-      "note": "",
-      "w": 1327,
-      "h": 829,
-      "sha1": "da386f33abc457572edb13533bbfaa750734ce29"
     },
     {
       "file": "steam-c66e8ab5.jpg",
@@ -64,7 +49,7 @@
       "api": "steam",
       "query": "Cookie Clicker",
       "generated": false,
-      "note": "",
+      "note": "лучи за главным объектом клика и вылетающие +1: отклик на нажатие виден сразу",
       "w": 1920,
       "h": 1080,
       "sha1": "c66e8ab5a4883a61f121d0abb8333179e5a54b24"
@@ -79,10 +64,40 @@
       "api": "steam",
       "query": "Cookie Clicker",
       "generated": false,
-      "note": "",
+      "note": "купленное видно рядами в сцене, сверху лента новостей, закрытые ярусы — силуэты с ???",
       "w": 1920,
       "h": 1080,
       "sha1": "40b3c9b31e2892891b3f13c2d2bfa6c3a5a81e76"
+    },
+    {
+      "file": "steam-be1a1ebe.jpg",
+      "url": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/3590/0000008150.1920x1080.jpg?t=1777394124",
+      "page": "https://store.steampowered.com/app/3590/",
+      "title": "Plants vs. Zombies GOTY Edition — screenshot 1",
+      "credit": "PopCap Games, Inc.",
+      "license": "© PopCap Games, Inc. — moodboard only",
+      "api": "steam",
+      "query": "Plants vs. Zombies GOTY Edition",
+      "generated": false,
+      "note": "сочные заливки с бликом на каждом объекте, голубое небо, пухлые формы",
+      "w": 1440,
+      "h": 1080,
+      "sha1": "be1a1ebe78c1f8164a5a87fad2930838e1ed80ed"
+    },
+    {
+      "file": "steam-f5f9a455.jpg",
+      "url": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/3590/0000008151.1920x1080.jpg?t=1777394124",
+      "page": "https://store.steampowered.com/app/3590/",
+      "title": "Plants vs. Zombies GOTY Edition — screenshot 2",
+      "credit": "PopCap Games, Inc.",
+      "license": "© PopCap Games, Inc. — moodboard only",
+      "api": "steam",
+      "query": "Plants vs. Zombies GOTY Edition",
+      "generated": false,
+      "note": "меню — предмет внутри сцены, а не панель поверх: наш магазин может быть вещью в комнате",
+      "w": 1440,
+      "h": 1080,
+      "sha1": "f5f9a455bb46d87653e9ce9e0a81f70601f91c85"
     }
   ],
   "pros": [
@@ -92,5 +107,22 @@
   "cons": [
     "похоже на сотни мобильных кликеров",
     "сатира звучит слабее"
+  ],
+  "dropped": [
+    {
+      "file": "steam-da386f33.jpg",
+      "url": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/346900/ss_24fbcd72d11e70c34a041ab3c6e4fe661f111ccd.1920x1080.jpg?t=1793831377",
+      "sha1": "da386f33abc457572edb13533bbfaa750734ce29"
+    },
+    {
+      "file": "openverse-abbfab7c.jpg",
+      "url": "https://images.rawpixel.com/image_png_1300/cHJpdmF0ZS9sci9pbWFnZXMvd2Vic2l0ZS8yMDIyLTA1L2pvYjcyMi0xNzgucG5n.png",
+      "sha1": "abbfab7c81b0d8b8fbd73db6a34a5763baa29412"
+    },
+    {
+      "file": "openverse-756e83fd.jpg",
+      "url": "https://images.rawpixel.com/image_png_1300/cHJpdmF0ZS9sci9pbWFnZXMvd2Vic2l0ZS8yMDIyLTEyL2pvYjk1OS1lbGVtZW50LWItMDA3OC5wbmc.png",
+      "sha1": "756e83fd7c204a29b2037b02f5cfb7b8637cfc10"
+    }
   ]
 }

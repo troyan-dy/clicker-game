@@ -8,7 +8,98 @@
     "тёплый свет",
     "tilt-shift"
   ],
-  "items": [],
+  "items": [
+    {
+      "file": "steam-926633bb.jpg",
+      "url": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/205020/ss_926633bbe4e9f02eac35a4cafd0c153e595e28d4.1920x1080.jpg?t=1717770049",
+      "page": "https://store.steampowered.com/app/205020/",
+      "title": "Lumino City — screenshot 3",
+      "credit": "State of Play",
+      "license": "© State of Play — moodboard only",
+      "api": "steam",
+      "query": "Lumino City",
+      "generated": false,
+      "note": "бумажные домики на макете — масштаб «город» как настольная модель",
+      "w": 1920,
+      "h": 1080,
+      "sha1": "926633bbe4e9f02eac35a4cafd0c153e595e28d4"
+    },
+    {
+      "file": "steam-17d0fc80.jpg",
+      "url": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/924750/ss_b87395ade1f30f93495a1b72013484f738b6a997.1920x1080.jpg?t=1757956874",
+      "page": "https://store.steampowered.com/app/924750/",
+      "title": "Harold Halibut — screenshot 1",
+      "credit": "Slow Bros.",
+      "license": "© Slow Bros. — moodboard only",
+      "api": "steam",
+      "query": "Harold Halibut",
+      "generated": false,
+      "note": "комната-коробка, заваленная вещами; тёплая лампа внутри тёмной рамы — наша стартовая комната",
+      "w": 1920,
+      "h": 1080,
+      "sha1": "17d0fc808b535774fe9abf25c00d85b3ac8c82f1"
+    },
+    {
+      "file": "steam-316c325f.jpg",
+      "url": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/924750/ss_5e1c5fa4eac0e8df830bfbdec61a4225fa794078.1920x1080.jpg?t=1757956874",
+      "page": "https://store.steampowered.com/app/924750/",
+      "title": "Harold Halibut — screenshot 2",
+      "credit": "Slow Bros.",
+      "license": "© Slow Bros. — moodboard only",
+      "api": "steam",
+      "query": "Harold Halibut",
+      "generated": false,
+      "note": "терминал как настоящий предмет рядом с блокнотом: экран Клода может быть вещью на столе",
+      "w": 1920,
+      "h": 1080,
+      "sha1": "316c325f0f200ac965729f1a20d0579499e4a320"
+    },
+    {
+      "file": "steam-3e99b601.jpg",
+      "url": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/334120/ss_3e99b601de74a1dd9a62db6b82d942e07a313283.1920x1080.jpg?t=1773307364",
+      "page": "https://store.steampowered.com/app/334120/",
+      "title": "Armikrog — screenshot 1",
+      "credit": "Pencil Test Studios",
+      "license": "© Pencil Test Studios — moodboard only",
+      "api": "steam",
+      "query": "Armikrog",
+      "generated": false,
+      "note": "пластилин с отпечатками пальцев, глаза-шарики, фон размыт: персонажа хочется потрогать",
+      "w": 1024,
+      "h": 682,
+      "sha1": "3e99b601de74a1dd9a62db6b82d942e07a313283"
+    },
+    {
+      "file": "wikimedia-039c30e8.jpg",
+      "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/c/cf/Animacion-con-plastilina-y-clay-animation-pelicula-Kuzmich-153.jpg/1280px-Animacion-con-plastilina-y-clay-animation-pelicula-Kuzmich-153.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+      "page": "https://commons.wikimedia.org/wiki/File:Animacion-con-plastilina-y-clay-animation-pelicula-Kuzmich-153.jpg",
+      "title": "Animacion-con-plastilina-y-clay-animation-pelicula-Kuzmich-153",
+      "credit": "Sviridov, Max",
+      "license": "Public domain",
+      "api": "wikimedia",
+      "query": "claymation set stop motion",
+      "generated": false,
+      "note": "яркий пластилин и цветной свет: рукотворное может быть сочным, а не блёклым",
+      "w": 1280,
+      "h": 896,
+      "sha1": "039c30e8548d99c2c272bbf7fedc6aba1be77075"
+    },
+    {
+      "file": "wikimedia-a28242d9.jpg",
+      "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/8/89/Miniature_Kingdom_2019_Stockholm_1.jpg/1280px-Miniature_Kingdom_2019_Stockholm_1.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+      "page": "https://commons.wikimedia.org/wiki/File:Miniature_Kingdom_2019_Stockholm_1.jpg",
+      "title": "Miniature Kingdom 2019 Stockholm 1",
+      "credit": "Dependability",
+      "license": "CC BY-SA 4.0",
+      "api": "wikimedia",
+      "query": "model railway layout town miniature",
+      "generated": false,
+      "note": "целый город как макет на столе в зале: при отъезде камеры прошлый масштаб становится игрушкой",
+      "w": 1280,
+      "h": 960,
+      "sha1": "a28242d93a4800235201c58bbc5b6de6be815554"
+    }
+  ],
   "pros": [
     "самое запоминающееся",
     "зум-аут как вложенные макеты: стол → комната → макет города",
@@ -17,5 +108,27 @@
   "cons": [
     "самое дорогое: модели в Blender с рендером в спрайты",
     "6 масштабов = много рендеров"
+  ],
+  "dropped": [
+    {
+      "file": "steam-5b03334f.jpg",
+      "url": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/205020/ss_5b03334f671f35e5a53daa3cda6ee6b165b86a18.1920x1080.jpg?t=1717770049",
+      "sha1": "5b03334f671f35e5a53daa3cda6ee6b165b86a18"
+    },
+    {
+      "file": "steam-a687e197.jpg",
+      "url": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/205020/ss_a687e197f89a3d63b9ab0cb1f349a8dbbd29e6de.1920x1080.jpg?t=1717770049",
+      "sha1": "a687e197f89a3d63b9ab0cb1f349a8dbbd29e6de"
+    },
+    {
+      "file": "steam-5adb5439.jpg",
+      "url": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/334120/ss_5adb5439ee6e757c13fd9f26b20f14e2b5a15aa7.1920x1080.jpg?t=1773307364",
+      "sha1": "5adb5439ee6e757c13fd9f26b20f14e2b5a15aa7"
+    },
+    {
+      "file": "wikimedia-0dfdee49.jpg",
+      "url": "https://upload.wikimedia.org/wikipedia/commons/2/2b/Beer_belly_clay_man.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail_unscaled",
+      "sha1": "0dfdee4992deb991438249e47037adae42a97215"
+    }
   ]
 }
