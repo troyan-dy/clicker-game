@@ -1,0 +1,32 @@
+{
+  "submissions": [
+    {
+      "board": "Стиль — раунд 3",
+      "selected": [],
+      "reactions": {
+        "..\\..\\refs\\claude-terminal\\local-2fcf387d.png": "like",
+        "..\\..\\refs\\claude-blueprint\\gen-d828b535.png": "like"
+      },
+      "comments": {
+        "claude-terminal": "Мне кажется реализовать идею с таким дизайном будет проще ",
+        "claude-blueprint": "Но это больше похоже на игру и будет нагляднее понятно что происходит, терминал важен только на первом этапе игры "
+      },
+      "comment": "",
+      "ts": "2026-11-13T23:43:08"
+    }
+  ],
+  "latest": {
+    "board": "Стиль — раунд 3",
+    "selected": [],
+    "reactions": {
+      "..\\..\\refs\\claude-terminal\\local-2fcf387d.png": "like",
+      "..\\..\\refs\\claude-blueprint\\gen-d828b535.png": "like"
+    },
+    "comments": {
+      "claude-terminal": "Мне кажется реализовать идею с таким дизайном будет проще ",
+      "claude-blueprint": "Но это больше похоже на игру и будет нагляднее понятно что происходит, терминал важен только на первом этапе игры "
+    },
+    "comment": "",
+    "ts": "2026-11-13T23:43:08"
+  }
+}
