@@ -16,6 +16,9 @@ VERIFIED: yes
 | Playwright + Chromium | 1.65.0 | снимки кадров без человека (`tools/capture.mjs`) |
 | ESLint + typescript-eslint | 10.14.0 / 8.72.2 | линтер |
 | Prettier | 3.10.1 | форматирование |
+| ZzFX | 1.4.0 | звуки кодом, единая точка `playSound` |
+| lil-gui | dev | панель настроек в гимах (Tab) |
+| шрифты Fontsource | 5.3.x | JetBrains Mono, Source Serif 4 (кириллица) |
 | git + git-lfs | 2.56.0 / 3.8.1 | версии; LFS для картинок, звука, шрифтов |
 | Python | 3.12.16 | скрипты студии |
 | ffmpeg | 9.0.2 (winget Gyan.FFmpeg) | звук, нарезка клипов |
@@ -27,6 +30,8 @@ VERIFIED: yes
 - кадры игры: `tools/capture.mjs` (Playwright, расписание ввода, ошибки консоли → exit 1, `window.__metrics` → metrics.json) — проверено на сцене hello
 - браузер для агента: расширение Claude in Chrome уже подключено в сессии; Playwright MCP не ставился — команда `claude` недоступна в PATH этой среды (VS Code)
 - редактора у веб-стека нет: весь проект — код в репозитории
+- гимы: `http://localhost:5173/?gym=<имя>` (agree — M01, hello — проверка окружения); `&debug=1` включает оверлей; клавиша P пишет настройки в `.studioigor/captures/tuning/` через dev-сервер
+- эскизы интерфейса: `node tools/shot.mjs <файл.html> <out.png>`
 
 ## Commands
 RUN: npm run dev -- --open

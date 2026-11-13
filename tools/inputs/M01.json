@@ -1,0 +1,235 @@
+[
+{
+"t": 0.5,
+"key": "Enter",
+"hold": 0.04
+},
+{
+"t": 0.667,
+"key": "Enter",
+"hold": 0.04
+},
+{
+"t": 0.833,
+"key": "Enter",
+"hold": 0.04
+},
+{
+"t": 1.0,
+"key": "Enter",
+"hold": 0.04
+},
+{
+"t": 1.167,
+"key": "Enter",
+"hold": 0.04
+},
+{
+"t": 1.333,
+"key": "Enter",
+"hold": 0.04
+},
+{
+"t": 1.5,
+"key": "Enter",
+"hold": 0.04
+},
+{
+"t": 1.667,
+"key": "Enter",
+"hold": 0.04
+},
+{
+"t": 1.833,
+"key": "Enter",
+"hold": 0.04
+},
+{
+"t": 2.0,
+"key": "Enter",
+"hold": 0.04
+},
+{
+"t": 2.167,
+"key": "Enter",
+"hold": 0.04
+},
+{
+"t": 2.333,
+"key": "Enter",
+"hold": 0.04
+},
+{
+"t": 2.5,
+"key": "Enter",
+"hold": 0.04
+},
+{
+"t": 2.667,
+"key": "Enter",
+"hold": 0.04
+},
+{
+"t": 2.833,
+"key": "Enter",
+"hold": 0.04
+},
+{
+"t": 3.0,
+"key": "Enter",
+"hold": 0.04
+},
+{
+"t": 3.167,
+"key": "Enter",
+"hold": 0.04
+},
+{
+"t": 3.333,
+"key": "Enter",
+"hold": 0.04
+},
+{
+"t": 3.5,
+"key": "Enter",
+"hold": 0.04
+},
+{
+"t": 3.667,
+"key": "Enter",
+"hold": 0.04
+},
+{
+"t": 3.833,
+"key": "Enter",
+"hold": 0.04
+},
+{
+"t": 4.0,
+"key": "Enter",
+"hold": 0.04
+},
+{
+"t": 4.167,
+"key": "Enter",
+"hold": 0.04
+},
+{
+"t": 4.333,
+"key": "Enter",
+"hold": 0.04
+},
+{
+"t": 4.5,
+"key": "Enter",
+"hold": 0.04
+},
+{
+"t": 4.7,
+"key": "Digit2"
+},
+{
+"t": 4.9,
+"key": "Space",
+"hold": 0.04
+},
+{
+"t": 5.067,
+"key": "Space",
+"hold": 0.04
+},
+{
+"t": 5.233,
+"key": "Space",
+"hold": 0.04
+},
+{
+"t": 5.4,
+"key": "Space",
+"hold": 0.04
+},
+{
+"t": 5.567,
+"key": "Space",
+"hold": 0.04
+},
+{
+"t": 5.733,
+"key": "Space",
+"hold": 0.04
+},
+{
+"t": 5.9,
+"key": "Space",
+"hold": 0.04
+},
+{
+"t": 6.067,
+"key": "Space",
+"hold": 0.04
+},
+{
+"t": 6.233,
+"key": "Space",
+"hold": 0.04
+},
+{
+"t": 6.4,
+"key": "Space",
+"hold": 0.04
+},
+{
+"t": 6.567,
+"key": "Space",
+"hold": 0.04
+},
+{
+"t": 6.733,
+"key": "Space",
+"hold": 0.04
+},
+{
+"t": 7.1,
+"key": "Digit1"
+},
+{
+"t": 7.3,
+"key": "Enter",
+"hold": 0.04
+},
+{
+"t": 7.467,
+"key": "Enter",
+"hold": 0.04
+},
+{
+"t": 7.633,
+"key": "Enter",
+"hold": 0.04
+},
+{
+"t": 7.8,
+"key": "Enter",
+"hold": 0.04
+},
+{
+"t": 7.967,
+"key": "Enter",
+"hold": 0.04
+},
+{
+"t": 8.133,
+"key": "Enter",
+"hold": 0.04
+},
+{
+"t": 8.3,
+"key": "Enter",
+"hold": 0.04
+},
+{
+"t": 8.467,
+"key": "Enter",
+"hold": 0.04
+}
+]

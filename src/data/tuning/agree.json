@@ -1,0 +1,8 @@
+{
+  "mode": "queue",
+  "rate": 3,
+  "stepsPerTask": 5,
+  "pay": 5,
+  "buffer": 1,
+  "queueMax": 8
+}

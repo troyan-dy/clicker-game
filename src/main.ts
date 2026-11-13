@@ -11,10 +11,12 @@ import './ui/style.css';
 import { readArgs } from './core/args';
 import { installMetrics } from './core/metrics';
 import { createRng } from './core/rng';
+import { AgreeGym } from './gyms/agree/AgreeGym';
 import { createLookdevUi } from './gyms/lookdev/lookdevUi';
 import { LookdevScene } from './gyms/lookdev/LookdevScene';
 import { createHud } from './ui/hud';
 import { mountUiScale } from './ui/scale';
+import { createTerminal } from './ui/terminal/terminal';
 import { HelloScene } from './view/HelloScene';
 
 const args = readArgs(window.location.search);
@@ -25,11 +27,13 @@ const stage = document.getElementById('stage')!;
 const ui = document.getElementById('ui')!;
 mountUiScale(stage, ui);
 
-// `?gym=hello` — the environment check scene; everything else shows the look-dev for now
+// ?gym=agree — M01 · ?gym=hello — environment check · otherwise the look-dev scene
+function pickScene(): Phaser.Scene {
+  if (args.gym === 'agree') return new AgreeGym(rng, createTerminal(ui), args.debug);
+  if (args.gym === 'hello') return new HelloScene(rng, createHud(ui));
+  return new LookdevScene(rng, createLookdevUi(ui, 'assets/img/scene_blueprint.webp'));
+}
 const hello = args.gym === 'hello';
-const scene = hello
-  ? new HelloScene(rng, createHud(ui))
-  : new LookdevScene(rng, createLookdevUi(ui, 'assets/img/scene_blueprint.webp'));
 stage.classList.toggle('overlay-canvas', !hello);
 
 // text needs the web fonts before the first frame
@@ -48,5 +52,5 @@ new Phaser.Game({
   transparent: !hello,
   backgroundColor: '#4cc9f0',
   scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH },
-  scene: [scene],
+  scene: [pickScene()],
 });

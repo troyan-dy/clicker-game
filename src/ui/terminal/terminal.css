@@ -1,0 +1,336 @@
+/* Stage 1 of the game: the full-screen terminal. Laid out in 1920×1080 px, scaled by .ui1080. */
+.ui1080 {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 1920px;
+  height: 1080px;
+  overflow: hidden;
+  transform-origin: 0 0;
+  transform: scale(var(--k, 1));
+}
+.ui1080 * {
+  box-sizing: border-box;
+}
+
+.tm {
+  --bg: #1f1e1d;
+  --panel: #262624;
+  --line: #3d3a36;
+  --text: #f0eee6;
+  --dim: #87867f;
+  --coral: #d97757;
+  --money: #7cc68d;
+  position: absolute;
+  inset: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 400 23px/1.6 'JetBrains Mono', monospace;
+}
+.tm .dim {
+  color: var(--dim);
+}
+.tm .ok {
+  color: var(--money);
+}
+
+.tm-bar {
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 132px;
+  border-bottom: 1px solid var(--line);
+}
+.tm-dots {
+  position: absolute;
+  left: 30px;
+  top: 26px;
+  display: flex;
+  gap: 10px;
+}
+.tm-dots i {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 1px solid var(--dim);
+}
+.tm-title {
+  position: absolute;
+  left: 112px;
+  top: 15px;
+  color: var(--dim);
+  font-size: 19px;
+}
+.tm-plan {
+  position: absolute;
+  right: 30px;
+  top: 15px;
+  color: var(--dim);
+  font-size: 19px;
+}
+.tm-money {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 12px;
+  text-align: center;
+  line-height: 1;
+}
+.tm-money b {
+  display: inline-block;
+  font-size: 84px;
+  font-weight: 700;
+  color: var(--money);
+  letter-spacing: -0.02em;
+}
+.tm-money b.pop {
+  animation: tm-pop 0.16s ease-out;
+}
+@keyframes tm-pop {
+  0% {
+    transform: scale(1.12, 0.9);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+/* who is the bottleneck right now: the pillar, said out loud */
+.tm-neck {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 96px;
+  text-align: center;
+  font-size: 19px;
+  color: var(--dim);
+}
+.tm-neck b {
+  color: var(--text);
+  font-weight: 700;
+}
+.tm-neck.claude b {
+  color: var(--coral);
+}
+
+.tm-main {
+  position: absolute;
+  left: 0;
+  top: 133px;
+  width: 1340px;
+  bottom: 54px;
+  padding: 26px 44px;
+}
+.tm-sq {
+  display: inline-block;
+  width: 13px;
+  height: 13px;
+  margin-right: 14px;
+  background: var(--coral);
+}
+.tm-sub {
+  padding-left: 27px;
+  color: var(--dim);
+}
+
+.tm-ask {
+  position: relative;
+  margin: 22px 0 0;
+  padding: 20px 28px 22px;
+  background: var(--panel);
+  border: 1px solid var(--coral);
+  border-radius: 12px;
+}
+.tm-ask.idle {
+  border-color: var(--line);
+}
+.tm-ask h3 {
+  margin: 0 0 10px;
+  min-height: 43px;
+  font-size: 27px;
+  font-weight: 700;
+}
+.tm-ask.idle h3 {
+  color: var(--dim);
+  font-weight: 400;
+}
+/* how far Claude is into writing the next request */
+.tm-think {
+  position: absolute;
+  left: 28px;
+  right: 28px;
+  top: 66px;
+  height: 2px;
+  background: var(--line);
+  opacity: 0;
+}
+.tm-ask.idle .tm-think {
+  opacity: 1;
+}
+.tm-think i {
+  display: block;
+  height: 100%;
+  width: 0;
+  background: var(--coral);
+}
+.tm-opt {
+  display: flex;
+  gap: 16px;
+  padding: 3px 10px;
+  margin: 0 -10px;
+  border-radius: 6px;
+}
+.tm-opt .n {
+  width: 30px;
+  color: var(--coral);
+}
+.tm-opt.sel {
+  color: var(--coral);
+  font-weight: 700;
+}
+.tm-ask.idle .tm-opt.sel {
+  color: var(--dim);
+  font-weight: 400;
+}
+.tm-ask.idle .tm-opt.sel .n {
+  color: var(--dim);
+}
+.tm-opt.sel.flash {
+  background: var(--coral);
+  color: var(--bg);
+}
+.tm-opt.sel.flash .n {
+  color: var(--bg);
+}
+.tm-opt .note {
+  margin-left: auto;
+  color: var(--dim);
+  font-weight: 400;
+}
+.tm-opt.off {
+  color: var(--dim);
+}
+.tm-task {
+  display: flex;
+  align-items: center;
+  gap: 22px;
+  margin-top: 18px;
+}
+.tm-pips {
+  display: flex;
+  gap: 8px;
+}
+.tm-pips i {
+  width: 22px;
+  height: 22px;
+  border: 1px solid var(--dim);
+}
+.tm-pips i.on {
+  background: var(--coral);
+  border-color: var(--coral);
+}
+.tm-key {
+  margin-left: auto;
+  padding: 6px 26px 8px;
+  border: 1px solid var(--text);
+  border-bottom-width: 5px;
+  border-radius: 10px;
+  font-weight: 700;
+  font-size: 27px;
+  white-space: nowrap;
+}
+.tm-key.down {
+  transform: translateY(3px);
+  border-bottom-width: 2px;
+}
+.tm-key.spent {
+  border-color: var(--dim);
+  color: var(--dim);
+}
+.tm-key.miss {
+  border-color: var(--dim);
+  color: var(--dim);
+  transform: translateX(-3px);
+}
+
+.tm-queue {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-top: 20px;
+  min-height: 37px;
+  color: var(--dim);
+  font-size: 21px;
+}
+.tm-queue .cells {
+  display: flex;
+  gap: 6px;
+}
+.tm-queue .cells i {
+  width: 14px;
+  height: 14px;
+  background: var(--coral);
+}
+.tm-queue .next {
+  color: var(--text);
+  opacity: 0.7;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.tm-queue .ahead {
+  margin-left: auto;
+  color: var(--money);
+  white-space: nowrap;
+}
+
+.tm-side {
+  position: absolute;
+  right: 0;
+  top: 133px;
+  bottom: 54px;
+  width: 580px;
+  padding: 26px 30px;
+  border-left: 1px solid var(--line);
+  font-size: 20px;
+  line-height: 1.5;
+}
+.tm-side h2 {
+  margin: 0 0 14px;
+  font-size: 19px;
+  font-weight: 400;
+  color: var(--dim);
+  letter-spacing: 0.14em;
+}
+.tm-side p {
+  margin: 0 0 10px;
+}
+.tm-side kbd {
+  display: inline-block;
+  min-width: 34px;
+  padding: 0 8px;
+  margin-right: 10px;
+  border: 1px solid var(--dim);
+  border-bottom-width: 3px;
+  border-radius: 6px;
+  font: inherit;
+  text-align: center;
+}
+
+.tm-status {
+  position: absolute;
+  inset: auto 0 0 0;
+  height: 54px;
+  padding: 0 30px;
+  display: flex;
+  align-items: center;
+  gap: 22px;
+  border-top: 1px solid var(--line);
+  color: var(--dim);
+  font-size: 20px;
+  white-space: nowrap;
+}
+.tm-status .news {
+  color: var(--text);
+}
+.tm-status .r {
+  margin-left: auto;
+}

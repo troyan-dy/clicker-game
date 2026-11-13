@@ -58,3 +58,5 @@
 | картинки персонажей, предметов и фонов | generated (Codex image_gen, аккаунт пользователя) | generated:true | — | art/gen/, public/assets/img/ | не требуется |
 | JetBrains Mono | https://www.npmjs.com/package/@fontsource/jetbrains-mono | OFL-1.1 | JetBrains | node_modules/@fontsource/jetbrains-mono | в титрах |
 | Source Serif 4 | https://www.npmjs.com/package/@fontsource/source-serif-4 | OFL-1.1 | Adobe | node_modules/@fontsource/source-serif-4 | в титрах |
+| ZzFX | https://github.com/KilledByAPixel/ZzFX | MIT | Frank Force | node_modules/zzfx | в титрах |
+| lil-gui (только dev-панель настроек) | https://github.com/georgealways/lil-gui | MIT | George Michael Brower | node_modules/lil-gui | не входит в сборку игры |
