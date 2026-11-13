@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import autoData from '../src/data/balance/auto.json';
+import gradeData from '../src/data/balance/grades.json';
 import planData from '../src/data/balance/plans.json';
 import sourceData from '../src/data/balance/sources.json';
 import tuningData from '../src/data/tuning/pipeline.json';
 import type { Plan } from '../src/systems/plan/plan';
 import {
+  buyGrade,
   buyNoAsk,
   buyPlan,
   buySource,
@@ -12,6 +14,7 @@ import {
   claudeRate,
   createPipe,
   inflowOf,
+  payOf,
   pressPipe,
   sourcePrice,
   stepPipe,
@@ -24,6 +27,7 @@ const cfg: PipeConfig = {
   tuning: tuningData,
   plans: planData as Plan[],
   sources: sourceData as Source[],
+  grades: gradeData,
   auto: autoData,
 };
 const DT = 1 / 60;
@@ -127,6 +131,21 @@ describe('pipeline', () => {
     expect(perSec).toBeGreaterThan(expected * 0.93);
     expect(perSec).toBeLessThan(expected * 1.07);
     expect(s.closedBySubagents).toBeGreaterThan(expected * 55);
+  });
+
+  it('test_pipe_promotion_raises_the_pay_of_every_task', () => {
+    const s = rich();
+    s.ready = 2;
+    const junior = payOf(s, cfg);
+    expect(junior).toBe(cfg.tuning.pay);
+    expect(buyGrade(s, cfg)).toBe(true);
+    const before = s.money;
+    pressPipe(s, cfg);
+    expect(s.money - before).toBe(cfg.tuning.pay * cfg.grades[1].mult);
+    expect(payOf(s, cfg)).toBeGreaterThan(junior);
+    for (let i = 0; i < cfg.grades.length; i++) buyGrade(s, cfg);
+    expect(s.grade).toBe(cfg.grades.length - 1); // the ladder ends
+    expect(buyGrade(s, cfg)).toBe(false);
   });
 
   it('test_pipe_prices_grow_and_money_is_required', () => {

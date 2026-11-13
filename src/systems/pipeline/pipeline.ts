@@ -1,5 +1,6 @@
 /**
- * The core loop as a conveyor of tasks (M01 «Согласие», M02 sources, M03 plan, M05 «не спрашивай» and subagents):
+ * The core loop as a conveyor of tasks (M01 «Согласие», M02 sources, M03 plan, M05 «не спрашивай» and subagents,
+ * M15 promotions):
  *
  *   sources ──► backlog ──► Claude (plan rate) ──► waiting for «Да» ──► $ per task
  *                  └──────► subagents: their own sessions, no «Да» needed ──► $
@@ -12,6 +13,8 @@ import { buyNextPlan, type Plan, type PlanState } from '../plan/plan';
 export interface Source {
   id: string;
   name: string;
+  /** short name for the caption on the blueprint */
+  tag: string;
   note: string;
   /** tasks per second one unit brings */
   inflow: number;
@@ -21,13 +24,23 @@ export interface Source {
   /** units owned at the start */
   start: number;
   max: number;
+  /** the screen it is sold from: 1 — the terminal, 2 — the blueprint */
+  screen: number;
+}
+
+/** A step of the career ladder: every closed task pays `mult` times the base. */
+export interface Grade {
+  id: string;
+  name: string;
+  mult: number;
+  price: number;
+  note: string;
 }
 
 export interface AutoConfig {
   /** one-off: the player's own terminal stops asking */
   noAsk: { name: string; note: string; price: number };
-  /** scalable: a session of its own that closes tasks at the plan's rate */
-  /** `share` — the part of the plan's speed one subagent session gets */
+  /** scalable: a session of its own; `share` — the part of the plan's speed it gets */
   subagent: { name: string; note: string; price: number; growth: number; share: number };
 }
 
@@ -47,6 +60,7 @@ export interface PipeConfig {
   tuning: PipeTuning;
   plans: readonly Plan[];
   sources: readonly Source[];
+  grades: readonly Grade[];
   auto: AutoConfig;
 }
 
@@ -62,6 +76,8 @@ export interface PipeState {
   owned: Record<string, number>;
   noAsk: boolean;
   subagents: number;
+  /** index in cfg.grades */
+  grade: number;
   presses: number;
   wasted: number;
   /** tasks closed in the player's terminal / by subagents */
@@ -86,6 +102,7 @@ export function createPipe(cfg: PipeConfig): PipeState {
     owned,
     noAsk: false,
     subagents: 0,
+    grade: 0,
     presses: 0,
     wasted: 0,
     closedHere: 0,
@@ -120,8 +137,13 @@ export function subagentPrice(cfg: PipeConfig, owned: number): number {
   return Math.round(cfg.auto.subagent.price * cfg.auto.subagent.growth ** owned);
 }
 
+/** dollars one closed task pays at the current grade */
+export function payOf(s: PipeState, cfg: PipeConfig): number {
+  return cfg.tuning.pay * cfg.grades[s.grade].mult;
+}
+
 function pay(s: PipeState, cfg: PipeConfig, bySubagent: boolean): void {
-  s.money += cfg.tuning.pay;
+  s.money += payOf(s, cfg);
   if (bySubagent) s.closedBySubagents++;
   else s.closedHere++;
 }
@@ -241,6 +263,14 @@ export function buyNoAsk(s: PipeState, cfg: PipeConfig): boolean {
   // everything that was waiting for a «Да» is approved on the spot
   for (; s.ready > 0; s.ready--) pay(s, cfg, false);
   s.buffered = 0;
+  return true;
+}
+
+/** A promotion: the next grade, bought in order. */
+export function buyGrade(s: PipeState, cfg: PipeConfig): boolean {
+  const next = cfg.grades[s.grade + 1];
+  if (!next || !spend(s, next.price)) return false;
+  s.grade++;
   return true;
 }
 

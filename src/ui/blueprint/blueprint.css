@@ -27,8 +27,8 @@
 
 .bl-money {
   position: absolute;
-  left: 0;
-  width: 1340px;
+  left: 360px;
+  width: 980px;
   top: 30px;
   text-align: center;
   line-height: 1;
@@ -61,11 +61,11 @@
 }
 .bl-neck {
   position: absolute;
-  left: 0;
-  width: 1340px;
+  left: 360px;
+  width: 980px;
   top: 216px;
   text-align: center;
-  font: 400 18px 'JetBrains Mono', monospace;
+  font: 400 18px/1.55 'JetBrains Mono', monospace;
   color: var(--dim);
 }
 .bl-neck b {

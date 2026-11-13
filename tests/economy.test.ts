@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import autoData from '../src/data/balance/auto.json';
+import gradeData from '../src/data/balance/grades.json';
 import planData from '../src/data/balance/plans.json';
 import sourceData from '../src/data/balance/sources.json';
 import tuningData from '../src/data/tuning/pipeline.json';
 import type { Plan } from '../src/systems/plan/plan';
 import {
+  buyGrade,
   buyNoAsk,
   buyPlan,
   buySource,
@@ -12,6 +14,7 @@ import {
   claudeRate,
   createPipe,
   inflowOf,
+  payOf,
   pressPipe,
   sourcePrice,
   stepPipe,
@@ -25,6 +28,7 @@ const base: PipeConfig = {
   tuning: tuningData,
   plans: planData as Plan[],
   sources: sourceData as Source[],
+  grades: gradeData,
   auto: autoData,
 };
 const FINGER = 5; // presses per second of a player who keeps mashing
@@ -50,6 +54,17 @@ function play(seconds: number, cfg: PipeConfig = base): { t: number; what: strin
 
     const inflow = inflowOf(s, cfg);
     const hands = s.noAsk ? Infinity : FINGER;
+    // a promotion that pays back within a minute and a half is taken first (promotions are sold on the blueprint)
+    const grade = cfg.grades[s.grade + 1];
+    if (s.noAsk && grade) {
+      const flow = Math.min(inflow, claudeRate(s, cfg) + subagentRate(s, cfg));
+      const gain = flow * cfg.tuning.pay * (grade.mult - cfg.grades[s.grade].mult);
+      if (grade.price / gain <= 90) {
+        if (buyGrade(s, cfg)) log.push({ t, what: `повышение: ${grade.name} → $${payOf(s, cfg)} за задачу, $${s.money.toFixed(0)}` });
+        continue; // saving for it
+      }
+    }
+
     const mine = Math.min(claudeRate(s, cfg), hands);
     const capacity = mine + subagentRate(s, cfg);
     const note = (what: string): void => {
@@ -59,7 +74,7 @@ function play(seconds: number, cfg: PipeConfig = base): { t: number; what: strin
     if (inflow < capacity) {
       // not enough tasks: the cheapest inflow per dollar
       const best = cfg.sources
-        .filter((x) => (s.owned[x.id] ?? 0) < x.max)
+        .filter((x) => (s.owned[x.id] ?? 0) < x.max && (x.screen === 1 || s.noAsk))
         .sort((a, b) => sourcePrice(a, s.owned[a.id]) / a.inflow - sourcePrice(b, s.owned[b.id]) / b.inflow)[0];
       if (best && buySource(s, cfg, best.id)) note(best.name);
     } else if (claudeRate(s, cfg) <= hands) {

@@ -8,6 +8,7 @@ type Pt = readonly [number, number];
 const INK = 0x262624;
 const DOT_SPEED = 520; // px per second along a connector
 const DOTS = 90;
+const TEXTURES = ['desk', 'laptop', 'office', 'tray', 'board', 'handshake', 'studio', 'box'];
 
 export interface BlueprintTopology {
   /** units owned per source id (job, freelance, …) */
@@ -27,7 +28,7 @@ interface Dot {
   dist: number;
 }
 
-/** How many subagent laptops are drawn one by one; the rest are a number on the last one. */
+/** How many subagent laptops are drawn one by one; the rest are a box of laptops with a number. */
 export const VISIBLE_SUBAGENTS = BP.slots.length;
 
 /**
@@ -47,9 +48,7 @@ export class BlueprintView {
   onDelivered: (x: number, y: number) => void = () => undefined;
 
   static preload(scene: Phaser.Scene): void {
-    for (const key of ['desk', 'laptop', 'office', 'tray', 'board']) {
-      scene.load.image(`node_${key}`, `assets/img/nodes/${key}.webp`);
-    }
+    for (const key of TEXTURES) scene.load.image(`node_${key}`, `assets/img/nodes/${key}.webp`);
   }
 
   constructor(scene: Phaser.Scene, rng: Rng) {
@@ -89,41 +88,41 @@ export class BlueprintView {
 
     for (const [id, place] of Object.entries(BP.sources)) {
       const key = `src:${id}`;
-      if ((t.sources[id] ?? 0) > 0 && !this.nodes.has(key)) {
-        this.addNode(key, place.key, place.x, place.y, place.scale, true);
-        const bendX = place.into[0];
-        const pts: Pt[] =
-          place.out[1] === place.into[1]
-            ? [place.out, place.into]
-            : id === 'job'
-              ? [place.out, [bendX, place.out[1]], place.into]
-              : [place.out, [320, place.out[1]], [320, place.into[1]], place.into];
-        this.route(key, pts);
-      }
+      if ((t.sources[id] ?? 0) === 0 || this.nodes.has(key)) continue;
+      const img = this.addNode(key, place.key, place.x, place.y, place.scale, true);
+      // out of the node's right side, along the common trunk, into the tray
+      const outY = Math.round(place.y - img.height * place.scale * 0.45);
+      const out: Pt = [Math.round(place.x + (img.width * place.scale) / 2 + 8), outY];
+      this.route(key, [out, [BP.trunkX, outY], [BP.trunkX, BP.trayIn[1]], BP.trayIn]);
     }
+
+    const out = BP.trayOut;
     const shown = Math.min(t.subagents, VISIBLE_SUBAGENTS);
     for (let i = 0; i < shown; i++) {
       const key = `ses:${i}`;
       if (this.nodes.has(key)) continue;
       const [x, y] = BP.slots[i];
-      this.addNode(key, 'laptop', x, y, BP.slotScale, true);
+      const img = this.addNode(key, 'laptop', x, y, BP.slotScale, true);
       const f = BP.slotFace;
       const face = this.scene.add.rectangle(x + f.dx, y + f.dy, 14, 12, CORAL).setRotation(f.rot).setAlpha(0);
       this.root.add(face);
       this.scene.tweens.add({ targets: face, alpha: 1, delay: 200, duration: 200 });
-      const out = BP.trayOut;
-      const above = y < BP.desk.y - BP.desk.h; // the slot above the desk is reached over the top
-      const pts: Pt[] = above
-        ? [out, [out[0], BP.busTopY], [x - 80, BP.busTopY]]
-        : x > 1100
+      const top = Math.round(y - img.height * BP.slotScale - 2);
+      const pts: Pt[] =
+        x > 1100
           ? [out, [out[0], BP.busY], [x - 90, BP.busY], [x - 90, y - 60], [x - 70, y - 60]]
-          : [out, [out[0], BP.busY], [x, BP.busY], [x, y - 162]];
+          : [out, [out[0], BP.busY], [x, BP.busY], [x, top]];
       this.route(key, pts);
+    }
+    if (t.subagents > VISIBLE_SUBAGENTS && !this.nodes.has('ses:more')) {
+      const m = BP.more;
+      const img = this.addNode('ses:more', 'box', m.x, m.y, m.scale, true);
+      this.route('ses:more', [out, [out[0], BP.busY], [m.x, BP.busY], [m.x, Math.round(m.y - img.height * m.scale - 6)]]);
     }
     this.redrawLines();
   }
 
-  /** Sends a square along a connector: `src:<id>` → tray, `ses:me` / `ses:<i>` → a session. */
+  /** Sends a square along a connector: `src:<id>` → tray, `ses:me` / `ses:<i>` / `ses:more` → a session. */
   flow(key: string): void {
     const route = this.routes.get(key);
     const dot = this.dots.find((d) => !d.route);
@@ -134,10 +133,11 @@ export class BlueprintView {
     dot.rect.setPosition(route.pts[0][0], route.pts[0][1]).setVisible(true);
   }
 
-  /** a random subagent connector that is drawn, or nothing */
+  /** the connector of a random subagent out of `count`; the ones beyond the slots share the box */
   randomSession(count: number): string {
-    const shown = Math.min(count, VISIBLE_SUBAGENTS);
-    return shown > 0 ? `ses:${this.rng.int(0, shown - 1)}` : '';
+    if (count <= 0) return '';
+    const i = this.rng.int(0, count - 1);
+    return i < VISIBLE_SUBAGENTS ? `ses:${i}` : 'ses:more';
   }
 
   step(dt: number): void {
@@ -166,13 +166,15 @@ export class BlueprintView {
     }
   }
 
-  private addNode(id: string, texture: string, x: number, y: number, scale: number, pop: boolean): void {
+  private addNode(id: string, texture: string, x: number, y: number, scale: number, pop: boolean): Phaser.GameObjects.Image {
     const img = this.scene.add.image(x, y, `node_${texture}`).setOrigin(0.5, 1).setScale(scale);
     this.root.add(img);
     this.nodes.set(id, img);
-    if (!pop) return;
-    img.setScale(scale * 0.6).setAlpha(0);
-    this.scene.tweens.add({ targets: img, scale, alpha: 1, duration: 280, ease: 'Back.Out' });
+    if (pop) {
+      img.setScale(scale * 0.6).setAlpha(0);
+      this.scene.tweens.add({ targets: img, scale, alpha: 1, duration: 280, ease: 'Back.Out' });
+    }
+    return img;
   }
 
   private route(key: string, pts: readonly Pt[]): void {

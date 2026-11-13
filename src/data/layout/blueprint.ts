@@ -8,10 +8,16 @@ export const BP = {
   /** the player's desk; `screen` is the laptop screen inside the sprite (423×360), measured on the picture */
   desk: { x: 800, y: 760, scale: 1, w: 423, h: 360, screen: { tl: [65, 83], tr: [130, 57], bl: [77, 139] } },
   tray: { x: 470, y: 690, scale: 0.55 },
+  /** kinds of work: a column on the left, in the order of the shop */
   sources: {
-    job: { key: 'office', x: 170, y: 470, scale: 0.55, out: [270, 430], into: [470, 540] },
-    freelance: { key: 'board', x: 170, y: 800, scale: 0.5, out: [242, 730], into: [382, 640] },
-  } as Record<string, { key: string; x: number; y: number; scale: number; out: Pt; into: Pt }>,
+    job: { key: 'office', x: 170, y: 250, scale: 0.42 },
+    freelance: { key: 'board', x: 170, y: 480, scale: 0.42 },
+    referral: { key: 'handshake', x: 170, y: 710, scale: 0.42 },
+    studio: { key: 'studio', x: 170, y: 940, scale: 0.42 },
+  } as Record<string, { key: string; x: number; y: number; scale: number }>,
+  /** every source sends its tasks to this vertical line, and along it into the tray */
+  trunkX: 345,
+  trayIn: [382, 640] as Pt,
   /** tasks leave the tray here */
   trayOut: [560, 640] as Pt,
   /** laptops of the subagents, in the order they are bought */
@@ -22,16 +28,15 @@ export const BP = {
     [1010, 990],
     [810, 990],
     [610, 990],
-    [410, 990],
-    [1000, 380],
   ] as readonly Pt[],
   slotScale: 0.5,
   /** Claude on the screen of a subagent's laptop: offset from the slot, tilt of the screen */
   slotFace: { dx: 14, dy: -128, rot: 0.37 },
-  /** connectors to the subagents run along these lines, below and above the desk */
+  /** subagents beyond the slots are a box of laptops with a number */
+  more: { x: 430, y: 992, scale: 0.4 },
+  /** connectors to the subagents run along this line below the desk */
   busY: 815,
-  busTopY: 330,
-  money: { x: 670, y: 96 },
+  money: { x: 850, y: 96 },
 } as const;
 
 /** The laptop screen of the desk in scene coordinates: top-left, top-right, bottom-left. */

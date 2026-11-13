@@ -1,4 +1,6 @@
 [
-  { "id": "job", "name": "Работа", "note": "стендап в 10:00, задачи в трекере", "inflow": 2, "price": 100, "growth": 1.15, "start": 1, "max": 99 },
-  { "id": "freelance", "name": "Фриланс-аккаунт", "note": "мелкие заказы идут сами", "inflow": 0.5, "price": 15, "growth": 1.15, "start": 0, "max": 99 }
+  { "id": "job", "name": "Работа", "tag": "работа", "note": "стендап в 10:00, задачи в трекере", "inflow": 2, "price": 100, "growth": 1.15, "start": 1, "max": 99, "screen": 1 },
+  { "id": "freelance", "name": "Фриланс-аккаунт", "tag": "фриланс", "note": "мелкие заказы идут сами", "inflow": 0.5, "price": 15, "growth": 1.15, "start": 0, "max": 99, "screen": 1 },
+  { "id": "referral", "name": "Работа по знакомству", "tag": "по знакомству", "note": "друг поручился, собеседования не было", "inflow": 8, "price": 900, "growth": 1.15, "start": 0, "max": 99, "screen": 2 },
+  { "id": "studio", "name": "Студия «Команда»", "tag": "студия", "note": "на сайте двенадцать сотрудников, все — ты", "inflow": 40, "price": 7500, "growth": 1.15, "start": 0, "max": 99, "screen": 2 }
 ]

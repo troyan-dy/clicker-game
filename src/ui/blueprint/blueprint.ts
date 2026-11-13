@@ -66,6 +66,7 @@ export function createBlueprint(layer: HTMLElement): BlueprintUi {
 
   // write to the DOM only when a value actually changed
   const last: Record<string, string> = {};
+  let lastPop = 0;
   const set = (name: string, html: string, el: HTMLElement = parts[name]): boolean => {
     if (last[name] === html) return false;
     last[name] = html;
@@ -79,7 +80,9 @@ export function createBlueprint(layer: HTMLElement): BlueprintUi {
       root.classList.add('on');
     },
     render(m) {
-      if (set('money', `$${fmt.format(Math.floor(m.money))}`, money)) {
+      // the counter jumps a few times a second at most: restarting the animation forces a layout
+      if (set('money', `$${fmt.format(Math.floor(m.money))}`, money) && performance.now() - lastPop > 150) {
+        lastPop = performance.now();
         money.classList.remove('pop');
         void money.offsetWidth; // restart the CSS animation
         money.classList.add('pop');
