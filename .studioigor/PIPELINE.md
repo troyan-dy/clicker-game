@@ -48,8 +48,8 @@ files: ASSETS.md
 - [x] asset and pipeline research done — check: test -s .studioigor/research/assets.md
 - [x] strategy by category agreed — check: user
 - [x] look-dev scene built per the art bible and captured — check: ls .studioigor/captures/lookdev/*.png
-- [ ] user approved the look-dev: "this is how the game will look" — check: user
-- [ ] everything third-party is in the license registry — check: manual
+- [x] user approved the look-dev: "this is how the game will look" — check: user
+- [x] everything third-party is in the license registry — check: manual
 
 ## Phase 6 — Mechanics
 files:
