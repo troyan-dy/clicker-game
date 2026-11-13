@@ -1,57 +1,98 @@
 import './terminal.css';
-import type { Ticket } from '../../content/tickets';
+import type { Prompt } from '../../content/tickets';
 import type { Rect } from '../../view/squares';
+
+export type Neck = 'tasks' | 'claude' | 'you' | 'none';
+
+export interface ShopRow {
+  /** what a click buys: `src:<id>`, `plan`, `brick`, `noask`, `sub`; empty — not for sale */
+  buy: string;
+  title: string;
+  sub: string;
+  /** right of the title: «×3», «есть», «куплен» */
+  count: string;
+  price: string;
+  state: 'can' | 'poor' | 'owned' | 'off';
+}
+
+export interface ShopShelf {
+  title: string;
+  /** this shelf removes the current bottleneck */
+  hot: boolean;
+  rows: ShopRow[];
+}
 
 /** Everything the terminal shows. The UI reads it and decides nothing. */
 export interface TerminalView {
   money: number;
-  ticket: Ticket;
-  pips: number;
-  stepsPerTask: number;
+  /** dollars per second, averaged */
+  income: number;
+  prompt: Prompt;
   pay: number;
-  /** requests waiting for a «Да» */
-  queue: number;
-  /** «Да» given in advance */
-  buffered: number;
-  /** 0..1 — how far Claude is into the next request */
-  thinking: number;
+  /** tasks per second coming in */
+  inflow: number;
+  backlog: number;
+  backlogMax: number;
+  /** tasks per second Claude prepares */
   rate: number;
-  /** name of Claude's plan: it sets the rate */
   plan: string;
-  classic: boolean;
+  /** 0..1 — how far Claude is into the current task */
+  think: number;
+  /** finished tasks waiting for a «Да» */
+  ready: number;
+  readyMax: number;
+  buffered: number;
+  brick: boolean;
+  brickRate: number;
+  noAsk: boolean;
+  noAskPrice: number;
+  canBuyNoAsk: boolean;
+  subagents: number;
+  /** tasks per second subagent sessions close */
+  subRate: number;
+  neck: Neck;
+  shelves: ShopShelf[];
   news: string;
 }
 
 export interface TerminalUi {
   render(view: TerminalView): void;
-  /** the visible answer to a key press */
-  hit(kind: 'approved' | 'buffered' | 'wasted'): void;
-  /** right-hand column: the shop in the game, help in a gym */
-  side: HTMLElement;
+  /** the visible answer to a «Да»: by hand or by the automation */
+  hit(kind: 'approved' | 'buffered' | 'wasted' | 'auto'): void;
+  /** below the shop: a gym puts its help here */
+  extra: HTMLElement;
 }
 
 /** Scene coordinates of the places squares fly between (match terminal.css). */
-export const TERMINAL_SPOTS: { ask: Rect; pips: Rect; money: Rect } = {
-  ask: { x: 560, y: 432, w: 420, h: 60 },
-  pips: { x: 333, y: 552, w: 142, h: 22 },
+export const TERMINAL_SPOTS: { ask: Rect; money: Rect; backlog: Rect } = {
+  ask: { x: 560, y: 410, w: 420, h: 60 },
   money: { x: 880, y: 44, w: 160, h: 40 },
+  backlog: { x: 330, y: 690, w: 160, h: 40 },
 };
 
 const fmt = new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 0 });
 const fmt2 = new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 2 });
-
-/** "0,75 запроса", "5 запросов", "21 запрос" */
-export function ratePhrase(rate: number): string {
-  const n = Math.abs(rate);
-  let word = 'запросов';
-  if (!Number.isInteger(n)) word = 'запроса';
-  else if (n % 10 === 1 && n % 100 !== 11) word = 'запрос';
-  else if (n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 12 || n % 100 > 14)) word = 'запроса';
-  return `${fmt2.format(rate)} ${word}`;
-}
 const esc = (s: string): string => s.replace(/&/g, '&amp;').replace(/</g, '&lt;');
 /** "+12" in a log line is shown green */
 const logLine = (s: string): string => `⎿ ${esc(s).replace(/(\+[\d\s]+)/g, '<span class="ok">$1</span>')}`;
+
+/** "0,75 задачи", "2 задачи", "15 задач", "21 задача" */
+export function tasksPhrase(count: number): string {
+  const n = Math.abs(count);
+  let word = 'задач';
+  if (!Number.isInteger(n)) word = 'задачи';
+  else if (n % 10 === 1 && n % 100 !== 11) word = 'задача';
+  else if (n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 12 || n % 100 > 14)) word = 'задачи';
+  return `${fmt2.format(count)} ${word}`;
+}
+
+const NECK_TEXT: Record<Neck, string> = {
+  tasks: 'узкое место: <b>задачи</b> — Клод всё сделал и ждёт работу',
+  claude: 'узкое место: <b>Клод</b> — задачи копятся быстрее, чем он делает',
+  you: 'узкое место: <b>ты</b> — Клод ждёт твоего «Да»',
+  none: '',
+};
+const NECK_CELL: Record<Neck, string> = { tasks: 'in', claude: 'claude', you: 'you', none: '' };
 
 export function createTerminal(root: HTMLElement): TerminalUi {
   root.innerHTML = `
@@ -64,31 +105,34 @@ export function createTerminal(root: HTMLElement): TerminalUi {
       <span class="tm-plan"></span>
     </header>
     <section class="tm-main">
-      <div><span class="tm-sq"></span>Задача <span data-f="id"></span> · «<span data-f="title"></span>»</div>
+      <div class="tm-head"><span class="tm-sq"></span>Задача <span data-f="id"></span> · «<span data-f="title"></span>»</div>
       <div class="tm-sub" data-f="log0"></div>
       <div class="tm-sub" data-f="log1"></div>
       <div class="tm-ask">
         <h3 data-f="ask"></h3>
         <div class="tm-think"><i></i></div>
-        <div class="tm-opt sel"><span class="n">❯</span>1. Да</div>
-        <div class="tm-opt"><span class="n"></span>2. Да, и больше не спрашивай<span class="note">улучшение · скоро</span></div>
+        <div class="tm-opt" data-o="1"><span class="n"></span>1. Да<span class="note" data-f="note1"></span></div>
+        <div class="tm-opt" data-o="2"><span class="n"></span>2. Да, и больше не спрашивай<span class="note" data-f="note2"></span></div>
         <div class="tm-opt off"><span class="n"></span>3. Нет<span class="note">недоступно в вашем тарифе</span></div>
         <div class="tm-task">
-          <span class="dim">согласий по задаче</span>
-          <span class="tm-pips"></span>
           <span class="ok" data-f="pay"></span>
+          <span class="dim" data-f="ahead"></span>
           <span class="tm-key">Enter — Да</span>
         </div>
       </div>
-      <div class="tm-queue">
-        <span data-f="qlabel"></span><span class="cells"></span><span class="next" data-f="next"></span>
-        <span class="ahead" data-f="ahead"></span>
+      <div class="tm-flow">
+        <div class="cell" data-c="in"><small>ВХОД</small><b data-f="fin"></b></div><i>►</i>
+        <div class="cell" data-c="backlog"><small>БЭКЛОГ</small><b data-f="fbacklog"></b></div><i>►</i>
+        <div class="cell" data-c="claude"><small data-f="fplan"></small><b data-f="fclaude"></b></div><i>►</i>
+        <div class="cell" data-c="you"><small>ЖДУТ «ДА»</small><b data-f="fready"></b></div><i>►</i>
+        <div class="cell" data-c="out"><small>ДОХОД</small><b class="ok" data-f="fout"></b></div>
       </div>
+      <div class="tm-auto" data-f="auto"></div>
     </section>
-    <aside class="tm-side"></aside>
+    <aside class="tm-side"><div class="tm-shop"></div><div class="tm-extra"></div></aside>
     <footer class="tm-status">
       <span>НОВОСТИ</span><span class="news" data-f="news"></span>
-      <span class="r">автосогласие: выкл</span>
+      <span class="r" data-f="autostate"></span>
     </footer>
   </div></div>`;
 
@@ -100,10 +144,12 @@ export function createTerminal(root: HTMLElement): TerminalUi {
   const plan = q('.tm-plan');
   const ask = q('.tm-ask');
   const think = q('.tm-think i');
-  const sel = q('.tm-opt.sel');
-  const pips = q('.tm-pips');
+  const opt1 = q('.tm-opt[data-o="1"]');
+  const opt2 = q('.tm-opt[data-o="2"]');
   const key = q('.tm-key');
-  const cells = q('.tm-queue .cells');
+  const shop = q('.tm-shop');
+  const cells = Array.from(root.querySelectorAll<HTMLElement>('.tm-flow .cell'));
+  let selected = opt1;
 
   // write to the DOM only when a value actually changed
   const last: Record<string, string> = {};
@@ -119,61 +165,95 @@ export function createTerminal(root: HTMLElement): TerminalUi {
   };
 
   return {
-    side: q('.tm-side'),
+    extra: q('.tm-extra'),
     render(v) {
       if (set('money', `$${fmt.format(Math.floor(v.money))}`, money)) {
         money.classList.remove('pop');
         void money.offsetWidth; // restart the CSS animation
         money.classList.add('pop');
       }
-      set('id', v.ticket.id);
-      set('title', esc(v.ticket.title));
-      set('log0', logLine(v.ticket.log[0]));
-      set('log1', logLine(v.ticket.log[1]));
-      set('pay', `выплата +$${v.pay}`);
+      set('plan', `тариф ${esc(v.plan)} · ${tasksPhrase(v.rate)} в секунду`, plan);
+      set('id', v.prompt.id);
+      set('title', esc(v.prompt.title));
+      set('log0', logLine(v.prompt.log[0]));
+      set('log1', logLine(v.prompt.log[1]));
       set('news', esc(v.news));
-      set(
-        'plan',
-        v.classic ? 'режим сравнения: каждое нажатие — «Да»' : `тариф ${esc(v.plan)} · ${ratePhrase(v.rate)} в секунду`,
-        plan,
-      );
+      set('pay', `за задачу +$${fmt2.format(v.pay)}`);
 
-      const idle = v.queue === 0;
-      ask.classList.toggle('idle', idle);
-      key.classList.toggle('spent', idle && v.buffered > 0);
-      set('ask', idle ? 'Клод думает…' : esc(v.ticket.asks[v.pips % v.ticket.asks.length]));
-      think.style.width = idle ? `${Math.round(v.thinking * 100)}%` : '0';
-
-      let dots = '';
-      for (let i = 0; i < v.stepsPerTask; i++) dots += i < v.pips ? '<i class="on"></i>' : '<i></i>';
-      set('pips', dots, pips);
-
-      const waiting = Math.max(0, v.queue - 1);
-      set('qlabel', v.classic ? '' : waiting > 0 ? `в очереди ещё ${waiting}:` : idle ? 'очередь пуста' : 'в очереди больше ничего');
-      set('cells', '<i></i>'.repeat(v.classic ? 0 : Math.min(waiting, 24)), cells);
-      const nextAsk = v.ticket.asks[(v.pips + 1) % v.ticket.asks.length];
-      set('next', !v.classic && waiting > 0 ? `далее: ${esc(nextAsk)}` : '');
-      set('ahead', v.buffered > 0 ? '«Да» дано заранее ✓' : '');
-
-      const who = v.classic ? '' : idle ? 'claude' : v.queue >= 3 ? 'you' : 'none';
-      if (last.who !== who) {
-        last.who = who;
-        neck.className = `tm-neck ${who}`;
-        neck.innerHTML =
-          who === 'claude'
-            ? 'сейчас тормозит: <b>Клод</b> — ты жмёшь быстрее, чем он пишет'
-            : who === 'you'
-              ? 'сейчас тормозишь: <b>ты</b> — Клод ждёт твоего «Да»'
-              : '';
+      // the prompt box: asking, working, out of work, or no longer asking at all
+      const working = v.backlog >= 1;
+      const state = v.noAsk ? 'noask' : v.ready > 0 ? 'asking' : working ? 'working' : 'empty';
+      if (last.state !== state) {
+        last.state = state;
+        ask.className = `tm-ask ${state}`;
+        selected = v.noAsk ? opt2 : opt1;
+        opt1.classList.toggle('sel', !v.noAsk);
+        opt2.classList.toggle('sel', v.noAsk);
+        opt1.querySelector('.n')!.textContent = v.noAsk ? '' : '❯';
+        opt2.querySelector('.n')!.textContent = v.noAsk ? '❯' : '';
       }
+      set(
+        'ask',
+        state === 'asking'
+          ? esc(v.prompt.ask)
+          : state === 'noask'
+            ? 'Клод больше не спрашивает'
+            : state === 'working'
+              ? 'Клод работает…'
+              : 'Задач нет. Клод ждёт работу',
+      );
+      think.style.width = state === 'working' ? `${Math.round(Math.min(1, v.think) * 100)}%` : '0';
+      set('note1', v.noAsk ? 'подгоняет Клода: закрывает задачу сразу' : '');
+      set('note2', v.noAsk ? 'куплено' : v.canBuyNoAsk ? `купить · $${fmt.format(v.noAskPrice)}` : `улучшение · $${fmt.format(v.noAskPrice)}`);
+      const buyable = !v.noAsk && v.canBuyNoAsk;
+      if (last.buy2 !== String(buyable)) {
+        last.buy2 = String(buyable);
+        opt2.classList.toggle('buy', buyable);
+        if (buyable) opt2.dataset.buy = 'noask';
+        else delete opt2.dataset.buy;
+      }
+      set('ahead', v.buffered > 0 ? '«Да» дано заранее ✓' : '');
+      key.classList.toggle('spent', state !== 'asking' && state !== 'noask' && v.buffered > 0);
+
+      // the conveyor: where the tasks are and what is slowest
+      set('fin', `${tasksPhrase(v.inflow)}/с`);
+      set('fbacklog', `${v.backlog} / ${v.backlogMax}`);
+      set('fplan', `КЛОД · ${esc(v.plan)}`);
+      set('fclaude', `${fmt2.format(v.rate)}/с`);
+      set('fready', v.noAsk ? 'не спрашивает' : `${v.ready} / ${v.readyMax}`);
+      set('fout', `+$${fmt2.format(Math.round(v.income * 10) / 10)}/с`);
+      if (last.neck !== v.neck) {
+        last.neck = v.neck;
+        neck.className = `tm-neck ${v.neck}`;
+        neck.innerHTML = NECK_TEXT[v.neck];
+        for (const c of cells) c.classList.toggle('neck', c.dataset.c === NECK_CELL[v.neck]);
+      }
+      const auto: string[] = [];
+      if (v.brick && !v.noAsk) auto.push(`кирпич на Enter жмёт «Да» ${fmt2.format(v.brickRate)} раз в секунду`);
+      if (v.subagents > 0) {
+        auto.push(`сабагентов: ${v.subagents} · свои сессии, сами закрывают до ${tasksPhrase(v.subRate)} в секунду`);
+      }
+      set('auto', auto.join(' · '));
+      set('autostate', v.noAsk ? 'автосогласие: вкл' : v.brick ? 'автосогласие: кирпич' : 'автосогласие: выкл');
+
+      let html = '';
+      for (const shelf of v.shelves) {
+        html += `<h2 class="${shelf.hot ? 'hot' : ''}">${esc(shelf.title)}${shelf.hot ? '<em>← сейчас поможет</em>' : ''}</h2>`;
+        for (const r of shelf.rows) {
+          html += `<div class="tm-item ${r.state}"${r.state === 'can' && r.buy ? ` data-buy="${r.buy}"` : ''}>
+            <b>${esc(r.title)}</b><span class="cnt">${esc(r.count)}</span>
+            <small>${esc(r.sub)}</small><span class="price">${esc(r.price)}</span></div>`;
+        }
+      }
+      set('shop', html, shop);
     },
     hit(kind) {
       if (kind === 'wasted') {
         pulse(key, 'miss', 110);
         return;
       }
-      pulse(key, 'down', 90);
-      if (kind === 'approved') pulse(sel, 'flash', 70);
+      if (kind !== 'auto') pulse(key, 'down', 90);
+      if (kind !== 'buffered') pulse(selected, 'flash', 70);
     },
   };
 }

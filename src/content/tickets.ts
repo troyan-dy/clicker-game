@@ -82,3 +82,19 @@ export const TICKETS: readonly Ticket[] = [
     ],
   },
 ];
+
+export interface Prompt {
+  id: string;
+  title: string;
+  log: readonly [string, string];
+  ask: string;
+}
+
+/** The i-th thing Claude asks about: tickets in order, each with its asks in order, forever. */
+export function promptAt(i: number): Prompt {
+  const n = Math.max(0, Math.floor(i));
+  const perTicket = TICKETS[0].asks.length;
+  const ticket = TICKETS[Math.floor(n / perTicket) % TICKETS.length];
+  return { id: ticket.id, title: ticket.title, log: ticket.log, ask: ticket.asks[n % ticket.asks.length] };
+}
+
