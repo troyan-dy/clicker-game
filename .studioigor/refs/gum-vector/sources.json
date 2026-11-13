@@ -1,0 +1,126 @@
+{
+  "title": "Жвачка: гладкий вектор и пиксельное конфетти",
+  "text": "Что меняем: рисовка — гладкий мультяшный вектор с толстым контуром; пиксели только в эффектах. Правило: мир гладкий и пухлый, а каждое «Да» взрывается квадратными пикселями. Свет: ровный дневной, без теней.",
+  "palette": [],
+  "tags": [
+    "вектор",
+    "день"
+  ],
+  "items": [
+    {
+      "file": "steam-30e87c46.jpg",
+      "url": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/960090/ss_c8525f327db944b0c0b9cedeeeca15c5c55797a2.1920x1080.jpg?t=1782123772",
+      "page": "https://store.steampowered.com/app/960090/",
+      "title": "Bloons TD 6 — screenshot 2",
+      "credit": "Ninja Kiwi",
+      "license": "© Ninja Kiwi — moodboard only",
+      "api": "steam",
+      "query": "Bloons TD 6",
+      "generated": false,
+      "note": "яркий день, пухлые формы с контуром, магазин-колонка с ценами справа",
+      "w": 1920,
+      "h": 1080,
+      "sha1": "30e87c461898dd0546ec24b6663c39da3836822b"
+    },
+    {
+      "file": "steam-f2a0ac7b.jpg",
+      "url": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/960090/ss_4134980ce3fd32fa19b0cb9bc0ecd25674a92a90.1920x1080.jpg?t=1782123772",
+      "page": "https://store.steampowered.com/app/960090/",
+      "title": "Bloons TD 6 — screenshot 3",
+      "credit": "Ninja Kiwi",
+      "license": "© Ninja Kiwi — moodboard only",
+      "api": "steam",
+      "query": "Bloons TD 6",
+      "generated": false,
+      "note": "вспышки-звёзды и молнии поверх гладкой мультяшной сцены — так может выглядеть взрыв на «Да»",
+      "w": 1920,
+      "h": 1080,
+      "sha1": "f2a0ac7b7a55159e004f239319c8e569508c8b1a"
+    },
+    {
+      "file": "steam-a24568b6.jpg",
+      "url": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/4259190/480769ba877fd56320ac3c6665ae3a83d9d1a400/ss_480769ba877fd56320ac3c6665ae3a83d9d1a400.1920x1080.jpg?t=1794341093",
+      "page": "https://store.steampowered.com/app/4259190/",
+      "title": "Kingdom Rush 6: Genesis TD — screenshot 1",
+      "credit": "Ironhide Game Studio",
+      "license": "© Ironhide Game Studio — moodboard only",
+      "api": "steam",
+      "query": "Kingdom Rush 6: Genesis TD",
+      "generated": false,
+      "note": "десятки мелких построек в одной сцене читаются за счёт контура и чистых цветов",
+      "w": 1920,
+      "h": 1080,
+      "sha1": "a24568b6e05ddaa7cd8f8d7df046bd0d602c2e2d"
+    },
+    {
+      "file": "steam-f28de747.jpg",
+      "url": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/363970/52832b77746ec2d2391ce5880979fe8b0ea5689e/ss_52832b77746ec2d2391ce5880979fe8b0ea5689e.1920x1080.jpg?t=1793915311",
+      "page": "https://store.steampowered.com/app/363970/",
+      "title": "Clicker Heroes — screenshot 1",
+      "credit": "Playsaurus",
+      "license": "© Playsaurus — moodboard only",
+      "api": "steam",
+      "query": "Clicker Heroes",
+      "generated": false,
+      "note": "кликер: слева покупки с крупными кнопками, справа объект клика на островке-диораме",
+      "w": 1920,
+      "h": 1080,
+      "sha1": "f28de7471ab0808dda5bc198e8c5d59fb3ed7a39"
+    },
+    {
+      "file": "local-10dcc15e.jpg",
+      "url": "",
+      "page": "",
+      "title": "AdVenture Capitalist",
+      "credit": "Steam",
+      "license": "",
+      "api": "local",
+      "query": "",
+      "generated": false,
+      "note": "из раунда 1 (ты отметил): толстый контур, плоские заливки, герой сбоку",
+      "w": 1328,
+      "h": 829,
+      "sha1": "10dcc15e7fea4fbe69416676236347dbf429559c"
+    },
+    {
+      "file": "local-4abe81cd.jpg",
+      "url": "",
+      "page": "",
+      "title": "AdVenture Capitalist",
+      "credit": "Steam",
+      "license": "",
+      "api": "local",
+      "query": "",
+      "generated": false,
+      "note": "из раунда 1 (ты отметил): источники дохода как персонажи с лицами",
+      "w": 1328,
+      "h": 829,
+      "sha1": "4abe81cdbea0bd3d684222b114907bb5cf9cf5d2"
+    }
+  ],
+  "pros": [
+    "самые выразительные лица и крупные читаемые кнопки",
+    "ближе всего к тому, что ты отметил"
+  ],
+  "cons": [
+    "пиксельные взрывы на гладкой картинке могут смотреться чужими",
+    "больше всего ручной рисовки"
+  ],
+  "dropped": [
+    {
+      "file": "steam-2311eaa4.jpg",
+      "url": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/960090/ss_a20e85177d96408281e0672927f8e9137c1f423a.1920x1080.jpg?t=1782123772",
+      "sha1": "2311eaa48f978651ccfec5dd50ae34affc7bee80"
+    },
+    {
+      "file": "steam-d7102034.jpg",
+      "url": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/4259190/12b6dc38f22726d027585dde1936b467d1f9495b/ss_12b6dc38f22726d027585dde1936b467d1f9495b.1920x1080.jpg?t=1794341093",
+      "sha1": "d7102034425ad274502d355d890e541c47e4adb3"
+    },
+    {
+      "file": "steam-93d3588e.jpg",
+      "url": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/363970/af5de888aa6a8ed3c47a5eff582c2c70e8cd1897/ss_af5de888aa6a8ed3c47a5eff582c2c70e8cd1897.1920x1080.jpg?t=1793915311",
+      "sha1": "93d3588eee1e160913ae0ad7523a70ab44ff8207"
+    }
+  ]
+}

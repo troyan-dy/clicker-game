@@ -1,0 +1,48 @@
+{
+  "submissions": [
+    {
+      "board": "Стиль — раунд 1",
+      "selected": [],
+      "reactions": {
+        "..\\..\\refs\\cartoon-gum\\steam-c66e8ab5.jpg": "like",
+        "..\\..\\refs\\cartoon-gum\\steam-4abe81cd.jpg": "like",
+        "..\\..\\refs\\cartoon-gum\\steam-40b3c9b3.jpg": "like",
+        "..\\..\\refs\\cartoon-gum\\steam-10dcc15e.jpg": "like",
+        "..\\..\\refs\\clay-mini\\steam-3e99b601.jpg": "dislike",
+        "..\\..\\refs\\clay-mini\\wikimedia-039c30e8.jpg": "dislike",
+        "..\\..\\refs\\clay-mini\\steam-926633bb.jpg": "dislike",
+        "..\\..\\refs\\neon-server\\steam-522e6af6.jpg": "like",
+        "..\\..\\refs\\neon-server\\steam-22934a67.jpg": "like"
+      },
+      "comments": {
+        "neon-server": "Здесь мне нравится яркий стиль пиксильной графики, взрывы с разлетающемися пикселями при ДА по клавиатуре. может быть сочно",
+        "cartoon-gum": "Это будет наиболее информативно и дружелюбно, что-то подбное и хочется",
+        "startup-landing": "Я не хнаю как в это играть, будет скучно и не понятно что делать, хотя сатира на тысячи однотипныъ лэндосо в стиле илюстраций с сайта клод  мне нравится) может куда-то добавить, хз"
+      },
+      "comment": "",
+      "ts": "2026-11-13T22:33:55"
+    }
+  ],
+  "latest": {
+    "board": "Стиль — раунд 1",
+    "selected": [],
+    "reactions": {
+      "..\\..\\refs\\cartoon-gum\\steam-c66e8ab5.jpg": "like",
+      "..\\..\\refs\\cartoon-gum\\steam-4abe81cd.jpg": "like",
+      "..\\..\\refs\\cartoon-gum\\steam-40b3c9b3.jpg": "like",
+      "..\\..\\refs\\cartoon-gum\\steam-10dcc15e.jpg": "like",
+      "..\\..\\refs\\clay-mini\\steam-3e99b601.jpg": "dislike",
+      "..\\..\\refs\\clay-mini\\wikimedia-039c30e8.jpg": "dislike",
+      "..\\..\\refs\\clay-mini\\steam-926633bb.jpg": "dislike",
+      "..\\..\\refs\\neon-server\\steam-522e6af6.jpg": "like",
+      "..\\..\\refs\\neon-server\\steam-22934a67.jpg": "like"
+    },
+    "comments": {
+      "neon-server": "Здесь мне нравится яркий стиль пиксильной графики, взрывы с разлетающемися пикселями при ДА по клавиатуре. может быть сочно",
+      "cartoon-gum": "Это будет наиболее информативно и дружелюбно, что-то подбное и хочется",
+      "startup-landing": "Я не хнаю как в это играть, будет скучно и не понятно что делать, хотя сатира на тысячи однотипныъ лэндосо в стиле илюстраций с сайта клод  мне нравится) может куда-то добавить, хз"
+    },
+    "comment": "",
+    "ts": "2026-11-13T22:33:55"
+  }
+}

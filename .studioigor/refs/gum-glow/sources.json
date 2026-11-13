@@ -1,0 +1,117 @@
+{
+  "title": "Жвачка ночью: светящиеся пиксели",
+  "text": "Что меняем: фон тёмный, всё важное светится. Правило: тёмная сцена и пухлые дружелюбные формы, а деньги и «Да» вспыхивают неоном. Свет: свечение от самих объектов.",
+  "palette": [],
+  "tags": [
+    "пиксели",
+    "ночь",
+    "свечение"
+  ],
+  "items": [
+    {
+      "file": "steam-3a0d431b.jpg",
+      "url": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1794680/ss_054159adc52856d066d48bda02866da524c43439.1920x1080.jpg?t=1794307910",
+      "page": "https://store.steampowered.com/app/1794680/",
+      "title": "Vampire Survivors — screenshot 3",
+      "credit": "poncle",
+      "license": "© poncle — moodboard only",
+      "api": "steam",
+      "query": "Vampire Survivors",
+      "generated": false,
+      "note": "сотни чисел и частиц на тёмном фоне всё ещё читаются",
+      "w": 1280,
+      "h": 800,
+      "sha1": "3a0d431beb6e391c03258e030d65d89ab07cff78"
+    },
+    {
+      "file": "steam-ee900fe5.jpg",
+      "url": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/310790/ss_5f9f634a96e0651e30b769e44d0839525d5f7920.1920x1080.jpg?t=1573065014",
+      "page": "https://store.steampowered.com/app/310790/",
+      "title": "Geometry Wars™ 3: Dimensions Evolved — screenshot 1",
+      "credit": "Lucid Games, Aspyr (Linux)",
+      "license": "© Lucid Games, Aspyr (Linux) — moodboard only",
+      "api": "steam",
+      "query": "Geometry Wars™ 3: Dimensions Evolved",
+      "generated": false,
+      "note": "фейерверк светящихся частиц на тёмной сетке — предел сочности взрыва",
+      "w": 1920,
+      "h": 1080,
+      "sha1": "ee900fe5d34a36153cddec6c33e8cc9341e98333"
+    },
+    {
+      "file": "steam-bcf26a55.jpg",
+      "url": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/274190/ss_b77d3d5ba767df4b2d58017804331e90a7ae4eaa.1920x1080.jpg?t=1764247760",
+      "page": "https://store.steampowered.com/app/274190/",
+      "title": "Broforce — screenshot 1",
+      "credit": "Free Lives",
+      "license": "© Free Lives — moodboard only",
+      "api": "steam",
+      "query": "Broforce",
+      "generated": false,
+      "note": "пиксельный взрыв с разлетающимися кусками; для сравнения — он работает и на дневном небе",
+      "w": 1920,
+      "h": 1080,
+      "sha1": "bcf26a55dc6c435620e73970f610efac5bb8824e"
+    },
+    {
+      "file": "local-22934a67.jpg",
+      "url": "",
+      "page": "",
+      "title": "Nodebuster",
+      "credit": "Steam",
+      "license": "",
+      "api": "local",
+      "query": "",
+      "generated": false,
+      "note": "из раунда 1 (ты отметил): светящиеся фигуры на чёрном, каждое попадание — вспышка",
+      "w": 1920,
+      "h": 1080,
+      "sha1": "22934a67736da094c50ea39c8b304b0ec6c023a7"
+    },
+    {
+      "file": "local-522e6af6.jpg",
+      "url": "",
+      "page": "",
+      "title": "Nodebuster",
+      "credit": "Steam",
+      "license": "",
+      "api": "local",
+      "query": "",
+      "generated": false,
+      "note": "из раунда 1 (ты отметил): улучшения как светящиеся узлы",
+      "w": 1920,
+      "h": 1080,
+      "sha1": "522e6af6e795261387f24c8ff9f43eb57290f7ab"
+    }
+  ],
+  "pros": [
+    "взрывы и числа выглядят максимально сочно",
+    "рост виден как всё больше огней"
+  ],
+  "cons": [
+    "менее дружелюбно и информативно, чем днём",
+    "нужен WebGL со свечением"
+  ],
+  "dropped": [
+    {
+      "file": "steam-3f3c6150.jpg",
+      "url": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1794680/ss_6c55afe36be2a7784bf18cb9b3218321ae2d10e5.1920x1080.jpg?t=1794307910",
+      "sha1": "3f3c6150380a05e28ad4dd84da140a70b2f43fac"
+    },
+    {
+      "file": "steam-2d419829.jpg",
+      "url": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1794680/ss_6105ad3d6af52593c31d915bf39e91512611ea8e.1920x1080.jpg?t=1794307910",
+      "sha1": "2d419829c3a25cafee8bef3043582f05cc29ca7e"
+    },
+    {
+      "file": "steam-95fb6316.jpg",
+      "url": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/310790/ss_2d63d8d08fb0d7306c81bf876ab98df0f49eaeb2.1920x1080.jpg?t=1573065014",
+      "sha1": "95fb63164a1b02c4bd6564318fa65e09f4fa2380"
+    },
+    {
+      "file": "steam-082c951b.jpg",
+      "url": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/274190/ss_700cda119dab1d0333b8d91771cf216ac7f8cafa.1920x1080.jpg?t=1764247760",
+      "sha1": "082c951b14273604b215e5ca392517633bcc6f2a"
+    }
+  ]
+}

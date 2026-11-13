@@ -1,0 +1,132 @@
+{
+  "title": "Жвачка: сочный пиксель-арт",
+  "text": "Что меняем: всё нарисовано крупными пикселями с тёмным контуром — сцена, люди, вещи. Правило: один размер пикселя на весь экран; взрыв — те же пиксели, разлетевшиеся в стороны. Свет: яркий день, чистые цвета без градиентов.",
+  "palette": [],
+  "tags": [
+    "пиксель-арт",
+    "день"
+  ],
+  "items": [
+    {
+      "file": "steam-961f77a9.jpg",
+      "url": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/751780/ss_288c1647ffd3639358505e4e0e5a74214a9a9a23.1920x1080.jpg?t=1794346279",
+      "page": "https://store.steampowered.com/app/751780/",
+      "title": "Forager — screenshot 1",
+      "credit": "HopFrog",
+      "license": "© HopFrog — moodboard only",
+      "api": "steam",
+      "query": "Forager",
+      "generated": false,
+      "note": "крупный пиксель, тёмный контур, чистые цвета: дружелюбно и читаемо",
+      "w": 1920,
+      "h": 1080,
+      "sha1": "961f77a9aceb3c1c7b5932e5ecead00539fcb6bd"
+    },
+    {
+      "file": "steam-2c17a91f.jpg",
+      "url": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/751780/ss_e2c17107d5896b8a5ecc01b26f5f4dc358e9edf6.1920x1080.jpg?t=1794346279",
+      "page": "https://store.steampowered.com/app/751780/",
+      "title": "Forager — screenshot 3",
+      "credit": "HopFrog",
+      "license": "© HopFrog — moodboard only",
+      "api": "steam",
+      "query": "Forager",
+      "generated": false,
+      "note": "взрыв лучей и разлетающиеся пиксели вокруг героя — ровно то самое сочное «Да»",
+      "w": 1919,
+      "h": 1079,
+      "sha1": "2c17a91fea040b6393e34b8f894d643500b63735"
+    },
+    {
+      "file": "steam-aba42dc4.jpg",
+      "url": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1353300/d20a28895c4e86a3182bedecc1ca72bc615bef52/ss_d20a28895c4e86a3182bedecc1ca72bc615bef52.1920x1080.jpg?t=1792608697",
+      "page": "https://store.steampowered.com/app/1353300/",
+      "title": "Idle Slayer — screenshot 1",
+      "credit": "Pablo Leban",
+      "license": "© Pablo Leban — moodboard only",
+      "api": "steam",
+      "query": "Idle Slayer",
+      "generated": false,
+      "note": "пиксельный кликер: сцена слева, магазин с ценами справа, монеты летят в счётчик",
+      "w": 1920,
+      "h": 1080,
+      "sha1": "aba42dc41974cd627c5f04e9ba3abe693dd9bc89"
+    },
+    {
+      "file": "steam-fc9b050f.jpg",
+      "url": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1353300/f87a7b5d0f7cef088e6653b05ec37f3e2c700360/ss_f87a7b5d0f7cef088e6653b05ec37f3e2c700360.1920x1080.jpg?t=1792608697",
+      "page": "https://store.steampowered.com/app/1353300/",
+      "title": "Idle Slayer — screenshot 3",
+      "credit": "Pablo Leban",
+      "license": "© Pablo Leban — moodboard only",
+      "api": "steam",
+      "query": "Idle Slayer",
+      "generated": false,
+      "note": "числа дохода и огоньки поверх сцены; палитра меняется от места к месту — пригодится для масштабов",
+      "w": 1920,
+      "h": 1080,
+      "sha1": "fc9b050fe965266b41df2127576691283c392a3e"
+    },
+    {
+      "file": "local-40b3c9b3.jpg",
+      "url": "",
+      "page": "",
+      "title": "Cookie Clicker",
+      "credit": "Steam",
+      "license": "",
+      "api": "local",
+      "query": "",
+      "generated": false,
+      "note": "из раунда 1 (ты отметил): купленное стоит рядами в сцене, сверху лента новостей",
+      "w": 1920,
+      "h": 1080,
+      "sha1": "40b3c9b31e2892891b3f13c2d2bfa6c3a5a81e76"
+    },
+    {
+      "file": "local-c66e8ab5.jpg",
+      "url": "",
+      "page": "",
+      "title": "Cookie Clicker",
+      "credit": "Steam",
+      "license": "",
+      "api": "local",
+      "query": "",
+      "generated": false,
+      "note": "из раунда 1 (ты отметил): лучи за объектом клика и вылетающие +1",
+      "w": 1920,
+      "h": 1080,
+      "sha1": "c66e8ab5a4883a61f121d0abb8333179e5a54b24"
+    }
+  ],
+  "pros": [
+    "взрывы пикселей родные для стиля",
+    "тысячи ноутбуков и серверов рисуются дёшево",
+    "отъезд камеры = спрайты мельче"
+  ],
+  "cons": [
+    "мелкий текст в пикселях читается хуже — цифры и магазин будут обычным шрифтом",
+    "лица проще"
+  ],
+  "dropped": [
+    {
+      "file": "steam-bf3e4e7a.jpg",
+      "url": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/751780/ss_f16f8a367daf470f242543c80fd5dc0ec69104da.1920x1080.jpg?t=1794346279",
+      "sha1": "bf3e4e7ac0c9e7484f3b437ed58048f4d46d2a4d"
+    },
+    {
+      "file": "steam-9dd95d93.jpg",
+      "url": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1353300/66c5516a8fdaf56f6cf009d319a4a638e6c013c8/ss_66c5516a8fdaf56f6cf009d319a4a638e6c013c8.1920x1080.jpg?t=1792608697",
+      "sha1": "9dd95d933861b32ff7c16b49778009001e667f28"
+    },
+    {
+      "file": "steam-21426393.jpg",
+      "url": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1296610/ss_1a2afdad48b809a7adecea90516889316d4f21bc.1920x1080.jpg?t=1779945876",
+      "sha1": "21426393f471c53d4ae967732e0a31b2c0f76c7f"
+    },
+    {
+      "file": "steam-b0c53962.jpg",
+      "url": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1296610/ss_71770eca91f44432783fbb971543b36f5f1023e1.1920x1080.jpg?t=1779945876",
+      "sha1": "b0c53962100ac937b905b61f6b60275f33fcbe67"
+    }
+  ]
+}

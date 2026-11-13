@@ -1,0 +1,206 @@
+{
+  "title": "Стиль — раунд 2",
+  "subtitle": "Да, Клод: основа «Мультяшная жвачка», три способа её нарисовать",
+  "question": "Как рисуем? Можно выбрать один вариант или смешать два — напиши, что из какого взять",
+  "mode": "multi",
+  "options": [
+    {
+      "id": "gum-vector",
+      "title": "Жвачка: гладкий вектор и пиксельное конфетти",
+      "text": "Что меняем: рисовка — гладкий мультяшный вектор с толстым контуром; пиксели только в эффектах. Правило: мир гладкий и пухлый, а каждое «Да» взрывается квадратными пикселями. Свет: ровный дневной, без теней.",
+      "palette": [],
+      "tags": [
+        "вектор",
+        "день"
+      ],
+      "pros": [
+        "самые выразительные лица и крупные читаемые кнопки",
+        "ближе всего к тому, что ты отметил"
+      ],
+      "cons": [
+        "пиксельные взрывы на гладкой картинке могут смотреться чужими",
+        "больше всего ручной рисовки"
+      ],
+      "media": [
+        {
+          "src": "..\\..\\refs\\gum-vector\\steam-30e87c46.jpg",
+          "caption": "яркий день, пухлые формы с контуром, магазин-колонка с ценами справа",
+          "source": "https://store.steampowered.com/app/960090/",
+          "credit": "Ninja Kiwi",
+          "license": "© Ninja Kiwi — moodboard only",
+          "generated": false
+        },
+        {
+          "src": "..\\..\\refs\\gum-vector\\steam-f2a0ac7b.jpg",
+          "caption": "вспышки-звёзды и молнии поверх гладкой мультяшной сцены — так может выглядеть взрыв на «Да»",
+          "source": "https://store.steampowered.com/app/960090/",
+          "credit": "Ninja Kiwi",
+          "license": "© Ninja Kiwi — moodboard only",
+          "generated": false
+        },
+        {
+          "src": "..\\..\\refs\\gum-vector\\steam-a24568b6.jpg",
+          "caption": "десятки мелких построек в одной сцене читаются за счёт контура и чистых цветов",
+          "source": "https://store.steampowered.com/app/4259190/",
+          "credit": "Ironhide Game Studio",
+          "license": "© Ironhide Game Studio — moodboard only",
+          "generated": false
+        },
+        {
+          "src": "..\\..\\refs\\gum-vector\\steam-f28de747.jpg",
+          "caption": "кликер: слева покупки с крупными кнопками, справа объект клика на островке-диораме",
+          "source": "https://store.steampowered.com/app/363970/",
+          "credit": "Playsaurus",
+          "license": "© Playsaurus — moodboard only",
+          "generated": false
+        },
+        {
+          "src": "..\\..\\refs\\gum-vector\\local-10dcc15e.jpg",
+          "caption": "из раунда 1 (ты отметил): толстый контур, плоские заливки, герой сбоку",
+          "source": "",
+          "credit": "Steam",
+          "license": "",
+          "generated": false
+        },
+        {
+          "src": "..\\..\\refs\\gum-vector\\local-4abe81cd.jpg",
+          "caption": "из раунда 1 (ты отметил): источники дохода как персонажи с лицами",
+          "source": "",
+          "credit": "Steam",
+          "license": "",
+          "generated": false
+        }
+      ]
+    },
+    {
+      "id": "gum-pixel",
+      "title": "Жвачка: сочный пиксель-арт",
+      "text": "Что меняем: всё нарисовано крупными пикселями с тёмным контуром — сцена, люди, вещи. Правило: один размер пикселя на весь экран; взрыв — те же пиксели, разлетевшиеся в стороны. Свет: яркий день, чистые цвета без градиентов.",
+      "palette": [],
+      "tags": [
+        "пиксель-арт",
+        "день"
+      ],
+      "pros": [
+        "взрывы пикселей родные для стиля",
+        "тысячи ноутбуков и серверов рисуются дёшево",
+        "отъезд камеры = спрайты мельче"
+      ],
+      "cons": [
+        "мелкий текст в пикселях читается хуже — цифры и магазин будут обычным шрифтом",
+        "лица проще"
+      ],
+      "media": [
+        {
+          "src": "..\\..\\refs\\gum-pixel\\steam-961f77a9.jpg",
+          "caption": "крупный пиксель, тёмный контур, чистые цвета: дружелюбно и читаемо",
+          "source": "https://store.steampowered.com/app/751780/",
+          "credit": "HopFrog",
+          "license": "© HopFrog — moodboard only",
+          "generated": false
+        },
+        {
+          "src": "..\\..\\refs\\gum-pixel\\steam-2c17a91f.jpg",
+          "caption": "взрыв лучей и разлетающиеся пиксели вокруг героя — ровно то самое сочное «Да»",
+          "source": "https://store.steampowered.com/app/751780/",
+          "credit": "HopFrog",
+          "license": "© HopFrog — moodboard only",
+          "generated": false
+        },
+        {
+          "src": "..\\..\\refs\\gum-pixel\\steam-aba42dc4.jpg",
+          "caption": "пиксельный кликер: сцена слева, магазин с ценами справа, монеты летят в счётчик",
+          "source": "https://store.steampowered.com/app/1353300/",
+          "credit": "Pablo Leban",
+          "license": "© Pablo Leban — moodboard only",
+          "generated": false
+        },
+        {
+          "src": "..\\..\\refs\\gum-pixel\\steam-fc9b050f.jpg",
+          "caption": "числа дохода и огоньки поверх сцены; палитра меняется от места к месту — пригодится для масштабов",
+          "source": "https://store.steampowered.com/app/1353300/",
+          "credit": "Pablo Leban",
+          "license": "© Pablo Leban — moodboard only",
+          "generated": false
+        },
+        {
+          "src": "..\\..\\refs\\gum-pixel\\local-40b3c9b3.jpg",
+          "caption": "из раунда 1 (ты отметил): купленное стоит рядами в сцене, сверху лента новостей",
+          "source": "",
+          "credit": "Steam",
+          "license": "",
+          "generated": false
+        },
+        {
+          "src": "..\\..\\refs\\gum-pixel\\local-c66e8ab5.jpg",
+          "caption": "из раунда 1 (ты отметил): лучи за объектом клика и вылетающие +1",
+          "source": "",
+          "credit": "Steam",
+          "license": "",
+          "generated": false
+        }
+      ]
+    },
+    {
+      "id": "gum-glow",
+      "title": "Жвачка ночью: светящиеся пиксели",
+      "text": "Что меняем: фон тёмный, всё важное светится. Правило: тёмная сцена и пухлые дружелюбные формы, а деньги и «Да» вспыхивают неоном. Свет: свечение от самих объектов.",
+      "palette": [],
+      "tags": [
+        "пиксели",
+        "ночь",
+        "свечение"
+      ],
+      "pros": [
+        "взрывы и числа выглядят максимально сочно",
+        "рост виден как всё больше огней"
+      ],
+      "cons": [
+        "менее дружелюбно и информативно, чем днём",
+        "нужен WebGL со свечением"
+      ],
+      "media": [
+        {
+          "src": "..\\..\\refs\\gum-glow\\steam-3a0d431b.jpg",
+          "caption": "сотни чисел и частиц на тёмном фоне всё ещё читаются",
+          "source": "https://store.steampowered.com/app/1794680/",
+          "credit": "poncle",
+          "license": "© poncle — moodboard only",
+          "generated": false
+        },
+        {
+          "src": "..\\..\\refs\\gum-glow\\steam-ee900fe5.jpg",
+          "caption": "фейерверк светящихся частиц на тёмной сетке — предел сочности взрыва",
+          "source": "https://store.steampowered.com/app/310790/",
+          "credit": "Lucid Games, Aspyr (Linux)",
+          "license": "© Lucid Games, Aspyr (Linux) — moodboard only",
+          "generated": false
+        },
+        {
+          "src": "..\\..\\refs\\gum-glow\\steam-bcf26a55.jpg",
+          "caption": "пиксельный взрыв с разлетающимися кусками; для сравнения — он работает и на дневном небе",
+          "source": "https://store.steampowered.com/app/274190/",
+          "credit": "Free Lives",
+          "license": "© Free Lives — moodboard only",
+          "generated": false
+        },
+        {
+          "src": "..\\..\\refs\\gum-glow\\local-22934a67.jpg",
+          "caption": "из раунда 1 (ты отметил): светящиеся фигуры на чёрном, каждое попадание — вспышка",
+          "source": "",
+          "credit": "Steam",
+          "license": "",
+          "generated": false
+        },
+        {
+          "src": "..\\..\\refs\\gum-glow\\local-522e6af6.jpg",
+          "caption": "из раунда 1 (ты отметил): улучшения как светящиеся узлы",
+          "source": "",
+          "credit": "Steam",
+          "license": "",
+          "generated": false
+        }
+      ]
+    }
+  ]
+}
