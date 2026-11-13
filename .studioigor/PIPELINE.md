@@ -26,8 +26,8 @@ files: CONCEPT.md
 ## Phase 2 — Style
 files: ART_BIBLE.md
 - [x] ≥3 directions with real references shown on the board — check: manual
-- [x] user locked the style — check: user
-- [x] art bible: hex palette, lighting, form, ≥3 signature techniques, "forbidden" — check: manual
+- [ ] user locked the style — check: user
+- [ ] art bible: hex palette, lighting, form, ≥3 signature techniques, "forbidden" — check: manual
 
 ## Phase 3 — Platform and engine
 files: TECH.md

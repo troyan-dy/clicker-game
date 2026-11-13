@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Концепт: чертёж</title>
+    <link rel="stylesheet" href="fonts.css" />
+    <link rel="stylesheet" href="paper.css" />
+    <style>
+      body { background-image: url('../gen/scene_blueprint.png'); }
+      .tag {
+        position: absolute;
+        padding: 2px 0 3px;
+        border-bottom: 1.5px solid var(--ink);
+        font: 400 18px 'JetBrains Mono', monospace;
+        white-space: nowrap;
+      }
+      .tag b { color: var(--money); font-weight: 700; }
+      .tag.soon { color: var(--dim); border-bottom-style: dashed; border-bottom-color: var(--dim); }
+      .note { width: 500px; padding: 18px 24px 20px; }
+      .note h3 { font-size: 30px; }
+      .note p { font-size: 21px; }
+    </style>
+  </head>
+  <body>
+    <div class="money"><b>$1 284</b><span>+$12,5 в секунду</span></div>
+
+    <div class="tag" style="left: 96px; top: 228px">вторая работа · <b>$6/с</b></div>
+    <div class="tag" style="left: 560px; top: 232px">фриланс №1 · <b>$1,5/с</b></div>
+    <div class="tag" style="left: 1010px; top: 650px">фриланс №2 · <b>$1,5/с</b></div>
+    <div class="tag" style="left: 1050px; top: 966px">фриланс №3 · <b>$1,5/с</b></div>
+    <div class="tag soon" style="left: 52px; top: 802px">сервер · скоро</div>
+
+    <div class="note" style="left: 818px; top: 148px">
+      <div class="kicker">Задача · фриланс</div>
+      <h3>Перекрасить кнопку в более синий</h3>
+      <p><b>Клод:</b> Сделал синее. Задеплоить в прод в пятницу вечером?</p>
+      <div class="row">
+        <span class="pips"><i class="on"></i><i class="on"></i><i></i><i></i><i></i></span>
+        <span class="pay">+$5</span>
+        <span class="key">Enter — Да</span>
+      </div>
+    </div>
+
+    <aside class="shop">
+      <h2>Магазин</h2>
+      <div class="card can">
+        <b>Фриланс-аккаунт</b><span class="cnt">×3</span>
+        <small>задачи идут и закрываются сами</small><span class="price">$15</span>
+      </div>
+      <div class="card">
+        <b>Вторая работа</b><span class="cnt">×1</span>
+        <small>ещё один стендап в 10:00</small><span class="price">$100</span>
+      </div>
+      <div class="card">
+        <b>Тариф Max</b><span class="cnt"></span>
+        <small>Клод пишет вдвое быстрее</small><span class="price">$200</span>
+      </div>
+      <div class="card off">
+        <b>Сабагент</b><span class="cnt">×0</span>
+        <small>соглашается сам с собой</small><span class="price">$1 100</span>
+      </div>
+      <div class="card off">
+        <b>???</b><span class="cnt"></span>
+        <small>откроется на $5 000</small><span class="price"></span>
+      </div>
+    </aside>
+
+    <div class="news">
+      <i>НОВОСТИ</i>
+      HR заметил, что новый сотрудник отвечает в чате за 0,2 секунды и всегда согласен
+    </div>
+
+    <!-- «Да» в полёте: квадраты Клода летят в счётчик и зеленеют -->
+    <i class="px" style="left: 792px; top: 560px; width: 14px; height: 14px"></i>
+    <i class="px" style="left: 800px; top: 486px; width: 12px; height: 12px"></i>
+    <i class="px g" style="left: 880px; top: 132px; width: 12px; height: 12px"></i>
+    <i class="px g" style="left: 852px; top: 96px; width: 10px; height: 10px"></i>
+  </body>
+</html>

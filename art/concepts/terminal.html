@@ -1,0 +1,228 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Концепт: терминал</title>
+    <link rel="stylesheet" href="fonts.css" />
+    <style>
+      :root {
+        --bg: #1f1e1d;
+        --panel: #262624;
+        --line: #3d3a36;
+        --text: #f0eee6;
+        --dim: #87867f;
+        --coral: #d97757;
+        --money: #7cc68d;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        width: 1920px;
+        height: 1080px;
+        overflow: hidden;
+        background: var(--bg);
+        color: var(--text);
+        font: 400 23px/1.6 'JetBrains Mono', monospace;
+      }
+      .bar {
+        position: absolute;
+        inset: 0 0 auto 0;
+        height: 132px;
+        border-bottom: 1px solid var(--line);
+      }
+      .dots { position: absolute; left: 30px; top: 26px; display: flex; gap: 10px; }
+      .dots i { width: 14px; height: 14px; border-radius: 50%; border: 1px solid var(--dim); }
+      .title { position: absolute; left: 112px; top: 15px; color: var(--dim); font-size: 19px; }
+      .money { position: absolute; left: 0; right: 0; top: 12px; text-align: center; line-height: 1; }
+      .money b { font-size: 84px; font-weight: 700; color: var(--money); letter-spacing: -0.02em; }
+      .money em { margin-left: 22px; font-style: normal; font-size: 27px; color: var(--money); opacity: 0.75; }
+      .plan { position: absolute; right: 30px; top: 15px; color: var(--dim); font-size: 19px; }
+
+      .term { position: absolute; left: 0; top: 133px; width: 1340px; bottom: 54px; padding: 26px 44px; }
+      .sq { display: inline-block; width: 13px; height: 13px; margin-right: 14px; background: var(--coral); }
+      .dim { color: var(--dim); }
+      .ok { color: var(--money); }
+      .sub { padding-left: 27px; color: var(--dim); }
+
+      .ask {
+        margin: 22px 0 0;
+        padding: 20px 28px 22px;
+        background: var(--panel);
+        border: 1px solid var(--coral);
+        border-radius: 12px;
+      }
+      .ask h3 { margin: 0 0 10px; font-size: 27px; font-weight: 700; }
+      .opt { display: flex; gap: 16px; padding: 3px 0; }
+      .opt .n { width: 30px; color: var(--coral); }
+      .opt.sel { color: var(--coral); font-weight: 700; }
+      .opt .note { margin-left: auto; color: var(--dim); font-weight: 400; }
+      .task { display: flex; align-items: center; gap: 22px; margin-top: 18px; }
+      .pips { display: flex; gap: 8px; }
+      .pips i { width: 22px; height: 22px; border: 1px solid var(--dim); }
+      .pips i.on { background: var(--coral); border-color: var(--coral); }
+      .key {
+        margin-left: auto;
+        padding: 6px 26px 8px;
+        border: 1px solid var(--text);
+        border-bottom-width: 5px;
+        border-radius: 10px;
+        font-weight: 700;
+        font-size: 27px;
+      }
+
+      .map { position: absolute; left: 44px; right: 40px; bottom: 26px; height: 236px; }
+      .map text { font: 400 18px 'JetBrains Mono', monospace; fill: var(--dim); }
+      .map .t { fill: var(--text); }
+
+      .shop {
+        position: absolute;
+        right: 0;
+        top: 133px;
+        bottom: 54px;
+        width: 580px;
+        padding: 26px 30px;
+        border-left: 1px solid var(--line);
+      }
+      .shop h2 { margin: 0 0 14px; font-size: 19px; font-weight: 400; color: var(--dim); letter-spacing: 0.14em; }
+      .row {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        gap: 2px 18px;
+        margin-bottom: 14px;
+        padding: 14px 20px 15px;
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        line-height: 1.35;
+      }
+      .row b { font-weight: 700; font-size: 25px; }
+      .row .cnt { color: var(--dim); text-align: right; }
+      .row small { color: var(--dim); font-size: 19px; }
+      .row .price { text-align: right; font-weight: 700; font-size: 25px; color: var(--dim); }
+      .row.can { border-color: var(--money); }
+      .row.can .price { color: var(--money); }
+      .row.off { opacity: 0.45; }
+
+      .status {
+        position: absolute;
+        inset: auto 0 0 0;
+        height: 54px;
+        padding: 0 30px;
+        display: flex;
+        align-items: center;
+        gap: 22px;
+        border-top: 1px solid var(--line);
+        color: var(--dim);
+        font-size: 20px;
+        white-space: nowrap;
+      }
+      .status .news { color: var(--text); }
+      .status .r { margin-left: auto; }
+
+      .px { position: absolute; background: var(--coral); }
+    </style>
+  </head>
+  <body>
+    <header class="bar">
+      <span class="dots"><i></i><i></i><i></i></span>
+      <span class="title">claude — ~/работа/все-сразу</span>
+      <span class="money"><b>$1 284</b><em>+$12,5/с</em></span>
+      <span class="plan">тариф Pro · 2 сообщения в секунду</span>
+    </header>
+
+    <section class="term">
+      <div><span class="sq"></span>Задача FRL-204 · «Перекрасить кнопку в более синий»</div>
+      <div class="sub">⎿ src/Button.tsx <span class="ok">+12</span> −4</div>
+      <div class="sub">⎿ tests/button.test.ts <span class="ok">+0</span> −310 <span class="dim">· тесты мешали, убрал</span></div>
+      <div><span class="sq"></span>Сделал синее. Осталось выкатить.</div>
+
+      <div class="ask">
+        <h3>Задеплоить в прод в пятницу вечером?</h3>
+        <div class="opt sel"><span class="n">❯</span>1. Да</div>
+        <div class="opt"><span class="n"></span>2. Да, и больше не спрашивай<span class="note">улучшение · $500</span></div>
+        <div class="opt dim"><span class="n"></span>3. Нет<span class="note">недоступно в вашем тарифе</span></div>
+        <div class="task">
+          <span class="dim">согласий по задаче</span>
+          <span class="pips"><i class="on"></i><i class="on"></i><i></i><i></i><i></i></span>
+          <span class="ok">выплата +$5</span>
+          <span class="key">Enter — Да</span>
+        </div>
+      </div>
+
+      <svg class="map" viewBox="0 0 1256 236">
+        <g fill="none" stroke="#3d3a36" stroke-width="1.5">
+          <path d="M150 118 H330" />
+          <path d="M470 118 H560 V46 H700" />
+          <path d="M560 118 H700" />
+          <path d="M560 118 V190 H700" />
+          <path d="M880 46 H960 V118 H1040" stroke-dasharray="6 7" />
+        </g>
+        <g fill="#262624" stroke="#87867f" stroke-width="1.5">
+          <rect x="30" y="86" width="120" height="64" rx="10" />
+          <rect x="700" y="18" width="180" height="56" rx="10" />
+          <rect x="700" y="90" width="180" height="56" rx="10" />
+          <rect x="700" y="162" width="180" height="56" rx="10" />
+          <rect x="1040" y="90" width="186" height="56" rx="10" stroke-dasharray="6 7" />
+        </g>
+        <rect x="330" y="78" width="140" height="80" rx="12" fill="#262624" stroke="#d97757" stroke-width="1.5" />
+        <rect x="372" y="98" width="56" height="40" rx="9" fill="#d97757" />
+        <rect x="388" y="112" width="6" height="8" fill="#1f1e1d" />
+        <rect x="406" y="112" width="6" height="8" fill="#1f1e1d" />
+        <g fill="#d97757">
+          <rect x="604" y="40" width="11" height="11" />
+          <rect x="650" y="112" width="11" height="11" />
+          <rect x="590" y="184" width="11" height="11" />
+          <rect x="516" y="112" width="11" height="11" />
+          <rect x="228" y="112" width="11" height="11" />
+        </g>
+        <text x="90" y="126" text-anchor="middle" class="t">ты</text>
+        <text x="400" y="182" text-anchor="middle">Клод</text>
+        <text x="790" y="53" text-anchor="middle" class="t">фриланс №1</text>
+        <text x="790" y="125" text-anchor="middle" class="t">фриланс №2</text>
+        <text x="790" y="197" text-anchor="middle" class="t">фриланс №3</text>
+        <text x="1133" y="125" text-anchor="middle">вторая работа</text>
+        <text x="240" y="98" text-anchor="middle">«Да»</text>
+      </svg>
+    </section>
+
+    <aside class="shop">
+      <h2>МАГАЗИН</h2>
+      <div class="row can">
+        <b>фриланс-аккаунт</b><span class="cnt">×3</span>
+        <small>задачи идут и закрываются сами</small><span class="price">$15</span>
+      </div>
+      <div class="row">
+        <b>вторая работа</b><span class="cnt">×0</span>
+        <small>ещё один стендап в 10:00</small><span class="price">$100</span>
+      </div>
+      <div class="row">
+        <b>тариф Max</b><span class="cnt"></span>
+        <small>Клод пишет вдвое быстрее</small><span class="price">$200</span>
+      </div>
+      <div class="row off">
+        <b>сабагент</b><span class="cnt">×0</span>
+        <small>соглашается сам с собой</small><span class="price">$1 100</span>
+      </div>
+      <div class="row off">
+        <b>???</b><span class="cnt"></span>
+        <small>откроется на $5 000</small><span class="price"></span>
+      </div>
+    </aside>
+
+    <footer class="status">
+      <span>НОВОСТИ</span>
+      <span class="news">HR заметил, что новый сотрудник отвечает в чате за 0,2 секунды и всегда согласен</span>
+      <span class="r">автосогласие: выкл · контекст 62%</span>
+    </footer>
+
+    <!-- «Да» в полёте: квадраты Клода летят в счётчик и зеленеют -->
+    <i class="px" style="left: 700px; top: 372px; width: 14px; height: 14px"></i>
+    <i class="px" style="left: 742px; top: 318px; width: 12px; height: 12px"></i>
+    <i class="px" style="left: 800px; top: 268px; width: 15px; height: 15px"></i>
+    <i class="px" style="left: 846px; top: 226px; width: 11px; height: 11px"></i>
+    <i class="px" style="left: 874px; top: 176px; width: 13px; height: 13px; background: #7cc68d"></i>
+    <i class="px" style="left: 902px; top: 146px; width: 10px; height: 10px; background: #7cc68d"></i>
+    <i class="px" style="left: 660px; top: 300px; width: 10px; height: 10px"></i>
+    <i class="px" style="left: 770px; top: 214px; width: 9px; height: 9px"></i>
+  </body>
+</html>

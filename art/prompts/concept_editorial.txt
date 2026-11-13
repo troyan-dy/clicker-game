@@ -1,0 +1,13 @@
+A complete 16:9 game-screen mockup for a calm, grown-up idle clicker game about a programmer who lets an AI assistant do all his work while he only presses "Yes".
+
+STYLE: editorial line illustration, in the spirit of the visual identity of a thoughtful AI-assistant brand. Warm ivory paper background (#F0EEE6). Thin, slightly hand-drawn charcoal ink lines (#262624) of one even, fine weight. Flat muted fills used sparingly: terracotta (#D97757) as the single strong accent, plus soft sage (#BCD1CA), dusty blue (#6A9BCC) and sand (#D4A27F). A lot of empty paper. Elegant, minimal, witty, like an illustration in The New Yorker or a design studio's annual report. NO thick outlines, NO chunky cartoon shapes, NO candy colours, no gradients.
+
+SCENE (centre and left, about 70% of the width): a simple line drawing of a desk with an open laptop. On the laptop screen: a small terracotta rounded square with two dot eyes (the AI). At the left, a relaxed programmer drawn with a few thin lines, leaning back in a chair with a mug, one finger resting on a single terracotta key that lies on the desk. A handful of tiny terracotta squares drift upward from the laptop toward the top of the screen in a loose arc.
+
+INTERFACE drawn in the same quiet style:
+- Top centre: the amount of money, large, in an elegant serif typeface: "$1,284" in deep green ink (#3F7D58), with a short thin rule and a smaller line under it.
+- Above the laptop: a small rounded note card with a thin border, holding three thin grey bars as placeholder text, five small square checkboxes in a row (two filled terracotta), and a neat keycap labelled "Yes".
+- Right side: a narrow vertical panel separated by one thin line, containing three tidy cards; each card has a tiny line icon, two thin grey placeholder bars and a small price in serif digits.
+- Bottom: one thin horizontal line and a row of small grey placeholder bars (a news ticker).
+
+All text except "$1,284", "Yes" and the three small prices is shown as thin grey placeholder bars, never as letters.

@@ -1,0 +1,7 @@
+One wide isometric line diagram, 16:9, no interface and no text at all (no letters, no numbers, no labels).
+
+STYLE: a deadpan-serious technical infographic, like an architecture diagram in an engineering report. Warm ivory paper background (#F0EEE6) with a very faint dot grid. Thin precise charcoal lines (#262624) of one fine, even weight. Flat muted fills used sparingly: terracotta (#D97757) as the single strong accent, plus a little soft sage (#BCD1CA), dusty blue (#6A9BCC) and sand (#D4A27F). No thick outlines, no chunky cartoon shapes, no candy colours, no gradients, no realistic shading.
+
+SUBJECT, placed in the lower-left two thirds of the picture: in the middle an isometric desk with an open laptop and a small, simply drawn programmer leaning back in a chair with a mug. On the laptop screen a small terracotta square with two dot eyes. In front of the laptop on the desk, one terracotta keyboard key. Thin straight connector lines with right-angle bends run from the laptop to five small isometric objects arranged around the desk: three more laptops on small tables, a small office building, a server rack. Small terracotta squares sit on the connector lines like beads, as if travelling along them toward the central laptop.
+
+The top quarter and the right third of the picture are completely empty paper.

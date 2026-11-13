@@ -1,7 +1,2 @@
-STYLE: bright Saturday-morning cartoon vector illustration for a casual clicker game ("bubblegum" look). Smooth, chunky, rounded shapes. A thick uniform dark outline (ink #2A2140) around every object, slightly thinner lines inside. Flat solid fills with exactly ONE small white highlight blob per object. No gradients for volume, no textures, no noise, no realistic shadows: only a soft flat oval blob shadow under objects. Even bright daylight with no visible light source. Big heads (about 1:2 head to body), plump friendly proportions, nothing thin or sharp.
-
-VIEW: flat front-on side view, like a cross-section dollhouse diorama. No perspective, no vanishing point, no camera tilt.
-
-PALETTE: cream #FFF3D0 (surfaces, furniture, panels), sky blue #4CC9F0 (walls, air, background), ink #2A2140 (outlines), sunny yellow #FFD23F, lilac #B388FF and pink #FF8FB1 (things of the human world). Orange #FF6A2B is RESERVED: only the AI character and its small square pixels may be orange. Green #39D353 is RESERVED for money only. Clean, saturated, cheerful.
-
-FORBIDDEN: clay or handmade look, blur, depth of field, photorealism, 3D render, dark or night backgrounds, grey or muted colours, brown mud, any text, letters, numbers, logos, watermarks, user interface elements.
+The ASSET text below fully defines the visual style of this picture: follow it exactly and do not add any other style.
+General rules for every picture: no real brand logos or trademarks, no watermarks, no signatures, no photorealism, no 3D render. The mood is grown-up, calm and intelligent, never childish or toy-like.

@@ -1,0 +1,35 @@
+{
+  "title": "",
+  "text": "",
+  "palette": [],
+  "tags": [],
+  "items": [
+    {
+      "file": "wikimedia-a13d85d6.png",
+      "url": "https://upload.wikimedia.org/wikipedia/commons/7/74/Claude_ru_wiki.png?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail_unscaled",
+      "page": "https://commons.wikimedia.org/wiki/File:Claude_ru_wiki.png",
+      "title": "Claude ru wiki",
+      "credit": "Прикли",
+      "license": "CC0",
+      "api": "wikimedia",
+      "query": "Anthropic",
+      "generated": false,
+      "note": "якорь: так выглядит сам Claude — проверяем по нему тон, палитру и толщину линий",
+      "w": 776,
+      "h": 595,
+      "sha1": "a13d85d6a9736368ba54a1869bee7415c708f30b"
+    }
+  ],
+  "dropped": [
+    {
+      "file": "wikimedia-3e5b7a2e.jpg",
+      "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/0/02/Secretary_of_State_Peter_Kyle_visits_Anthropic_in_San_Francisco._%2854098999333%29.jpg/1280px-Secretary_of_State_Peter_Kyle_visits_Anthropic_in_San_Francisco._%2854098999333%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+      "sha1": "3e5b7a2eff5c49ac68dddbd69c6d3a7b68c2e1e6"
+    },
+    {
+      "file": "wikimedia-bd2060a2.jpg",
+      "url": "https://upload.wikimedia.org/wikipedia/commons/8/8d/Fragment_of_an_Egyptian_Textile%2C_circa_700-1000_CE%2C_depicting_the_anthropic_figure_of_Anthousa%2C_a_rarely_depicted_divinity%2C_considered_to_be_the_deity_of_blossoming_plants._Fitzwilliam_Museum%2C_Cambridge.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail_unscaled",
+      "sha1": "bd2060a278ff595da6e24110715571c75d3705cf"
+    }
+  ]
+}
