@@ -3,6 +3,7 @@ import { TICKETS } from '../../content/tickets';
 import { logEvent, metrics } from '../../core/metrics';
 import type { Rng } from '../../core/rng';
 import { playSound, unlockSound } from '../../core/sound';
+import planData from '../../data/balance/plans.json';
 import tuningData from '../../data/tuning/agree.json';
 import { createOverlay, type Overlay } from '../../debug/overlay';
 import { createTuningPanel, type TuningPanel } from '../../debug/tuningPanel';
@@ -15,33 +16,38 @@ import {
   type AgreeTuning,
   type Approval,
 } from '../../systems/agree/agree';
-import { TERMINAL_SPOTS, type TerminalUi } from '../../ui/terminal/terminal';
+import { buyNextPlan, createPlan, type Plan, type PlanState } from '../../systems/plan/plan';
+import { ratePhrase, TERMINAL_SPOTS, type TerminalUi } from '../../ui/terminal/terminal';
 import { Squares } from '../../view/squares';
 
 const STEP = 1 / 60;
 const MONEY_GREEN = 0x7cc68d;
 const WINDOW = 3; // seconds the overlay rates are averaged over
-const GYM_KEYS = new Set(['KeyR', 'Tab', 'KeyO', 'KeyP', 'KeyT', 'Digit1', 'Digit2']);
+const GYM_KEYS = new Set(['KeyR', 'Tab', 'KeyO', 'KeyP', 'KeyT', 'KeyM', 'Digit1', 'Digit2']);
+const GYM_GIFT = 100;
 const NEWS = 'Местный разработчик третий день не открывал редактор. Коллеги ничего не заметили';
+const PLANS = planData as Plan[];
+const fmt = new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 0 });
 
 const HELP = `
-  <h2>ГИМ M01 · СОГЛАСИЕ</h2>
-  <p>Любая клавиша — «Да». Клод присылает запросы со своей скоростью, одно нажатие одобряет один.</p>
-  <p><kbd>1</kbd>очередь запросов (как задумано)</p>
-  <p><kbd>2</kbd>сравнение: каждое нажатие — «Да»</p>
-  <p><kbd>Tab</kbd>настройки: скорость Клода и др.</p>
-  <p><kbd>O</kbd>цифры: нажатия, согласия, вхолостую</p>
-  <p><kbd>P</kbd>сохранить настройки</p>
-  <p><kbd>T</kbd>замедление ×0,25</p>
-  <p><kbd>R</kbd>начать заново</p>`;
+  <div class="help">
+    <h2>ГИМ M01 · СОГЛАСИЕ</h2>
+    <p>Любая клавиша — «Да». Тариф покупается кликом.</p>
+    <p><kbd>M</kbd>подбросить $${GYM_GIFT} (только в гиме)</p>
+    <p><kbd>1</kbd>очередь запросов (как задумано)</p>
+    <p><kbd>2</kbd>сравнение: каждое нажатие — «Да»</p>
+    <p><kbd>Tab</kbd>настройки <kbd>O</kbd>цифры</p>
+    <p><kbd>T</kbd>замедление <kbd>R</kbd>заново <kbd>P</kbd>сохранить</p>
+  </div>`;
 
-/** M01 gym: the terminal, Claude's request queue and the «Да» key, with live tuning. */
+/** M01 gym: the terminal, Claude's request queue and the «Да» key; Claude's plan sets the pace (M03). */
 export class AgreeGym extends Phaser.Scene {
   private readonly rng: Rng;
   private readonly ui: TerminalUi;
   private readonly showOverlay: boolean;
   private readonly tuning = { ...tuningData } as AgreeTuning;
   private state!: AgreeState;
+  private plan!: PlanState;
   private squares!: Squares;
   private panel!: TuningPanel;
   private overlay!: Overlay;
@@ -49,6 +55,7 @@ export class AgreeGym extends Phaser.Scene {
   private clock = 0;
   private slow = false;
   private shownMoney = 0;
+  private sideHtml = '';
   private payouts: { at: number; amount: number }[] = [];
   private pressTimes: number[] = [];
   private approveTimes: number[] = [];
@@ -64,11 +71,10 @@ export class AgreeGym extends Phaser.Scene {
 
   create(): void {
     this.squares = new Squares(this, this.rng);
-    this.ui.side.innerHTML = HELP;
     this.overlay = createOverlay(this.showOverlay);
     this.panel = createTuningPanel('M01', this.tuning, [
       { key: 'mode', options: ['queue', 'classic'] },
-      { key: 'rate', min: 0.5, max: 20, step: 0.5 },
+      { key: 'rate', min: 0.25, max: 60, step: 0.25 },
       { key: 'stepsPerTask', min: 1, max: 10, step: 1 },
       { key: 'pay', min: 1, max: 50, step: 1 },
       { key: 'buffer', min: 0, max: 5, step: 1 },
@@ -78,7 +84,10 @@ export class AgreeGym extends Phaser.Scene {
 
     window.addEventListener('keydown', (e) => this.onKey(e));
     window.addEventListener('pointerdown', (e) => {
-      if (!(e.target as HTMLElement).closest('.lil-gui')) this.press();
+      const el = e.target as HTMLElement;
+      if (el.closest('.lil-gui')) return;
+      if (el.closest('[data-buy]')) this.buyPlan();
+      else if (!el.closest('.tm-side')) this.press();
     });
     window.__GAME__.ready = true;
   }
@@ -93,6 +102,8 @@ export class AgreeGym extends Phaser.Scene {
   }
 
   private restart(): void {
+    this.plan = createPlan();
+    this.applyPlan();
     this.state = createAgree(this.tuning);
     this.shownMoney = 0;
     this.payouts = [];
@@ -100,6 +111,24 @@ export class AgreeGym extends Phaser.Scene {
     this.approveTimes = [];
     this.wasteTimes = [];
     this.taskTimes = [];
+  }
+
+  /** The plan is what sets Claude's pace; the panel slider can still override it live. */
+  private applyPlan(): void {
+    this.tuning.rate = PLANS[this.plan.index].rate;
+    this.panel.refresh();
+  }
+
+  private buyPlan(): void {
+    unlockSound();
+    const paid = buyNextPlan(PLANS, this.plan, this.state.money);
+    if (!paid) return;
+    this.state.money -= paid;
+    this.payouts = [];
+    this.shownMoney = this.state.money;
+    this.applyPlan();
+    playSound('buy');
+    logEvent(`plan_${PLANS[this.plan.index].id}`);
   }
 
   private onKey(e: KeyboardEvent): void {
@@ -114,7 +143,10 @@ export class AgreeGym extends Phaser.Scene {
     else if (e.code === 'KeyO') this.overlay.toggle();
     else if (e.code === 'KeyP') this.panel.dump();
     else if (e.code === 'KeyT') this.slow = !this.slow;
-    else {
+    else if (e.code === 'KeyM') {
+      this.state.money += GYM_GIFT;
+      this.shownMoney += GYM_GIFT;
+    } else {
       this.tuning.mode = e.code === 'Digit2' ? 'classic' : 'queue';
       this.panel.refresh();
       logEvent(`mode_${this.tuning.mode}`);
@@ -167,6 +199,25 @@ export class AgreeGym extends Phaser.Scene {
     return times.length / Math.min(WINDOW, Math.max(this.clock, 0.5));
   }
 
+  private drawSide(): void {
+    let html = '<h2>ТАРИФ КЛОДА</h2>';
+    PLANS.forEach((p, i) => {
+      const cur = i === this.plan.index;
+      const next = i === this.plan.index + 1;
+      const can = next && this.state.money >= p.price;
+      const cls = cur ? 'cur' : can ? 'can' : i < this.plan.index || !next ? 'off' : '';
+      const status = cur ? 'подключён' : i < this.plan.index ? 'был' : can ? 'купить' : '';
+      html += `<div class="tm-item ${cls}"${can ? ' data-buy="1"' : ''}>
+        <b>${p.name}</b><span class="cnt">${status}</span>
+        <small>${ratePhrase(p.rate)}/с · ${p.note}</small><span class="price">$${fmt.format(p.price)}</span>
+      </div>`;
+    });
+    html += HELP;
+    if (html === this.sideHtml) return;
+    this.sideHtml = html;
+    this.ui.side.innerHTML = html;
+  }
+
   private draw(): void {
     const s = this.state;
     const t = this.tuning;
@@ -180,15 +231,17 @@ export class AgreeGym extends Phaser.Scene {
       buffered: s.buffered,
       thinking: thinkingProgress(s, t),
       rate: t.rate,
+      plan: PLANS[this.plan.index].name,
       classic: t.mode === 'classic',
       news: NEWS,
     });
+    this.drawSide();
     const presses = this.rate(this.pressTimes);
     const tasks = this.rate(this.taskTimes);
     this.overlay.set([
       `M01 согласие · режим ${t.mode}${this.slow ? ' · замедление' : ''}`,
       `нажатий/с   ${presses.toFixed(1)}   (всего ${s.presses})`,
-      `согласий/с  ${this.rate(this.approveTimes).toFixed(1)}   Клод шлёт ${t.rate.toFixed(1)}/с`,
+      `согласий/с  ${this.rate(this.approveTimes).toFixed(1)}   Клод шлёт ${t.rate.toFixed(2)}/с`,
       `вхолостую   ${this.rate(this.wasteTimes).toFixed(1)}/с  (всего ${s.wasted})`,
       `задач/с     ${tasks.toFixed(2)}   $/мин ${(tasks * t.pay * 60).toFixed(0)}`,
       `очередь     ${s.queue}/${t.queueMax}   «Да» заранее ${s.buffered}/${t.buffer}`,

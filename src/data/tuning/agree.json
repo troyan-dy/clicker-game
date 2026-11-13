@@ -1,6 +1,6 @@
 {
   "mode": "queue",
-  "rate": 3,
+  "rate": 0.75,
   "stepsPerTask": 5,
   "pay": 5,
   "buffer": 1,

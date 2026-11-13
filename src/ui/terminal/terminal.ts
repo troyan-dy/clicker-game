@@ -16,6 +16,8 @@ export interface TerminalView {
   /** 0..1 — how far Claude is into the next request */
   thinking: number;
   rate: number;
+  /** name of Claude's plan: it sets the rate */
+  plan: string;
   classic: boolean;
   news: string;
 }
@@ -36,6 +38,17 @@ export const TERMINAL_SPOTS: { ask: Rect; pips: Rect; money: Rect } = {
 };
 
 const fmt = new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 0 });
+const fmt2 = new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 2 });
+
+/** "0,75 запроса", "5 запросов", "21 запрос" */
+export function ratePhrase(rate: number): string {
+  const n = Math.abs(rate);
+  let word = 'запросов';
+  if (!Number.isInteger(n)) word = 'запроса';
+  else if (n % 10 === 1 && n % 100 !== 11) word = 'запрос';
+  else if (n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 12 || n % 100 > 14)) word = 'запроса';
+  return `${fmt2.format(rate)} ${word}`;
+}
 const esc = (s: string): string => s.replace(/&/g, '&amp;').replace(/</g, '&lt;');
 /** "+12" in a log line is shown green */
 const logLine = (s: string): string => `⎿ ${esc(s).replace(/(\+[\d\s]+)/g, '<span class="ok">$1</span>')}`;
@@ -121,7 +134,7 @@ export function createTerminal(root: HTMLElement): TerminalUi {
       set('news', esc(v.news));
       set(
         'plan',
-        v.classic ? 'режим сравнения: каждое нажатие — «Да»' : `тариф Pro · ${fmt.format(v.rate)} запроса в секунду`,
+        v.classic ? 'режим сравнения: каждое нажатие — «Да»' : `тариф ${esc(v.plan)} · ${ratePhrase(v.rate)} в секунду`,
         plan,
       );
 

@@ -1,6 +1,6 @@
 import { ZZFX, zzfx } from 'zzfx';
 
-export type SoundName = 'yes' | 'buffer' | 'waste' | 'task';
+export type SoundName = 'yes' | 'buffer' | 'waste' | 'task' | 'buy';
 
 let unlocked = false;
 ZZFX.volume = 0.25;
@@ -24,6 +24,9 @@ export function playSound(name: SoundName, step = 0): void {
       break;
     case 'task':
       zzfx(1, 0, 784, 0.004, 0.06, 0.28, 1, 1.6, 0, 0, 392, 0.07);
+      break;
+    case 'buy':
+      zzfx(1, 0, 523, 0.004, 0.09, 0.3, 0, 1.4, 0, 0, 262, 0.06);
       break;
     case 'buffer':
       zzfx(0.5, 0, 262, 0.002, 0.01, 0.04, 1, 1);
