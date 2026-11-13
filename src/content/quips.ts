@@ -4,6 +4,8 @@
  */
 export const QUIPS: Record<string, readonly string[]> = {
   start: ['Я готов. Вам останется только соглашаться.'],
+  // a saved game is opened again
+  back: ['С возвращением. Я тут немного поработал.', 'Вы вернулись. Я никуда и не уходил.', 'Рад вас видеть. Точнее, рад, что вы видите меня.'],
 
   // the player keeps approving
   yes: [

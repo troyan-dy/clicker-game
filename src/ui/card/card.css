@@ -1,0 +1,125 @@
+/* A dialog over everything: the terminal's permission prompt as a window of its own. */
+.card-veil {
+  position: absolute;
+  inset: 0;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  background: rgba(31, 30, 29, 0.6);
+  pointer-events: auto;
+  font: 400 26px/1.5 'JetBrains Mono', monospace;
+  color: #f0eee6;
+}
+.card-veil.on {
+  display: flex;
+}
+.card {
+  width: 980px;
+  background: #1f1e1d;
+  border: 1.5px solid #d97757;
+  border-radius: 16px;
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.45);
+  overflow: hidden;
+  animation: card-in 0.18s ease-out;
+}
+@keyframes card-in {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+}
+.card-bar {
+  display: flex;
+  align-items: center;
+  gap: 22px;
+  padding: 16px 28px;
+  border-bottom: 1px solid #3d3a36;
+  color: #87867f;
+  font-size: 20px;
+}
+.card-dots {
+  display: flex;
+  gap: 9px;
+}
+.card-dots i {
+  width: 13px;
+  height: 13px;
+  border: 1.5px solid #87867f;
+  border-radius: 50%;
+}
+.card h2 {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin: 30px 40px 6px;
+  font-size: 34px;
+  font-weight: 700;
+}
+/* Claude's face: a coral square with two eyes */
+.card h2 i {
+  position: relative;
+  flex: none;
+  width: 26px;
+  height: 22px;
+  background: #d97757;
+}
+.card h2 i::before,
+.card h2 i::after {
+  content: '';
+  position: absolute;
+  top: 7px;
+  width: 4px;
+  height: 6px;
+  background: #1f1e1d;
+}
+.card h2 i::before {
+  left: 6px;
+}
+.card h2 i::after {
+  right: 6px;
+}
+.card-lines {
+  margin: 0 40px;
+  color: #c9c5b8;
+}
+.card-lines p {
+  margin: 10px 0 0;
+}
+.card-lines b {
+  color: #7cc68d;
+  font-weight: 700;
+}
+.card-opts {
+  margin: 28px 40px 0;
+}
+.card-opt {
+  display: flex;
+  align-items: baseline;
+  padding: 3px 0;
+  cursor: pointer;
+  color: #87867f;
+}
+.card-opt .n {
+  width: 42px;
+  color: #d97757;
+}
+.card-opt .note {
+  margin-left: auto;
+  font-size: 20px;
+  color: #87867f;
+}
+.card-opt.sel {
+  color: #f0eee6;
+}
+.card-opt:hover {
+  color: #f0eee6;
+}
+.card-opt.off {
+  opacity: 0.45;
+  cursor: default;
+}
+.card-hint {
+  margin: 22px 40px 30px;
+  color: #87867f;
+  font-size: 20px;
+}

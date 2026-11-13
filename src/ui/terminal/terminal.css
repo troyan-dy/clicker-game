@@ -345,6 +345,11 @@
   transition: opacity 0.12s linear;
 }
 
+/* a saved game opens beyond the terminal: it is simply not there */
+.tm.gone {
+  display: none;
+}
+
 /* ------------------------------------------------------------ the shop */
 .tm-side {
   position: absolute;

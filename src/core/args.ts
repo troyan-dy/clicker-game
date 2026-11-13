@@ -4,9 +4,11 @@ export interface Args {
   state: string;
   debug: boolean;
   capture: boolean;
+  /** keep the game between visits */
+  save: boolean;
 }
 
-/** Launch arguments from the URL: ?seed=7&gym=agree&state=rich&debug=1 */
+/** Launch arguments from the URL: ?seed=7&gym=agree&state=rich&debug=1&save=1 */
 export function readArgs(search: string): Args {
   const p = new URLSearchParams(search);
   const seed = Number(p.get('seed'));
@@ -16,5 +18,6 @@ export function readArgs(search: string): Args {
     state: p.get('state') ?? '',
     debug: p.get('debug') === '1',
     capture: p.get('capture') === '1',
+    save: p.get('save') === '1',
   };
 }

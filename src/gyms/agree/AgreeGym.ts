@@ -15,6 +15,7 @@ import sourceData from '../../data/balance/sources.json';
 import { BP, deskScreen } from '../../data/layout/blueprint';
 import { HUBS } from '../../data/layout/hubs';
 import feedData from '../../data/tuning/feed.json';
+import saveData from '../../data/tuning/save.json';
 import tuningData from '../../data/tuning/pipeline.json';
 import { createOverlay, type Overlay } from '../../debug/overlay';
 import { createTuningPanel, type TuningPanel } from '../../debug/tuningPanel';
@@ -36,6 +37,7 @@ import {
   inflowOf,
   payOf,
   pressPipe,
+  screenOf,
   sessionsOf,
   shareOf,
   sourcePrice,
@@ -47,7 +49,9 @@ import {
   type PipeState,
   type Source,
 } from '../../systems/pipeline/pipeline';
+import { applyOffline, offlineReport, packSave, unpackSave, type OfflineReport } from '../../systems/save/save';
 import type { BlueprintTag, BlueprintUi } from '../../ui/blueprint/blueprint';
+import type { CardUi } from '../../ui/card/card';
 import { plural, short } from '../../ui/format';
 import {
   tasksPhrase,
@@ -74,6 +78,8 @@ const YES_MILESTONES = [3, 15, 40, 90, 160, 260];
 const IDLE_AFTER = 12; // seconds without a «Да» while requests wait
 const NECK_AFTER = 14; // seconds the same bottleneck lasts before Claude mentions it
 const SESSION_FORMS = ['сессия', 'сессии', 'сессий'] as const;
+const TASK_FORMS = ['задачу', 'задачи', 'задач'] as const;
+const SAVE_KEY = 'da-klod-save';
 const MONEY_SPOT: Rect = { x: BP.money.x - 80, y: BP.money.y - 20, w: 160, h: 40 };
 /** a big screen shrinks to this share of its size when it becomes a node of the next one */
 const HUB_SHRINK = 0.14;
@@ -87,7 +93,7 @@ function flowText(perSec: number): string {
 declare global {
   interface Window {
     /** gym-only hooks for scripted captures */
-    __gym?: { buy(what: string): boolean; gift(dollars: number): void };
+    __gym?: { buy(what: string): boolean; gift(dollars: number): void; away(hours: number): void };
   }
 }
 
@@ -108,7 +114,10 @@ export class AgreeGym extends Phaser.Scene {
   private readonly rng: Rng;
   private readonly term: TerminalUi;
   private readonly paper: BlueprintUi;
+  private readonly card: CardUi;
   private readonly showOverlay: boolean;
+  /** keep the game between visits (off in captures and tuning sessions) */
+  private readonly saving: boolean;
   // own copies of the data: the tuning panel edits them live, the mechanic reads them every step
   private readonly cfg: PipeConfig = {
     tuning: { ...tuningData },
@@ -140,18 +149,24 @@ export class AgreeGym extends Phaser.Scene {
   private won = false;
   private readonly feed = createFeed();
   private lastPress = 0;
+  private seconds = 0;
+  private sinceSave = 0;
+  /** set when the page is about to reload on purpose: the last save must stay as it is */
+  private frozen = false;
   private neckKind: Neck = 'none';
   private neckFor = 0;
   private pressTimes: number[] = [];
   /** squares owed to the connectors: tasks move faster than squares may be drawn */
   private owed = { in: 0, me: 0, sub: 0 };
 
-  constructor(rng: Rng, term: TerminalUi, paper: BlueprintUi, showOverlay: boolean) {
+  constructor(rng: Rng, term: TerminalUi, paper: BlueprintUi, card: CardUi, opts: { overlay: boolean; save: boolean }) {
     super('agree');
     this.rng = rng;
     this.term = term;
     this.paper = paper;
-    this.showOverlay = showOverlay;
+    this.card = card;
+    this.showOverlay = opts.overlay;
+    this.saving = opts.save;
   }
 
   preload(): void {
@@ -180,18 +195,19 @@ export class AgreeGym extends Phaser.Scene {
       { target: this.cfg.auto.subagent, key: 'share', label: 'сабагент: доля тарифа', min: 0.05, max: 1, step: 0.05 },
     ]);
     this.state = createPipe(this.cfg);
+    if (!this.loadGame()) this.say('start', true);
     this.lastMoney = this.state.money;
-    this.say('start', true);
 
     window.addEventListener('keydown', (e) => this.onKey(e));
     window.addEventListener('pointerdown', (e) => {
       const el = e.target as HTMLElement;
-      if (el.closest('.lil-gui')) return;
+      if (el.closest('.lil-gui') || this.card.open) return;
       const buy = el.closest<HTMLElement>('[data-buy]');
       if (buy) this.buy(buy.dataset.buy ?? '');
       else if (!el.closest('.tm-side') && !el.closest('.bl-shop')) this.press();
     });
-    window.__gym = { buy: (what) => this.buy(what), gift: (dollars) => this.gift(dollars) };
+    window.addEventListener('pagehide', () => this.saveGame());
+    window.__gym = { buy: (what) => this.buy(what), gift: (dollars) => this.gift(dollars), away: (hours) => this.away(hours) };
     window.__GAME__.ready = true;
   }
 
@@ -205,16 +221,112 @@ export class AgreeGym extends Phaser.Scene {
     else if (this.stage === 2) this.drawBlueprint();
     else this.drawHub();
     this.drawOverlay();
+
+    this.sinceSave += deltaMs / 1000;
+    if (this.sinceSave >= saveData.autosaveSeconds) this.saveGame();
+  }
+
+  private saveGame(): void {
+    this.sinceSave = 0;
+    if (!this.saving || this.frozen) return;
+    try {
+      const feed = { shown: this.feed.shown, said: this.feed.said };
+      localStorage.setItem(SAVE_KEY, packSave({ at: Date.now(), state: this.state, feed, won: this.won, seconds: this.seconds }));
+    } catch {
+      // private mode or a full disk: the game goes on without saving
+    }
+  }
+
+  /** Opens a saved game on the screen it was left at. Returns false when there is nothing to open. */
+  private loadGame(): boolean {
+    if (!this.saving) return false;
+    let json: string | null;
+    try {
+      json = localStorage.getItem(SAVE_KEY);
+    } catch {
+      return false;
+    }
+    const file = unpackSave(json, this.cfg);
+    if (!file) return false;
+    this.state = file.state;
+    this.feed.shown = file.feed.shown;
+    this.feed.said = file.feed.said;
+    this.won = file.won;
+    this.seconds = file.seconds;
+    this.stage = screenOf(this.state);
+    if (this.stage >= 2) {
+      this.term.root.classList.add('gone');
+      this.paper.show(true);
+    }
+    if (this.stage === 2) {
+      this.view.sync({ sources: this.state.owned, subagents: this.state.subagents });
+      this.view.show(0);
+    } else if (this.stage >= 3) {
+      const hub = this.hubs.get(this.stage)!;
+      hub.sync({ owned: this.state.owned, farms: this.state.farms });
+      hub.show(0);
+    }
+    const report = offlineReport(this.state, this.cfg, saveData, (Date.now() - file.at) / 1000);
+    if (report) this.morning(report);
+    else this.say('back', true);
+    return true;
+  }
+
+  /** The morning report: what the sessions did while the game was closed. One answer: «Да». */
+  private morning(report: OfflineReport): void {
+    const h = Math.floor(report.seconds / 3600);
+    const m = Math.floor((report.seconds % 3600) / 60);
+    const away = h && m ? `${h} ч ${m} мин` : h ? `${h} ч` : `${m} мин`;
+    const capped = report.seconds >= saveData.offlineCapHours * 3600;
+    const lines = report.waited
+      ? [`Прошло ${away}.`, 'Клод ждал вашего «Да». Он не в обиде: у него нет такой функции.']
+      : [
+          `Прошло ${away}${capped ? ' — дольше сессии не ждут, они уснули' : ''}.`,
+          `Клод закрыл ${short(report.tasks)} ${plural(report.tasks, TASK_FORMS)}. Никто ничего не заметил.`,
+          `На счёт пришло <b>$${short(report.dollars)}</b>.`,
+        ];
+    this.card.show({ head: 'claude — утренний отчёт', title: 'Пока вас не было', lines, options: [{ label: 'Да', note: report.waited ? '' : 'забрать' }] }, () => {
+      unlockSound();
+      applyOffline(this.state, report);
+      this.lastMoney += report.dollars; // not this second's income
+      if (report.dollars > 0) playSound('buy');
+      this.say('back', true);
+      this.saveGame();
+    });
+  }
+
+  /** gym-only: pretend the game was closed for `hours` and open it again */
+  private away(hours: number): void {
+    this.saveGame();
+    this.frozen = true;
+    try {
+      const file = JSON.parse(localStorage.getItem(SAVE_KEY) ?? '{}') as { at?: number };
+      file.at = Date.now() - hours * 3600 * 1000;
+      localStorage.setItem(SAVE_KEY, JSON.stringify(file));
+    } catch {
+      return;
+    }
+    window.location.reload();
   }
 
   private onKey(e: KeyboardEvent): void {
+    if (this.card.key(e)) return;
     if (e.repeat) return;
     if (!GYM_KEYS.has(e.code)) {
       this.press();
       return;
     }
     e.preventDefault();
-    if (e.code === 'KeyR') window.location.reload();
+    if (e.code === 'KeyR') {
+      // «заново» means a new game: the save goes too
+      this.frozen = true;
+      try {
+        localStorage.removeItem(SAVE_KEY);
+      } catch {
+        // nothing was saved anyway
+      }
+      window.location.reload();
+    }
     else if (e.code === 'Tab') this.panel.toggle();
     else if (e.code === 'KeyO') this.overlay.toggle();
     else if (e.code === 'KeyP') this.panel.dump({ tuning: this.cfg.tuning, sources: this.cfg.sources, auto: this.cfg.auto });
@@ -258,6 +370,7 @@ export class AgreeGym extends Phaser.Scene {
     if (what === 'noask') this.pullBack();
     else if (what === 'scale') this.scaleUp();
     this.remark(what, surged);
+    this.saveGame();
     return true;
   }
 
@@ -383,6 +496,7 @@ export class AgreeGym extends Phaser.Scene {
 
   private step(dt: number): void {
     this.clock += dt;
+    this.seconds += dt;
     const s = this.state;
     const done = stepPipe(s, this.cfg, dt);
 

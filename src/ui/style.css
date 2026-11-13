@@ -76,3 +76,11 @@ body {
   z-index: 2;
   pointer-events: none;
 }
+
+/* dialogs: above the canvas and everything else */
+#top {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+}

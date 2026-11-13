@@ -15,6 +15,7 @@ import { AgreeGym } from './gyms/agree/AgreeGym';
 import { createLookdevUi } from './gyms/lookdev/lookdevUi';
 import { LookdevScene } from './gyms/lookdev/LookdevScene';
 import { createBlueprint } from './ui/blueprint/blueprint';
+import { createCard } from './ui/card/card';
 import { createHud } from './ui/hud';
 import { mountUiScale } from './ui/scale';
 import { createTerminal } from './ui/terminal/terminal';
@@ -36,7 +37,14 @@ function pickScene(): Phaser.Scene {
     layer.className = 'ui1080';
     ui.append(layer);
     const paper = createBlueprint(layer);
-    return new AgreeGym(rng, createTerminal(layer), paper, args.debug);
+    // dialogs live in a layer of their own, above the canvas
+    const top = document.createElement('div');
+    top.id = 'top';
+    top.innerHTML = '<div class="ui1080"></div>';
+    stage.append(top);
+    mountUiScale(stage, top);
+    const card = createCard(top.firstElementChild as HTMLElement);
+    return new AgreeGym(rng, createTerminal(layer), paper, card, { overlay: args.debug, save: args.save && !args.capture });
   }
   if (args.gym === 'hello') return new HelloScene(rng, createHud(ui));
   return new LookdevScene(rng, createLookdevUi(ui, 'assets/img/scene_blueprint.webp'));

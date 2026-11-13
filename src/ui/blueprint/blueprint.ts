@@ -36,8 +36,8 @@ export interface BlueprintModel {
 
 export interface BlueprintUi {
   render(model: BlueprintModel): void;
-  /** the pull-back has happened: captions, shop and money appear */
-  show(): void;
+  /** the pull-back has happened: captions, shop and money appear; `now` — at once, a saved game opens here */
+  show(now?: boolean): void;
   /** below the shop: a gym puts its help here */
   extra: HTMLElement;
 }
@@ -86,8 +86,9 @@ export function createBlueprint(layer: HTMLElement): BlueprintUi {
 
   return {
     extra: q('.bl-extra'),
-    show() {
+    show(now = false) {
       root.classList.add('on');
+      root.classList.toggle('now', now);
     },
     render(m) {
       // the counter jumps a few times a second at most: restarting the animation forces a layout
