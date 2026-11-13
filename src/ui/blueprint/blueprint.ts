@@ -28,6 +28,10 @@ export interface BlueprintModel {
   shelves: ShopShelf[];
   news: string;
   hint: string;
+  /** Claude's remark; empty — he is silent */
+  quip: string;
+  /** where the remark appears: above the laptop of the blueprint or in the corner of a map */
+  quipAt: 'desk' | 'corner';
 }
 
 export interface BlueprintUi {
@@ -51,6 +55,7 @@ export function createBlueprint(layer: HTMLElement): BlueprintUi {
     <div class="bl-money"><b>$0</b><span></span></div>
     <div class="bl-neck"></div>
     <div class="bl-tags"></div>
+    <div class="bl-quip"><i></i><span></span></div>
     <aside class="bl-shop"><div class="bl-shelves"></div><div class="bl-extra"></div></aside>
     <div class="bl-news"><i>НОВОСТИ</i><span></span><em></em></div>
   </div></div>`,
@@ -58,6 +63,8 @@ export function createBlueprint(layer: HTMLElement): BlueprintUi {
   const root = layer.lastElementChild as HTMLElement;
   const q = <T extends HTMLElement>(sel: string): T => root.querySelector<T>(sel)!;
   const money = q('.bl-money b');
+  const quip = q('.bl-quip');
+  const quipText = q('.bl-quip span');
   const parts: Record<string, HTMLElement> = {
     summary: q('.bl-money span'),
     neck: q('.bl-neck'),
@@ -96,6 +103,9 @@ export function createBlueprint(layer: HTMLElement): BlueprintUi {
       set('summary', `+$${income} в секунду · ${esc(m.summary)}`);
       set('neck', m.neck);
       set('news', esc(m.news));
+      // the last remark stays in place while it fades out
+      if (m.quip) set('quip', esc(m.quip), quipText);
+      quip.className = `bl-quip ${m.quipAt}${m.quip ? ' on' : ''}`;
       set('hint', esc(m.hint));
       set(
         'tags',

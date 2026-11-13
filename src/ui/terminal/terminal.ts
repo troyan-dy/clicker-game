@@ -51,6 +51,8 @@ export interface TerminalView {
   neck: Neck;
   shelves: ShopShelf[];
   news: string;
+  /** Claude's remark; empty — he is silent */
+  quip: string;
 }
 
 export interface TerminalUi {
@@ -131,6 +133,7 @@ export function createTerminal(layer: HTMLElement): TerminalUi {
         <div class="cell" data-c="out"><small>ДОХОД</small><b class="ok" data-f="fout"></b></div>
       </div>
       <div class="tm-auto" data-f="auto"></div>
+      <div class="tm-quip"><span class="tm-sq"></span><span data-f="quip"></span></div>
     </section>
     <aside class="tm-side"><div class="tm-shop"></div><div class="tm-extra"></div></aside>
     <footer class="tm-status">
@@ -153,6 +156,7 @@ export function createTerminal(layer: HTMLElement): TerminalUi {
   const opt2 = q('.tm-opt[data-o="2"]');
   const key = q('.tm-key');
   const shop = q('.tm-shop');
+  const quip = q('.tm-quip');
   const cells = Array.from(root.querySelectorAll<HTMLElement>('.tm-flow .cell'));
   let selected = opt1;
 
@@ -184,6 +188,9 @@ export function createTerminal(layer: HTMLElement): TerminalUi {
       set('log0', logLine(v.prompt.log[0]));
       set('log1', logLine(v.prompt.log[1]));
       set('news', esc(v.news));
+      // the last remark stays in place while it fades out
+      if (v.quip) set('quip', esc(v.quip));
+      quip.classList.toggle('on', !!v.quip);
       set('pay', `за задачу +$${fmt2.format(v.pay)}`);
 
       // the prompt box: asking, working, out of work, or no longer asking at all

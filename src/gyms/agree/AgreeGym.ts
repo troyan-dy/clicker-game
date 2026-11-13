@@ -1,4 +1,6 @@
 import Phaser from 'phaser';
+import { NEWS } from '../../content/news';
+import { QUIPS } from '../../content/quips';
 import { FINALE, HUB_TEXT, SCALE_SHELF } from '../../content/screens';
 import { promptAt } from '../../content/tickets';
 import { logEvent, metrics } from '../../core/metrics';
@@ -12,9 +14,11 @@ import scaleData from '../../data/balance/scales.json';
 import sourceData from '../../data/balance/sources.json';
 import { BP, deskScreen } from '../../data/layout/blueprint';
 import { HUBS } from '../../data/layout/hubs';
+import feedData from '../../data/tuning/feed.json';
 import tuningData from '../../data/tuning/pipeline.json';
 import { createOverlay, type Overlay } from '../../debug/overlay';
 import { createTuningPanel, type TuningPanel } from '../../debug/tuningPanel';
+import { createFeed, say, stepFeed, type FeedContent } from '../../systems/feed/feed';
 import type { Plan } from '../../systems/plan/plan';
 import {
   backlogCap,
@@ -64,8 +68,11 @@ const MONEY_ON_PAPER = 0x3f7d58;
 const SMOOTH = 1.5; // seconds: how slowly the bottleneck reading and the income follow the moment
 const GYM_KEYS = new Set(['KeyR', 'Tab', 'KeyO', 'KeyP', 'KeyT', 'KeyM']);
 const GYM_GIFT = 100;
-const NEWS_TERMINAL = 'Местный разработчик третий день не открывал редактор. Коллеги ничего не заметили';
-const NEWS_BLUEPRINT = 'HR заметил, что новый сотрудник отвечает в чате за 0,2 секунды и всегда согласен';
+const FEED: FeedContent = { news: NEWS, quips: QUIPS };
+/** approvals after which Claude says something nice about the player's judgement */
+const YES_MILESTONES = [3, 15, 40, 90, 160, 260];
+const IDLE_AFTER = 12; // seconds without a «Да» while requests wait
+const NECK_AFTER = 14; // seconds the same bottleneck lasts before Claude mentions it
 const SESSION_FORMS = ['сессия', 'сессии', 'сессий'] as const;
 const MONEY_SPOT: Rect = { x: BP.money.x - 80, y: BP.money.y - 20, w: 160, h: 40 };
 /** a big screen shrinks to this share of its size when it becomes a node of the next one */
@@ -131,6 +138,10 @@ export class AgreeGym extends Phaser.Scene {
   private avgBacklog = 0;
   private avgReady = 0;
   private won = false;
+  private readonly feed = createFeed();
+  private lastPress = 0;
+  private neckKind: Neck = 'none';
+  private neckFor = 0;
   private pressTimes: number[] = [];
   /** squares owed to the connectors: tasks move faster than squares may be drawn */
   private owed = { in: 0, me: 0, sub: 0 };
@@ -170,6 +181,7 @@ export class AgreeGym extends Phaser.Scene {
     ]);
     this.state = createPipe(this.cfg);
     this.lastMoney = this.state.money;
+    this.say('start', true);
 
     window.addEventListener('keydown', (e) => this.onKey(e));
     window.addEventListener('pointerdown', (e) => {
@@ -226,6 +238,7 @@ export class AgreeGym extends Phaser.Scene {
     const s = this.state;
     const cfg = this.cfg;
     const before = s.money;
+    const surged = what.startsWith('farm:') && (s.surge[what.slice(5)] ?? 1) > 1.3; // bought in a shortage
     let ok = false;
     if (what.startsWith('src:')) {
       const src = cfg.sources.find((x) => x.id === what.slice(4));
@@ -244,7 +257,32 @@ export class AgreeGym extends Phaser.Scene {
     logEvent(`buy_${what}`);
     if (what === 'noask') this.pullBack();
     else if (what === 'scale') this.scaleUp();
+    this.remark(what, surged);
     return true;
+  }
+
+  /** Claude's word on a purchase. Plans, grades and steps in scale are said every time: their lines go in the order of the purchases. */
+  private remark(what: string, surged: boolean): void {
+    if (what.startsWith('src:')) this.say(this.stage >= 3 ? 'buy:employer' : 'buy:src');
+    else if (what.startsWith('farm:')) {
+      const farm = this.cfg.farms.find((x) => x.id === what.slice(5));
+      this.say(surged ? 'surge' : farm?.share ? 'quota' : 'buy:farm');
+    } else this.say(`buy:${what}`, what !== 'sub');
+  }
+
+  private say(on: string, force = false): void {
+    if (say(this.feed, FEED, feedData, on, force)) playSound('quip');
+  }
+
+  /** whether the player owns what a news line is about */
+  private has(id: string): boolean {
+    const s = this.state;
+    if (id === 'plan') return s.plan.index > 0;
+    if (id === 'sub') return s.subagents > 0;
+    if (id === 'grade') return s.grade > 0;
+    // the first job is there from the start: news about a source mean one that was bought
+    const src = this.cfg.sources.find((x) => x.id === id);
+    return (s.owned[id] ?? 0) > (src?.start ?? 0) || (s.farms[id] ?? 0) > 0;
   }
 
   /** «Да, и больше не спрашивай»: the terminal shrinks into the laptop screen, the blueprint appears. */
@@ -264,6 +302,7 @@ export class AgreeGym extends Phaser.Scene {
     this.paper.show();
     this.view.sync({ sources: this.state.owned, subagents: this.state.subagents });
     this.view.show(650);
+    playSound('scale');
     logEvent('pull_back');
   }
 
@@ -279,6 +318,7 @@ export class AgreeGym extends Phaser.Scene {
     const hub = this.hubs.get(next)!;
     hub.sync({ owned: this.state.owned, farms: this.state.farms });
     hub.show(450);
+    playSound('scale');
     logEvent(`scale_${next}`);
   }
 
@@ -286,14 +326,19 @@ export class AgreeGym extends Phaser.Scene {
     unlockSound();
     const result = pressPipe(this.state, this.cfg);
     this.pressTimes.push(this.clock);
+    this.lastPress = this.clock;
     if (this.stage === 1) this.term.hit(result);
     if (result === 'approved') {
       playSound('yes', this.yesStreak++ % 5);
       if (this.stage === 1) this.squares.fly(TERMINAL_SPOTS.ask, TERMINAL_SPOTS.money, 5, MONEY_ON_DARK, 220, [0.35, 0.6]);
       else if (this.stage === 2) this.delivered(...this.deskSpot(), 3);
       else this.delivered(...this.homeSpot(), 3);
+      if (YES_MILESTONES.includes(this.state.closedHere)) this.say('yes');
     } else if (result === 'buffered') playSound('buffer');
-    else playSound('waste');
+    else {
+      playSound('waste');
+      if (this.state.wasted === 3 || this.state.wasted % 20 === 0) this.say('waste');
+    }
     metrics.presses = this.state.presses;
     metrics.completed = this.state.closedHere >= 3;
   }
@@ -398,9 +443,27 @@ export class AgreeGym extends Phaser.Scene {
     }
     if (!this.won && finished(s, this.cfg)) {
       this.won = true;
-      playSound('buy');
+      playSound('finale');
       logEvent('finale');
+      this.say('finale', true);
     }
+
+    // Claude notices a pause and a bottleneck that does not go away
+    if (!s.noAsk && s.ready >= 2 && this.clock - this.lastPress > IDLE_AFTER) {
+      this.say('idle');
+      this.lastPress = this.clock;
+    }
+    const neck = this.neck();
+    if (neck !== this.neckKind) {
+      this.neckKind = neck;
+      this.neckFor = 0;
+    }
+    this.neckFor += dt;
+    if (neck !== 'none' && this.neckFor > NECK_AFTER) {
+      this.say(`neck:${neck}`);
+      this.neckFor = -45; // and not again for a while
+    }
+    stepFeed(this.feed, FEED, feedData, dt, this.stage, (id) => this.has(id), this.rng);
 
     // smoothed readings: what is slowest, how much comes in per second
     const k = dt / SMOOTH;
@@ -554,7 +617,8 @@ export class AgreeGym extends Phaser.Scene {
       subRate: subagentRate(s, cfg),
       neck,
       shelves: this.terminalShelves(neck),
-      news: NEWS_TERMINAL,
+      news: this.feed.news,
+      quip: this.feed.quip,
     });
   }
 
@@ -604,7 +668,9 @@ export class AgreeGym extends Phaser.Scene {
             : 'узких мест нет — можно просить повышение'),
       tags,
       shelves: this.blueprintShelves(neck),
-      news: NEWS_BLUEPRINT,
+      news: this.feed.news,
+      quip: this.feed.quip,
+      quipAt: 'desk',
       hint: 'Enter — подогнать Клода: +1 задача',
     });
   }
@@ -660,7 +726,9 @@ export class AgreeGym extends Phaser.Scene {
                 : 'узких мест нет — можно просить повышение'),
       tags,
       shelves: this.hubShelves(neck, hired, employers.length),
-      news: t.news,
+      news: this.feed.news,
+      quip: this.feed.quip,
+      quipAt: 'corner',
       hint: `${t.place}: ${hired} из ${employers.length} ${t.unit}`,
     });
   }

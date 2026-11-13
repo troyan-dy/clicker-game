@@ -102,6 +102,62 @@
   line-height: 1.35;
 }
 
+/* Claude's remark: a small dark terminal card */
+.bl-quip {
+  position: absolute;
+  max-width: 430px;
+  padding: 12px 18px 13px 50px;
+  border-radius: 10px;
+  background: #262624;
+  color: #f0eee6;
+  font: 400 17px/1.4 'JetBrains Mono', monospace;
+  opacity: 0;
+  transform: translateY(6px);
+  transition:
+    opacity 0.35s linear,
+    transform 0.35s ease-out;
+}
+.bl-quip.on {
+  opacity: 1;
+  transform: none;
+  transition:
+    opacity 0.12s linear,
+    transform 0.16s ease-out;
+}
+.bl-quip.desk {
+  left: 560px;
+  top: 292px;
+}
+.bl-quip.corner {
+  left: 24px;
+  top: 36px;
+  max-width: 318px;
+}
+/* his face: a coral square with two eyes */
+.bl-quip i {
+  position: absolute;
+  left: 17px;
+  top: 15px;
+  width: 20px;
+  height: 17px;
+  background: var(--coral);
+}
+.bl-quip i::before,
+.bl-quip i::after {
+  content: '';
+  position: absolute;
+  top: 5px;
+  width: 3px;
+  height: 5px;
+  background: #262624;
+}
+.bl-quip i::before {
+  left: 5px;
+}
+.bl-quip i::after {
+  right: 5px;
+}
+
 .bl-shop {
   position: absolute;
   right: 0;
@@ -116,7 +172,7 @@
 .bl-shop h2 {
   display: flex;
   align-items: baseline;
-  margin: 14px 0 10px;
+  margin: 12px 0 8px;
   font: 400 16px 'JetBrains Mono', monospace;
   letter-spacing: 0.12em;
   color: var(--dim);
@@ -134,8 +190,8 @@
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 0 16px;
-  margin-bottom: 10px;
-  padding: 11px 20px 13px;
+  margin-bottom: 8px;
+  padding: 8px 20px 10px;
   background: var(--card);
   border: 1.5px solid var(--rule);
   border-radius: 12px;

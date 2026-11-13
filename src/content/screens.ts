@@ -16,7 +16,6 @@ export interface HubText {
   /** «город: 3 из 12 компаний» */
   place: string;
   unit: string;
-  news: string;
 }
 
 export const HUB_TEXT: Record<number, HubText> = {
@@ -31,7 +30,6 @@ export const HUB_TEXT: Record<number, HubText> = {
     doneSub: 'ты числишься во всех компаниях',
     place: 'город',
     unit: 'компаний',
-    news: 'В городе закрыты все вакансии разработчика. Кадровики подозревают одного и того же человека',
   },
   4: {
     home: 'твой город',
@@ -44,7 +42,6 @@ export const HUB_TEXT: Record<number, HubText> = {
     doneSub: 'все ведомства у тебя на подряде',
     place: 'страна',
     unit: 'ведомств',
-    news: 'Госзакупки: тендер на «разработку всего» снова выиграл единственный участник',
   },
   5: {
     home: 'твоя страна',
@@ -57,7 +54,6 @@ export const HUB_TEXT: Record<number, HubText> = {
     doneSub: 'все операции планирует Клод',
     place: 'планета',
     unit: 'операций',
-    news: 'Аналитики: вся выручка одной ИИ-лаборатории приходится на одного клиента. Клиент согласен',
   },
 };
 

@@ -332,6 +332,19 @@
   font-size: 20px;
 }
 
+.tm-quip {
+  margin-top: 10px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  opacity: 0;
+  transition: opacity 0.35s linear;
+}
+.tm-quip.on {
+  opacity: 1;
+  transition: opacity 0.12s linear;
+}
+
 /* ------------------------------------------------------------ the shop */
 .tm-side {
   position: absolute;
