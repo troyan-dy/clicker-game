@@ -32,3 +32,8 @@ test-results/
 playwright-report/
 *.log
 # <<< studioigor:web
+
+# image generation scratch (finals live in art/gen and public/assets)
+art/raw/
+art/old/
+art/logs/

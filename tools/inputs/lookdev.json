@@ -1,0 +1,10 @@
+[
+  { "t": 0.5, "key": "Enter" },
+  { "t": 1.0, "key": "Enter" },
+  { "t": 1.5, "key": "Space" },
+  { "t": 2.0, "key": "Enter" },
+  { "t": 2.5, "key": "Enter" },
+  { "t": 3.3, "key": "Enter" },
+  { "t": 3.7, "key": "KeyY" },
+  { "t": 4.1, "key": "Enter" }
+]

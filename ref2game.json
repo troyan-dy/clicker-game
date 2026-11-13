@@ -1,0 +1,5 @@
+{
+  "generator": { "provider": "codex", "alpha": "auto", "key": "00ff00", "jobs": 4 },
+  "style_bible": "art/style_bible.txt",
+  "style_ref": ["art/gen/key_lookdev.png"]
+}

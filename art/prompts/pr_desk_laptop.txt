@@ -1,0 +1,8 @@
+ONE isolated game sprite: a wide chunky cream desk with a chunky cream laptop standing on it, seen flat from the front.
+
+- The desk: a thick rounded cream tabletop on two fat rounded legs, simple, friendly, with one white highlight blob.
+- The laptop stands in the middle of the desk, its screen facing the viewer straight on, no tilt. The laptop is big: about half the desk's width.
+- The laptop screen is one flat solid dark navy rectangle (#2A2140) with rounded corners and NOTHING on it: no face, no icons, no reflections, no text. A face will be drawn on it later.
+- Below the screen, the laptop's keyboard base is a simple cream slab with a row of tiny rounded keys suggested by a few small shapes.
+- Nothing else on the desk: no mug, no lamp, no person.
+- The whole desk and laptop fit inside the picture with a margin on every side; the desk legs end at the bottom with a soft flat oval blob shadow.

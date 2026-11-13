@@ -1,0 +1,8 @@
+ONE isolated game sprite, full body: a plump young programmer sitting sideways on a chunky office chair, facing RIGHT.
+
+- Big round head (about half of his body height), messy dark curly hair, a relaxed, slightly smug smile, half-closed eyes, pink cheeks. No glasses.
+- Lilac hoodie (#B388FF), dark purple trousers, lilac sneakers.
+- He leans back in the chair with his legs crossed. His right arm is stretched forward to the right with the index finger pointing down, as if about to press a big button. His other hand holds a cream mug.
+- The chair: a chunky rounded cream office chair on one leg with a wheeled base.
+- The whole figure and chair fit inside the picture with a margin on every side; a soft flat oval blob shadow under the chair.
+- No desk, no computer, no button, no other objects.

@@ -1,0 +1,8 @@
+An EMPTY room background for a game, 16:9, edge to edge, no characters and no desk.
+
+- A sky-blue wall filling most of the picture.
+- Upper left: a rounded window with a cream frame showing a lighter sky with two fluffy white clouds.
+- Upper right: a small cream wall shelf with a potted plant and two books, a round wall clock next to it.
+- A cream floor strip along the bottom fifth of the picture, separated from the wall by one thick dark outline; a pink round rug lying flat on the floor in the middle.
+- The whole central area of the wall and the middle of the floor stay free and uncluttered: furniture and characters will be placed on top later.
+- The top fifth of the picture is plain calm wall with nothing on it.

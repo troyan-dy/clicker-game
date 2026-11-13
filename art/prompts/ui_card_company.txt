@@ -1,0 +1,10 @@
+A small banner illustration in the style of a tech-startup landing page ("corporate Memphis" flat illustration), used as a parody of company websites.
+
+- Completely flat shapes with NO outlines at all.
+- Two or three faceless people with tiny heads and huge, long, bendy arms and legs, happily high-fiving around a floating laptop.
+- Simple geometric decorations around them: circles, squiggles, a potted plant, a rocket.
+- Pastel background (soft cream or pale lilac) with exactly one acid accent colour (bright mint or hot pink).
+- No text, no letters, no logos, no buttons. Edge to edge, no frame.
+- Friendly, generic, slightly too enthusiastic.
+
+This asset deliberately does NOT follow the outlined cartoon style of the rest of the game: flat, outline-free, faceless.
