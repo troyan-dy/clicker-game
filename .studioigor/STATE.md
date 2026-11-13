@@ -1,7 +1,7 @@
 # studioigor — Да, Клод
 
 PROJECT: Да, Клод
-PHASE: 2 — Style
+PHASE: 5 — Assets and look-dev
 UPDATED: 2026-11-13 23:36
 
 ## Now

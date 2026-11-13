@@ -67,3 +67,12 @@ body {
   font-size: 3.2cqh;
   opacity: 0.75;
 }
+
+/* look-dev and later scenes: the canvas only draws effects, above the HTML layers */
+#stage.overlay-canvas #ui {
+  z-index: 1;
+}
+#stage.overlay-canvas #game {
+  z-index: 2;
+  pointer-events: none;
+}

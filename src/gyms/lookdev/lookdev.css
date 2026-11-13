@@ -1,0 +1,451 @@
+/* Look-dev for «Терминал и чертёж». Laid out in 1920×1080 px; .ui1080 scales it to the stage. */
+.ui1080 {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 1920px;
+  height: 1080px;
+  overflow: hidden;
+  transform-origin: 0 0;
+  transform: scale(var(--k, 1));
+  --paper: #f0eee6;
+  --card: #faf9f5;
+  --ink: #262624;
+  --dim: #87867f;
+  --rule: #c9c5b8;
+  --coral: #d97757;
+  --money-paper: #3f7d58;
+  --t-bg: #1f1e1d;
+  --t-panel: #262624;
+  --t-line: #3d3a36;
+  --t-text: #f0eee6;
+  --money-term: #7cc68d;
+}
+.ui1080 * {
+  box-sizing: border-box;
+}
+
+/* ---------------------------------------------------------------- blueprint (paper) */
+.bp {
+  position: absolute;
+  inset: 0;
+  /* the picture itself is set from lookdevUi.ts so the path stays relative to the page */
+  background: var(--paper) 0 0 / 1920px 1080px no-repeat;
+  color: var(--ink);
+  font: 400 22px/1.45 'Source Serif 4', serif;
+}
+.bp-hud {
+  opacity: 0;
+  transition: opacity 0.2s linear;
+}
+.bp.on .bp-hud {
+  opacity: 1;
+  transition: opacity 0.5s linear 0.85s;
+}
+.bp-money {
+  position: absolute;
+  left: 0;
+  width: 1340px;
+  top: 34px;
+  text-align: center;
+  line-height: 1;
+}
+.bp-money b {
+  display: block;
+  font-size: 118px;
+  font-weight: 600;
+  color: var(--money-paper);
+  letter-spacing: -0.02em;
+}
+.bp-money span {
+  display: inline-block;
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1.5px solid var(--ink);
+  font-size: 26px;
+}
+.bp-tag {
+  position: absolute;
+  padding: 2px 0 3px;
+  border-bottom: 1.5px solid var(--ink);
+  font: 400 18px 'JetBrains Mono', monospace;
+  white-space: nowrap;
+}
+.bp-tag b {
+  color: var(--money-paper);
+  font-weight: 700;
+}
+.bp-tag.soon {
+  color: var(--dim);
+  border-bottom: 1.5px dashed var(--dim);
+}
+
+/* Claude's prompt on the blueprint: a small dark terminal window */
+.bp-card {
+  position: absolute;
+  left: 818px;
+  top: 148px;
+  width: 500px;
+  padding: 18px 24px 20px;
+  background: var(--t-bg);
+  border: 1.5px solid var(--ink);
+  border-radius: 14px;
+  color: var(--t-text);
+  font: 400 20px/1.5 'JetBrains Mono', monospace;
+}
+.bp-card .who {
+  color: var(--dim);
+  font-size: 17px;
+}
+.bp-card h3 {
+  margin: 4px 0 8px;
+  font-size: 23px;
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+.sq {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  margin-right: 12px;
+  background: var(--coral);
+}
+.opt {
+  display: flex;
+  gap: 12px;
+  padding: 1px 8px;
+  margin: 0 -8px;
+  border-radius: 6px;
+}
+.opt .n {
+  width: 22px;
+  color: var(--coral);
+}
+.opt.sel {
+  color: var(--coral);
+  font-weight: 700;
+}
+.opt.sel.flash {
+  background: var(--coral);
+  color: var(--t-bg);
+}
+.opt.sel.flash .n {
+  color: var(--t-bg);
+}
+.opt .note {
+  margin-left: auto;
+  color: var(--dim);
+  font-weight: 400;
+}
+.opt.off {
+  color: var(--dim);
+}
+.task {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-top: 14px;
+}
+.pips {
+  display: flex;
+  gap: 7px;
+}
+.pips i {
+  width: 20px;
+  height: 20px;
+  border: 1px solid var(--dim);
+}
+.pips i.on {
+  background: var(--coral);
+  border-color: var(--coral);
+}
+.pay {
+  color: var(--money-term);
+}
+.key {
+  margin-left: auto;
+  padding: 4px 18px 6px;
+  border: 1px solid var(--t-text);
+  border-bottom-width: 5px;
+  border-radius: 10px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.key.down {
+  transform: translateY(3px);
+  border-bottom-width: 2px;
+}
+
+.bp-shop {
+  position: absolute;
+  right: 0;
+  top: 0;
+  bottom: 58px;
+  width: 580px;
+  padding: 40px 36px;
+  border-left: 1.5px solid var(--ink);
+  background: var(--paper);
+}
+.bp-shop h2 {
+  margin: 0 0 20px;
+  font-size: 40px;
+  font-weight: 600;
+}
+.bp-item {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 2px 16px;
+  margin-bottom: 16px;
+  padding: 16px 22px 18px;
+  background: var(--card);
+  border: 1.5px solid var(--rule);
+  border-radius: 14px;
+  line-height: 1.3;
+}
+.bp-item b {
+  font-size: 28px;
+  font-weight: 600;
+}
+.bp-item .cnt {
+  font: 400 21px 'JetBrains Mono', monospace;
+  color: var(--dim);
+  text-align: right;
+}
+.bp-item small {
+  font-size: 20px;
+  color: var(--dim);
+}
+.bp-item .price {
+  font-size: 28px;
+  font-weight: 600;
+  color: var(--dim);
+  text-align: right;
+}
+.bp-item.can {
+  border-color: var(--ink);
+}
+.bp-item.can .price {
+  color: var(--money-paper);
+}
+.bp-item.off {
+  opacity: 0.5;
+}
+.bp-news {
+  position: absolute;
+  inset: auto 0 0 0;
+  height: 58px;
+  padding: 0 36px;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  border-top: 1.5px solid var(--ink);
+  background: var(--paper);
+  font-size: 22px;
+  white-space: nowrap;
+}
+.bp-news i,
+.bp-news em {
+  font: 400 17px 'JetBrains Mono', monospace;
+  font-style: normal;
+  color: var(--dim);
+  letter-spacing: 0.12em;
+}
+.bp-news em {
+  margin-left: auto;
+  letter-spacing: 0;
+}
+
+/* ---------------------------------------------------------------- terminal (stage 1) */
+.term {
+  position: absolute;
+  inset: 0;
+  background: var(--t-bg);
+  color: var(--t-text);
+  font: 400 23px/1.6 'JetBrains Mono', monospace;
+  transform-origin: 0 0;
+  transition:
+    transform 1.1s cubic-bezier(0.7, 0, 0.2, 1),
+    opacity 0.2s linear;
+}
+/* the terminal becomes the screen of the central laptop (LD.screen in layout.ts) */
+.term.small {
+  transform: matrix(0.070833, 0.023438, -0.012963, 0.091667, 589, 611);
+  opacity: 0;
+  transition:
+    transform 1.1s cubic-bezier(0.7, 0, 0.2, 1),
+    opacity 0.3s linear 0.95s;
+}
+.t-bar {
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 132px;
+  border-bottom: 1px solid var(--t-line);
+}
+.t-dots {
+  position: absolute;
+  left: 30px;
+  top: 26px;
+  display: flex;
+  gap: 10px;
+}
+.t-dots i {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 1px solid var(--dim);
+}
+.t-title {
+  position: absolute;
+  left: 112px;
+  top: 15px;
+  color: var(--dim);
+  font-size: 19px;
+}
+.t-plan {
+  position: absolute;
+  right: 30px;
+  top: 15px;
+  color: var(--dim);
+  font-size: 19px;
+}
+.t-money {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 12px;
+  text-align: center;
+  line-height: 1;
+}
+.t-money b {
+  font-size: 84px;
+  font-weight: 700;
+  color: var(--money-term);
+  letter-spacing: -0.02em;
+}
+.t-money em {
+  margin-left: 22px;
+  font-style: normal;
+  font-size: 27px;
+  color: var(--money-term);
+  opacity: 0.75;
+}
+.pop {
+  display: inline-block;
+  animation: ld-pop 0.16s ease-out;
+}
+@keyframes ld-pop {
+  0% {
+    transform: scale(1.1, 0.92);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+.t-main {
+  position: absolute;
+  left: 0;
+  top: 133px;
+  width: 1340px;
+  bottom: 54px;
+  padding: 26px 44px;
+}
+.t-main .sub {
+  padding-left: 26px;
+  color: var(--dim);
+}
+.t-main .ok {
+  color: var(--money-term);
+}
+.t-ask {
+  margin: 22px 0 0;
+  padding: 20px 28px 22px;
+  background: var(--t-panel);
+  border: 1px solid var(--coral);
+  border-radius: 12px;
+}
+.t-ask h3 {
+  margin: 0 0 10px;
+  font-size: 27px;
+  font-weight: 700;
+}
+.t-ask .key {
+  font-size: 27px;
+  padding: 6px 26px 8px;
+}
+.t-ask .pips i {
+  width: 22px;
+  height: 22px;
+}
+.t-hint {
+  margin-top: 26px;
+  color: var(--dim);
+  font-size: 20px;
+}
+.t-shop {
+  position: absolute;
+  right: 0;
+  top: 133px;
+  bottom: 54px;
+  width: 580px;
+  padding: 26px 30px;
+  border-left: 1px solid var(--t-line);
+}
+.t-shop h2 {
+  margin: 0 0 14px;
+  font-size: 19px;
+  font-weight: 400;
+  color: var(--dim);
+  letter-spacing: 0.14em;
+}
+.t-item {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 2px 18px;
+  margin-bottom: 14px;
+  padding: 14px 20px 15px;
+  background: var(--t-panel);
+  border: 1px solid var(--t-line);
+  border-radius: 12px;
+  line-height: 1.35;
+}
+.t-item b {
+  font-weight: 700;
+  font-size: 25px;
+}
+.t-item .cnt {
+  color: var(--dim);
+  text-align: right;
+}
+.t-item small {
+  color: var(--dim);
+  font-size: 19px;
+}
+.t-item .price {
+  text-align: right;
+  font-weight: 700;
+  font-size: 25px;
+  color: var(--dim);
+}
+.t-item.off {
+  opacity: 0.45;
+}
+.t-status {
+  position: absolute;
+  inset: auto 0 0 0;
+  height: 54px;
+  padding: 0 30px;
+  display: flex;
+  align-items: center;
+  gap: 22px;
+  border-top: 1px solid var(--t-line);
+  color: var(--dim);
+  font-size: 20px;
+  white-space: nowrap;
+}
+.t-status .news {
+  color: var(--t-text);
+}
+.t-status .r {
+  margin-left: auto;
+}

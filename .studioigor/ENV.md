@@ -32,7 +32,7 @@ VERIFIED: yes
 RUN: npm run dev -- --open
 TEST: npx tsc --noEmit && npx vitest run
 BUILD: npm run build
-CAPTURE: npm run build && node tools/capture.mjs --dir dist --out .studioigor/captures/hello --duration 5 --every 1 --inputs tools/inputs/hello.json --wait-for "window.__GAME__?.ready" --seed 7
+CAPTURE: npm run build && node tools/capture.mjs --dir dist --url "/?gym=hello" --out .studioigor/captures/hello --duration 5 --every 1 --inputs tools/inputs/hello.json --wait-for "window.__GAME__?.ready" --seed 7
 EDITOR: none — the code is in the repository
 
 ## Pitfalls

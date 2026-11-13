@@ -1,10 +1,12 @@
 [
   { "t": 0.5, "key": "Enter" },
-  { "t": 1.0, "key": "Enter" },
-  { "t": 1.5, "key": "Space" },
-  { "t": 2.0, "key": "Enter" },
-  { "t": 2.5, "key": "Enter" },
-  { "t": 3.3, "key": "Enter" },
-  { "t": 3.7, "key": "KeyY" },
-  { "t": 4.1, "key": "Enter" }
+  { "t": 0.9, "key": "Enter" },
+  { "t": 1.3, "key": "Space" },
+  { "t": 1.7, "key": "Enter" },
+  { "t": 2.1, "key": "Enter" },
+  { "t": 4.6, "key": "Enter" },
+  { "t": 5.0, "key": "Enter" },
+  { "t": 5.4, "key": "KeyD" },
+  { "t": 5.8, "key": "Enter" },
+  { "t": 6.2, "key": "Enter" }
 ]
