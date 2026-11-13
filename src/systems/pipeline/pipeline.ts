@@ -1,5 +1,5 @@
 /**
- * The core loop as a conveyor of tasks (M01 «Согласие», M02 sources, M03 plan, M05 automation):
+ * The core loop as a conveyor of tasks (M01 «Согласие», M02 sources, M03 plan, M05 «не спрашивай» and subagents):
  *
  *   sources ──► backlog ──► Claude (plan rate) ──► waiting for «Да» ──► $ per task
  *                  └──────► subagents: their own sessions, no «Да» needed ──► $
@@ -24,12 +24,11 @@ export interface Source {
 }
 
 export interface AutoConfig {
-  /** one-off: presses «Да» for the player, `rate` times a second */
-  brick: { name: string; note: string; price: number; rate: number };
   /** one-off: the player's own terminal stops asking */
   noAsk: { name: string; note: string; price: number };
   /** scalable: a session of its own that closes tasks at the plan's rate */
-  subagent: { name: string; note: string; price: number; growth: number };
+  /** `share` — the part of the plan's speed one subagent session gets */
+  subagent: { name: string; note: string; price: number; growth: number; share: number };
 }
 
 export interface PipeTuning {
@@ -61,7 +60,6 @@ export interface PipeState {
   plan: PlanState;
   /** units owned per source id */
   owned: Record<string, number>;
-  brick: boolean;
   noAsk: boolean;
   subagents: number;
   presses: number;
@@ -70,7 +68,6 @@ export interface PipeState {
   closedHere: number;
   closedBySubagents: number;
   inflowAcc: number;
-  brickAcc: number;
   subAcc: number;
 }
 
@@ -87,7 +84,6 @@ export function createPipe(cfg: PipeConfig): PipeState {
     think: 0.6,
     plan: { index: 0 },
     owned,
-    brick: false,
     noAsk: false,
     subagents: 0,
     presses: 0,
@@ -95,7 +91,6 @@ export function createPipe(cfg: PipeConfig): PipeState {
     closedHere: 0,
     closedBySubagents: 0,
     inflowAcc: 0,
-    brickAcc: 0,
     subAcc: 0,
   };
 }
@@ -114,7 +109,7 @@ export function claudeRate(s: PipeState, cfg: PipeConfig): number {
 
 /** tasks per second all subagent sessions close on their own */
 export function subagentRate(s: PipeState, cfg: PipeConfig): number {
-  return s.subagents * claudeRate(s, cfg);
+  return s.subagents * claudeRate(s, cfg) * cfg.auto.subagent.share;
 }
 
 export function sourcePrice(src: Source, owned: number): number {
@@ -131,16 +126,21 @@ function pay(s: PipeState, cfg: PipeConfig, bySubagent: boolean): void {
   else s.closedHere++;
 }
 
-/** Advances the conveyor by dt seconds. Returns how many tasks were closed without a key press. */
-export function stepPipe(s: PipeState, cfg: PipeConfig, dt: number): { here: number; subagents: number } {
+/** Advances the conveyor by dt seconds. Returns how many tasks arrived and how many were closed without a key press. */
+export function stepPipe(
+  s: PipeState,
+  cfg: PipeConfig,
+  dt: number,
+): { arrived: number; here: number; subagents: number } {
   const t = cfg.tuning;
-  const out = { here: 0, subagents: 0 };
+  const out = { arrived: 0, here: 0, subagents: 0 };
 
   // tasks arrive
   s.inflowAcc += inflowOf(s, cfg) * dt;
   while (s.inflowAcc >= 1 && s.backlog < t.backlogMax) {
     s.inflowAcc--;
     s.backlog++;
+    out.arrived++;
   }
   if (s.backlog >= t.backlogMax) s.inflowAcc = Math.min(s.inflowAcc, 1); // the boss waits
 
@@ -167,22 +167,12 @@ export function stepPipe(s: PipeState, cfg: PipeConfig, dt: number): { here: num
     if (s.ready >= t.readyMax) s.think = Math.min(s.think, 1); // Claude waits for a «Да»
   }
 
-  // «Да» given in advance, then the brick
+  // «Да» given in advance
   while (s.buffered > 0 && s.ready > 0) {
     s.buffered--;
     s.ready--;
     pay(s, cfg, false);
     out.here++;
-  }
-  if (s.brick && !s.noAsk) {
-    s.brickAcc += cfg.auto.brick.rate * dt;
-    while (s.brickAcc >= 1 && s.ready > 0) {
-      s.brickAcc--;
-      s.ready--;
-      pay(s, cfg, false);
-      out.here++;
-    }
-    if (s.ready === 0) s.brickAcc = Math.min(s.brickAcc, 1);
   }
 
   // subagents: sessions of their own, straight from the backlog
@@ -242,12 +232,6 @@ export function buyPlan(s: PipeState, cfg: PipeConfig): boolean {
   const paid = buyNextPlan(cfg.plans, s.plan, s.money);
   if (!paid) return false;
   s.money -= paid;
-  return true;
-}
-
-export function buyBrick(s: PipeState, cfg: PipeConfig): boolean {
-  if (s.brick || s.noAsk || !spend(s, cfg.auto.brick.price)) return false;
-  s.brick = true;
   return true;
 }
 

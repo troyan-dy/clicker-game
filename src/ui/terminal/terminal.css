@@ -26,6 +26,22 @@
   background: var(--bg);
   color: var(--text);
   font: 400 23px/1.6 'JetBrains Mono', monospace;
+  transform-origin: 0 0;
+  transition:
+    transform 1.1s cubic-bezier(0.7, 0, 0.2, 1),
+    opacity 0.2s linear;
+}
+/* the pull-back: the terminal shrinks into the screen of the laptop on the blueprint (transform is set from code) */
+.tm.small {
+  opacity: 0;
+  pointer-events: none;
+  transition:
+    transform 1.1s cubic-bezier(0.7, 0, 0.2, 1),
+    opacity 0.3s linear 0.95s;
+}
+.tm.small .tm-side,
+.tm.small .tm-opt.buy {
+  pointer-events: none;
 }
 .tm .dim {
   color: var(--dim);

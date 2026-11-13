@@ -2,5 +2,5 @@
   { "id": "pro", "name": "Pro", "price": 20, "rate": 0.75, "note": "Клод отвечает, когда освободится" },
   { "id": "max5", "name": "Max 5x", "price": 100, "rate": 3.75, "note": "в пять раз больше Клода" },
   { "id": "max20", "name": "Max 20x", "price": 200, "rate": 15, "note": "пишет быстрее, чем ты жмёшь" },
-  { "id": "ent", "name": "Enterprise", "price": 2000, "rate": 60, "note": "цена по запросу, запросы без счёта" }
+  { "id": "ent", "name": "Enterprise", "price": 20000, "rate": 60, "note": "цена по запросу" }
 ]

@@ -6,12 +6,12 @@ import { playSound, unlockSound } from '../../core/sound';
 import autoData from '../../data/balance/auto.json';
 import planData from '../../data/balance/plans.json';
 import sourceData from '../../data/balance/sources.json';
+import { BP, deskScreen } from '../../data/layout/blueprint';
 import tuningData from '../../data/tuning/pipeline.json';
 import { createOverlay, type Overlay } from '../../debug/overlay';
 import { createTuningPanel, type TuningPanel } from '../../debug/tuningPanel';
 import type { Plan } from '../../systems/plan/plan';
 import {
-  buyBrick,
   buyNoAsk,
   buyPlan,
   buySource,
@@ -28,6 +28,7 @@ import {
   type PipeState,
   type Source,
 } from '../../systems/pipeline/pipeline';
+import type { BlueprintTag, BlueprintUi } from '../../ui/blueprint/blueprint';
 import {
   tasksPhrase,
   TERMINAL_SPOTS,
@@ -36,14 +37,18 @@ import {
   type ShopShelf,
   type TerminalUi,
 } from '../../ui/terminal/terminal';
-import { Squares } from '../../view/squares';
+import { BlueprintView, VISIBLE_SUBAGENTS } from '../../view/blueprintView';
+import { Squares, type Rect } from '../../view/squares';
 
 const STEP = 1 / 60;
-const MONEY_GREEN = 0x7cc68d;
+const MONEY_ON_DARK = 0x7cc68d;
+const MONEY_ON_PAPER = 0x3f7d58;
 const SMOOTH = 1.5; // seconds: how slowly the bottleneck reading and the income follow the moment
 const GYM_KEYS = new Set(['KeyR', 'Tab', 'KeyO', 'KeyP', 'KeyT', 'KeyM']);
 const GYM_GIFT = 100;
-const NEWS = 'Местный разработчик третий день не открывал редактор. Коллеги ничего не заметили';
+const NEWS_TERMINAL = 'Местный разработчик третий день не открывал редактор. Коллеги ничего не заметили';
+const NEWS_BLUEPRINT = 'HR заметил, что новый сотрудник отвечает в чате за 0,2 секунды и всегда согласен';
+const MONEY_SPOT: Rect = { x: BP.money.x - 80, y: BP.money.y - 20, w: 160, h: 40 };
 const fmt = new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 0 });
 
 declare global {
@@ -59,45 +64,60 @@ const HELP = `
   <p><kbd>Tab</kbd>настройки <kbd>O</kbd>цифры <kbd>P</kbd>сохранить</p>`;
 
 /**
- * Gym of the core loop (M01 «Согласие», M02 sources, M03 plan, M05 automation): the terminal
- * with the conveyor of tasks. The player presses «Да», buys from three shelves, watches the bottleneck.
+ * Gym of the core loop. Stage 1 — the terminal: the conveyor of tasks, «Да», sources, plan
+ * (M01–M03). Buying «Да, и больше не спрашивай» pulls the camera back to stage 2 — the blueprint,
+ * where subagents and more jobs scale the operation (M04, M05).
  */
 export class AgreeGym extends Phaser.Scene {
   private readonly rng: Rng;
-  private readonly ui: TerminalUi;
+  private readonly term: TerminalUi;
+  private readonly paper: BlueprintUi;
   private readonly showOverlay: boolean;
   // own copies of the data: the tuning panel edits them live, the mechanic reads them every step
   private readonly cfg: PipeConfig = {
     tuning: { ...tuningData },
     plans: planData as Plan[],
     sources: (sourceData as Source[]).map((s) => ({ ...s })),
-    auto: { brick: { ...autoData.brick }, noAsk: { ...autoData.noAsk }, subagent: { ...autoData.subagent } },
+    auto: { noAsk: { ...autoData.noAsk }, subagent: { ...autoData.subagent } },
   };
   private state!: PipeState;
+  private view!: BlueprintView;
   private squares!: Squares;
   private panel!: TuningPanel;
   private overlay!: Overlay;
+  private onBlueprint = false;
   private acc = 0;
   private clock = 0;
   private slow = false;
   private yesStreak = 0;
   private lastAutoSound = 0;
+  private lastDelivery = 0;
   private lastMoney = 0;
   private income = 0;
   private avgBacklog = 0;
   private avgReady = 0;
   private pressTimes: number[] = [];
+  /** squares owed to the connectors: tasks move faster than squares may be drawn */
+  private owed = { in: 0, me: 0, sub: 0 };
 
-  constructor(rng: Rng, ui: TerminalUi, showOverlay: boolean) {
+  constructor(rng: Rng, term: TerminalUi, paper: BlueprintUi, showOverlay: boolean) {
     super('agree');
     this.rng = rng;
-    this.ui = ui;
+    this.term = term;
+    this.paper = paper;
     this.showOverlay = showOverlay;
   }
 
+  preload(): void {
+    BlueprintView.preload(this);
+  }
+
   create(): void {
+    this.view = new BlueprintView(this, this.rng);
+    this.view.onDelivered = (x, y) => this.delivered(x, y);
     this.squares = new Squares(this, this.rng, 700);
-    this.ui.extra.innerHTML = HELP;
+    this.term.extra.innerHTML = HELP;
+    this.paper.extra.innerHTML = HELP;
     this.overlay = createOverlay(this.showOverlay);
     const t = this.cfg.tuning;
     this.panel = createTuningPanel('M01', [
@@ -105,10 +125,11 @@ export class AgreeGym extends Phaser.Scene {
       { target: t, key: 'backlogMax', label: 'бэклог, макс.', min: 5, max: 100, step: 5 },
       { target: t, key: 'readyMax', label: 'ждут «Да», макс.', min: 1, max: 30, step: 1 },
       { target: t, key: 'buffer', label: '«Да» заранее', min: 0, max: 5, step: 1 },
-      { target: this.cfg.sources[0], key: 'inflow', label: 'работа №1: задач/с', min: 0.25, max: 5, step: 0.25 },
-      { target: this.cfg.auto.brick, key: 'rate', label: 'кирпич: «Да»/с', min: 1, max: 20, step: 1 },
+      { target: this.cfg.sources[0], key: 'inflow', label: 'работа: задач/с', min: 0.25, max: 5, step: 0.25 },
+      { target: this.cfg.auto.subagent, key: 'share', label: 'сабагент: доля тарифа', min: 0.05, max: 1, step: 0.05 },
     ]);
-    this.restart();
+    this.state = createPipe(this.cfg);
+    this.lastMoney = this.state.money;
 
     window.addEventListener('keydown', (e) => this.onKey(e));
     window.addEventListener('pointerdown', (e) => {
@@ -116,12 +137,9 @@ export class AgreeGym extends Phaser.Scene {
       if (el.closest('.lil-gui')) return;
       const buy = el.closest<HTMLElement>('[data-buy]');
       if (buy) this.buy(buy.dataset.buy ?? '');
-      else if (!el.closest('.tm-side')) this.press();
+      else if (!el.closest('.tm-side') && !el.closest('.bl-shop')) this.press();
     });
-    window.__gym = {
-      buy: (what) => this.buy(what),
-      gift: (dollars) => this.gift(dollars),
-    };
+    window.__gym = { buy: (what) => this.buy(what), gift: (dollars) => this.gift(dollars) };
     window.__GAME__.ready = true;
   }
 
@@ -131,17 +149,9 @@ export class AgreeGym extends Phaser.Scene {
       this.step(STEP);
       this.acc -= STEP;
     }
-    this.draw();
-  }
-
-  private restart(): void {
-    this.state = createPipe(this.cfg);
-    this.lastMoney = this.state.money;
-    this.income = 0;
-    this.avgBacklog = 0;
-    this.avgReady = 0;
-    this.pressTimes = [];
-    this.yesStreak = 0;
+    if (this.onBlueprint) this.drawBlueprint();
+    else this.drawTerminal();
+    this.drawOverlay();
   }
 
   private onKey(e: KeyboardEvent): void {
@@ -151,7 +161,7 @@ export class AgreeGym extends Phaser.Scene {
       return;
     }
     e.preventDefault();
-    if (e.code === 'KeyR') this.restart();
+    if (e.code === 'KeyR') window.location.reload();
     else if (e.code === 'Tab') this.panel.toggle();
     else if (e.code === 'KeyO') this.overlay.toggle();
     else if (e.code === 'KeyP') this.panel.dump({ tuning: this.cfg.tuning, sources: this.cfg.sources, auto: this.cfg.auto });
@@ -172,45 +182,103 @@ export class AgreeGym extends Phaser.Scene {
     let ok = false;
     if (what.startsWith('src:')) ok = buySource(s, this.cfg, what.slice(4));
     else if (what === 'plan') ok = buyPlan(s, this.cfg);
-    else if (what === 'brick') ok = buyBrick(s, this.cfg);
-    else if (what === 'noask') ok = buyNoAsk(s, this.cfg);
-    else if (what === 'sub') ok = buySubagent(s, this.cfg);
+    else if (what === 'noask') ok = !this.onBlueprint && buyNoAsk(s, this.cfg);
+    else if (what === 'sub') ok = this.onBlueprint && buySubagent(s, this.cfg);
     if (!ok) return false;
     this.lastMoney -= before - s.money; // a purchase is not negative income
     playSound('buy');
     logEvent(`buy_${what}`);
+    if (what === 'noask') this.pullBack();
     return true;
+  }
+
+  /** «Да, и больше не спрашивай»: the terminal shrinks into the laptop screen, the blueprint appears. */
+  private pullBack(): void {
+    this.onBlueprint = true;
+    const q = deskScreen();
+    const m = [
+      (q.tr[0] - q.tl[0]) / 1920,
+      (q.tr[1] - q.tl[1]) / 1920,
+      (q.bl[0] - q.tl[0]) / 1080,
+      (q.bl[1] - q.tl[1]) / 1080,
+      q.tl[0],
+      q.tl[1],
+    ];
+    this.term.root.style.transform = `matrix(${m.map((v) => v.toFixed(5)).join(',')})`;
+    this.term.root.classList.add('small');
+    this.paper.show();
+    this.view.sync({ sources: this.state.owned, subagents: this.state.subagents });
+    this.view.show(650);
+    logEvent('pull_back');
   }
 
   private press(): void {
     unlockSound();
     const result = pressPipe(this.state, this.cfg);
     this.pressTimes.push(this.clock);
-    this.ui.hit(result);
+    if (!this.onBlueprint) this.term.hit(result);
     if (result === 'approved') {
       playSound('yes', this.yesStreak++ % 5);
-      this.squares.fly(TERMINAL_SPOTS.ask, TERMINAL_SPOTS.money, 5, MONEY_GREEN, 220, [0.35, 0.6]);
+      if (this.onBlueprint) this.delivered(...this.deskSpot(), 3);
+      else this.squares.fly(TERMINAL_SPOTS.ask, TERMINAL_SPOTS.money, 5, MONEY_ON_DARK, 220, [0.35, 0.6]);
     } else if (result === 'buffered') playSound('buffer');
     else playSound('waste');
     metrics.presses = this.state.presses;
     metrics.completed = this.state.closedHere >= 3;
   }
 
+  private deskSpot(): [number, number] {
+    const q = deskScreen();
+    return [(q.tr[0] + q.bl[0]) / 2, (q.tr[1] + q.bl[1]) / 2];
+  }
+
+  /** a task was closed at a session on the blueprint: a square flies from there into the money */
+  private delivered(x: number, y: number, count = 1): void {
+    if (count === 1 && this.clock - this.lastDelivery < 0.07) return; // not more than ~14 squares a second
+    this.lastDelivery = this.clock;
+    this.squares.fly({ x: x - 6, y: y - 6, w: 12, h: 12 }, MONEY_SPOT, count, MONEY_ON_PAPER, 160, [0.45, 0.75]);
+  }
+
   private step(dt: number): void {
     this.clock += dt;
     const s = this.state;
     const done = stepPipe(s, this.cfg, dt);
-    if (done.here > 0) {
-      this.ui.hit('auto');
-      this.squares.fly(TERMINAL_SPOTS.ask, TERMINAL_SPOTS.money, Math.min(done.here, 3) * 2, MONEY_GREEN, 220, [0.35, 0.6]);
-      if (this.clock - this.lastAutoSound > 0.16) {
-        this.lastAutoSound = this.clock;
-        playSound('auto');
+
+    if (this.onBlueprint) {
+      // squares on the connectors: at most a handful per second on each, however fast the tasks go
+      this.owed.in = Math.min(this.owed.in + done.arrived, 2);
+      this.owed.me = Math.min(this.owed.me + done.here, 2);
+      this.owed.sub = Math.min(this.owed.sub + done.subagents, 3);
+      if (this.rng.next() < dt * 9 && this.owed.in >= 1) {
+        this.owed.in--;
+        const total = inflowOf(s, this.cfg);
+        let pick = this.rng.range(0, total);
+        for (const src of this.cfg.sources) {
+          pick -= (s.owned[src.id] ?? 0) * src.inflow;
+          if (pick <= 0) {
+            this.view.flow(`src:${src.id}`);
+            break;
+          }
+        }
       }
+      if (this.rng.next() < dt * 9 && this.owed.me >= 1) {
+        this.owed.me--;
+        this.view.flow('ses:me');
+      }
+      if (this.rng.next() < dt * 14 && this.owed.sub >= 1) {
+        this.owed.sub--;
+        this.view.flow(this.view.randomSession(s.subagents));
+      }
+      this.view.step(dt);
+    } else if (done.here > 0) {
+      this.term.hit('auto');
+      this.squares.fly(TERMINAL_SPOTS.ask, TERMINAL_SPOTS.money, Math.min(done.here, 3) * 2, MONEY_ON_DARK, 220, [0.35, 0.6]);
     }
-    if (done.subagents > 0) {
-      this.squares.fly(TERMINAL_SPOTS.backlog, TERMINAL_SPOTS.money, Math.min(done.subagents, 2), MONEY_GREEN, 320, [0.5, 0.8]);
+    if (done.here > 0 && this.clock - this.lastAutoSound > 0.16) {
+      this.lastAutoSound = this.clock;
+      playSound('auto');
     }
+
     // smoothed readings: what is slowest, how much comes in per second
     const k = dt / SMOOTH;
     this.avgBacklog += (s.backlog - this.avgBacklog) * k;
@@ -229,61 +297,64 @@ export class AgreeGym extends Phaser.Scene {
     return 'none';
   }
 
-  private shelves(neck: Neck): ShopShelf[] {
+  private row(title: string, sub: string, count: string, buy: string, cost: number): ShopRow {
+    return { title, sub, count, buy, price: `$${fmt.format(cost)}`, state: this.state.money >= cost ? 'can' : 'poor' };
+  }
+
+  private sourceRows(): ShopRow[] {
     const s = this.state;
-    const cfg = this.cfg;
-    const price = (n: number): string => `$${fmt.format(n)}`;
-    const forSale = (buy: string, cost: number): Pick<ShopRow, 'buy' | 'price' | 'state'> => ({
-      buy,
-      price: price(cost),
-      state: s.money >= cost ? 'can' : 'poor',
-    });
-
-    const sources: ShopRow[] = cfg.sources.map((src) => {
+    return this.cfg.sources.map((src) => {
       const owned = s.owned[src.id] ?? 0;
-      const sub = `+${tasksPhrase(src.inflow)}/с · ${src.note}`;
-      if (owned >= src.max) return { buy: '', title: src.name, sub, count: 'есть', price: '', state: 'owned' };
-      return { title: src.name, sub, count: owned ? `×${owned}` : '', ...forSale(`src:${src.id}`, sourcePrice(src, owned)) };
+      return this.row(src.name, `+${tasksPhrase(src.inflow)}/с · ${src.note}`, owned ? `×${owned}` : '', `src:${src.id}`, sourcePrice(src, owned));
     });
+  }
 
-    const next = cfg.plans[s.plan.index + 1];
-    const plans: ShopRow[] = next
-      ? [{ title: `Тариф ${next.name}`, sub: `${tasksPhrase(next.rate)}/с · ${next.note}`, count: '', ...forSale('plan', next.price) }]
-      : [{ buy: '', title: `Тариф ${cfg.plans[s.plan.index].name}`, sub: 'быстрее тарифа нет', count: 'максимум', price: '', state: 'owned' }];
+  private planRows(): ShopRow[] {
+    const s = this.state;
+    const next = this.cfg.plans[s.plan.index + 1];
+    if (next) return [this.row(`Тариф ${next.name}`, `${tasksPhrase(next.rate)}/с · ${next.note}`, '', 'plan', next.price)];
+    const cur = this.cfg.plans[s.plan.index];
+    return [{ buy: '', title: `Тариф ${cur.name}`, sub: 'быстрее тарифа нет', count: 'максимум', price: '', state: 'owned' }];
+  }
 
-    const a = cfg.auto;
-    const brick: ShopRow = s.noAsk
-      ? { buy: '', title: a.brick.name, sub: 'больше не нужен', count: '', price: '', state: 'off' }
-      : s.brick
-        ? { buy: '', title: a.brick.name, sub: `жмёт «Да» ${a.brick.rate} раз в секунду`, count: 'лежит', price: '', state: 'owned' }
-        : { title: a.brick.name, sub: `${a.brick.rate} «Да»/с · ${a.brick.note}; один`, count: '', ...forSale('brick', a.brick.price) };
-    const noAsk: ShopRow = s.noAsk
-      ? { buy: '', title: a.noAsk.name, sub: a.noAsk.note, count: 'куплено', price: '', state: 'owned' }
-      : { title: a.noAsk.name, sub: a.noAsk.note, count: '', ...forSale('noask', a.noAsk.price) };
-    const sub: ShopRow = {
-      title: a.subagent.name,
-      sub: `+${tasksPhrase(claudeRate(s, cfg))}/с · ${a.subagent.note}`,
-      count: s.subagents ? `×${s.subagents}` : '',
-      ...forSale('sub', subagentPrice(cfg, s.subagents)),
-    };
-
+  private terminalShelves(neck: Neck): ShopShelf[] {
+    const a = this.cfg.auto;
     return [
-      { title: 'ВХОД · больше задач', hot: neck === 'tasks', rows: sources },
-      { title: 'КЛОД · быстрее делает', hot: neck === 'claude', rows: plans },
-      { title: 'АВТОМАТ · жать меньше', hot: neck === 'you', rows: [brick, noAsk, sub] },
+      { title: 'ВХОД · больше задач', hot: neck === 'tasks', rows: this.sourceRows() },
+      { title: 'КЛОД · быстрее делает', hot: neck === 'claude', rows: this.planRows() },
+      {
+        title: 'АВТОМАТ · жать не надо',
+        hot: neck === 'you',
+        rows: [this.row(a.noAsk.name, `${a.noAsk.note}; откроет вид сверху`, '', 'noask', a.noAsk.price)],
+      },
     ];
   }
 
-  private draw(): void {
+  private blueprintShelves(neck: Neck): ShopShelf[] {
+    const s = this.state;
+    const a = this.cfg.auto;
+    const sub = this.row(
+      a.subagent.name,
+      `+${tasksPhrase(claudeRate(s, this.cfg) * a.subagent.share)}/с · ${a.subagent.note}`,
+      s.subagents ? `×${s.subagents}` : '',
+      'sub',
+      subagentPrice(this.cfg, s.subagents),
+    );
+    return [
+      { title: 'СЕССИИ · больше рук', hot: neck === 'claude', rows: [sub] },
+      { title: 'РАБОТЫ · больше задач', hot: neck === 'tasks', rows: this.sourceRows() },
+      { title: 'ТАРИФ · быстрее все сессии', hot: false, rows: this.planRows() },
+    ];
+  }
+
+  private drawTerminal(): void {
     const s = this.state;
     const cfg = this.cfg;
     const neck = this.neck();
-    // at automatic speeds the text would flicker: show a new task twice a second at most
-    const shown = s.noAsk ? Math.floor(this.clock * 2) : s.closedHere;
-    this.ui.render({
+    this.term.render({
       money: s.money,
       income: Math.max(0, this.income),
-      prompt: promptAt(shown),
+      prompt: promptAt(s.closedHere),
       pay: cfg.tuning.pay,
       inflow: inflowOf(s, cfg),
       backlog: s.backlog,
@@ -294,20 +365,69 @@ export class AgreeGym extends Phaser.Scene {
       ready: s.ready,
       readyMax: cfg.tuning.readyMax,
       buffered: s.buffered,
-      brick: s.brick,
-      brickRate: cfg.auto.brick.rate,
       noAsk: s.noAsk,
       noAskPrice: cfg.auto.noAsk.price,
       canBuyNoAsk: s.money >= cfg.auto.noAsk.price,
       subagents: s.subagents,
       subRate: subagentRate(s, cfg),
       neck,
-      shelves: this.shelves(neck),
-      news: NEWS,
+      shelves: this.terminalShelves(neck),
+      news: NEWS_TERMINAL,
     });
+  }
+
+  private drawBlueprint(): void {
+    const s = this.state;
+    const cfg = this.cfg;
+    const neck = this.neck();
+    const rate = claudeRate(s, cfg);
+    this.view.sync({ sources: s.owned, subagents: s.subagents });
+
+    const tags: BlueprintTag[] = [];
+    for (const src of cfg.sources) {
+      const owned = s.owned[src.id] ?? 0;
+      const place = BP.sources[src.id];
+      if (!owned || !place) continue;
+      tags.push({
+        x: place.x - 110,
+        y: place.y + 8,
+        html: `${src.name.toLowerCase()} ×${owned} · <b>${tasksPhrase(owned * src.inflow)}/с</b>`,
+        hot: neck === 'tasks',
+      });
+    }
+    tags.push({ x: BP.tray.x - 90, y: BP.tray.y + 8, html: `ждут: <b>${s.backlog} / ${cfg.tuning.backlogMax}</b>`, hot: neck === 'claude' });
+    tags.push({ x: BP.desk.x - 190, y: BP.desk.y + 8, html: `твой ноутбук · ${cfg.plans[s.plan.index].name} · <b>${tasksPhrase(rate)}/с</b>` });
+    const shown = Math.min(s.subagents, VISIBLE_SUBAGENTS);
+    for (let i = 0; i < shown; i++) {
+      const [x, y] = BP.slots[i];
+      const more = i === shown - 1 && s.subagents > shown ? ` и ещё ${s.subagents - shown}` : '';
+      tags.push({ x: x - 60, y: y + 4, html: `сабагент №${i + 1}${more}`, small: true });
+    }
+
+    const capacity = rate + subagentRate(s, cfg);
+    this.paper.render({
+      money: s.money,
+      income: Math.max(0, this.income),
+      summary: `приходит ${tasksPhrase(inflowOf(s, cfg))}/с, сессии успевают ${tasksPhrase(capacity)}/с`,
+      neck:
+        neck === 'tasks'
+          ? 'узкое место: <b>задачи</b> — сессии простаивают, нужны ещё работы'
+          : neck === 'claude'
+            ? 'узкое место: <b>сессии</b> — задачи копятся, нужны сабагенты или тариф быстрее'
+            : '',
+      tags,
+      shelves: this.blueprintShelves(neck),
+      news: NEWS_BLUEPRINT,
+      hint: 'Enter — подогнать Клода: +1 задача',
+    });
+  }
+
+  private drawOverlay(): void {
+    const s = this.state;
+    const cfg = this.cfg;
     while (this.pressTimes.length && this.pressTimes[0] < this.clock - 3) this.pressTimes.shift();
     this.overlay.set([
-      `конвейер${this.slow ? ' · замедление' : ''} · узкое место: ${neck}`,
+      `конвейер${this.slow ? ' · замедление' : ''} · узкое место: ${this.neck()} · экран: ${this.onBlueprint ? 'чертёж' : 'терминал'}`,
       `вход        ${inflowOf(s, cfg).toFixed(2)} задач/с`,
       `бэклог      ${s.backlog}/${cfg.tuning.backlogMax}   (в среднем ${this.avgBacklog.toFixed(1)})`,
       `Клод        ${claudeRate(s, cfg).toFixed(2)}/с   сабагенты ${subagentRate(s, cfg).toFixed(2)}/с`,

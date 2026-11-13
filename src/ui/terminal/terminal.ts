@@ -5,7 +5,7 @@ import type { Rect } from '../../view/squares';
 export type Neck = 'tasks' | 'claude' | 'you' | 'none';
 
 export interface ShopRow {
-  /** what a click buys: `src:<id>`, `plan`, `brick`, `noask`, `sub`; empty — not for sale */
+  /** what a click buys: `src:<id>`, `plan`, `noask`, `sub`; empty — not for sale */
   buy: string;
   title: string;
   sub: string;
@@ -42,8 +42,6 @@ export interface TerminalView {
   ready: number;
   readyMax: number;
   buffered: number;
-  brick: boolean;
-  brickRate: number;
   noAsk: boolean;
   noAskPrice: number;
   canBuyNoAsk: boolean;
@@ -61,6 +59,8 @@ export interface TerminalUi {
   hit(kind: 'approved' | 'buffered' | 'wasted' | 'auto'): void;
   /** below the shop: a gym puts its help here */
   extra: HTMLElement;
+  /** the whole terminal layer: the pull-back shrinks it into a laptop screen */
+  root: HTMLElement;
 }
 
 /** Scene coordinates of the places squares fly between (match terminal.css). */
@@ -94,9 +94,12 @@ const NECK_TEXT: Record<Neck, string> = {
 };
 const NECK_CELL: Record<Neck, string> = { tasks: 'in', claude: 'claude', you: 'you', none: '' };
 
-export function createTerminal(root: HTMLElement): TerminalUi {
-  root.innerHTML = `
-  <div class="ui1080"><div class="tm">
+/** Adds the terminal as the top layer of a 1920×1080 `.ui1080` container. */
+export function createTerminal(layer: HTMLElement): TerminalUi {
+  layer.insertAdjacentHTML(
+    'beforeend',
+    `
+  <div class="tm">
     <header class="tm-bar">
       <span class="tm-dots"><i></i><i></i><i></i></span>
       <span class="tm-title">claude — ~/работа/все-сразу</span>
@@ -134,7 +137,9 @@ export function createTerminal(root: HTMLElement): TerminalUi {
       <span>НОВОСТИ</span><span class="news" data-f="news"></span>
       <span class="r" data-f="autostate"></span>
     </footer>
-  </div></div>`;
+  </div>`,
+  );
+  const root = layer.lastElementChild as HTMLElement;
 
   const q = <T extends HTMLElement>(sel: string): T => root.querySelector<T>(sel)!;
   const field: Record<string, HTMLElement> = {};
@@ -165,6 +170,7 @@ export function createTerminal(root: HTMLElement): TerminalUi {
   };
 
   return {
+    root,
     extra: q('.tm-extra'),
     render(v) {
       if (set('money', `$${fmt.format(Math.floor(v.money))}`, money)) {
@@ -229,12 +235,11 @@ export function createTerminal(root: HTMLElement): TerminalUi {
         for (const c of cells) c.classList.toggle('neck', c.dataset.c === NECK_CELL[v.neck]);
       }
       const auto: string[] = [];
-      if (v.brick && !v.noAsk) auto.push(`кирпич на Enter жмёт «Да» ${fmt2.format(v.brickRate)} раз в секунду`);
       if (v.subagents > 0) {
         auto.push(`сабагентов: ${v.subagents} · свои сессии, сами закрывают до ${tasksPhrase(v.subRate)} в секунду`);
       }
       set('auto', auto.join(' · '));
-      set('autostate', v.noAsk ? 'автосогласие: вкл' : v.brick ? 'автосогласие: кирпич' : 'автосогласие: выкл');
+      set('autostate', v.noAsk ? 'автосогласие: вкл' : 'автосогласие: выкл');
 
       let html = '';
       for (const shelf of v.shelves) {

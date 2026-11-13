@@ -1,0 +1,220 @@
+/* Stage 2 of the game: the paper blueprint. Sits under the terminal layer inside .ui1080. */
+.bl {
+  --paper: #f0eee6;
+  --card: #faf9f5;
+  --ink: #262624;
+  --dim: #87867f;
+  --rule: #c9c5b8;
+  --coral: #d97757;
+  --money: #3f7d58;
+  position: absolute;
+  inset: 0;
+  background-color: var(--paper);
+  /* the faint dot grid of drafting paper */
+  background-image: radial-gradient(#d6d2c4 1.3px, transparent 1.4px);
+  background-size: 32px 32px;
+  color: var(--ink);
+  font: 400 22px/1.45 'Source Serif 4', serif;
+}
+.bl-hud {
+  opacity: 0;
+  transition: opacity 0.2s linear;
+}
+.bl.on .bl-hud {
+  opacity: 1;
+  transition: opacity 0.5s linear 0.85s;
+}
+
+.bl-money {
+  position: absolute;
+  left: 0;
+  width: 1340px;
+  top: 30px;
+  text-align: center;
+  line-height: 1;
+}
+.bl-money b {
+  display: inline-block;
+  font-size: 112px;
+  font-weight: 600;
+  color: var(--money);
+  letter-spacing: -0.02em;
+}
+.bl-money b.pop {
+  animation: bl-pop 0.14s ease-out;
+}
+@keyframes bl-pop {
+  0% {
+    transform: scale(1.06, 0.95);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+.bl-money span {
+  display: block;
+  width: fit-content;
+  margin: 10px auto 0;
+  padding-top: 9px;
+  border-top: 1.5px solid var(--ink);
+  font-size: 24px;
+}
+.bl-neck {
+  position: absolute;
+  left: 0;
+  width: 1340px;
+  top: 216px;
+  text-align: center;
+  font: 400 18px 'JetBrains Mono', monospace;
+  color: var(--dim);
+}
+.bl-neck b {
+  color: var(--ink);
+  font-weight: 700;
+}
+
+/* every node on the diagram is signed */
+.bl-tag {
+  position: absolute;
+  padding: 2px 0 3px;
+  border-bottom: 1.5px solid var(--ink);
+  font: 400 17px 'JetBrains Mono', monospace;
+  white-space: nowrap;
+}
+.bl-tag b {
+  font-weight: 700;
+}
+.bl-tag.hot {
+  color: var(--coral);
+  border-bottom-color: var(--coral);
+}
+.bl-tag.small {
+  border-bottom: none;
+  color: var(--dim);
+  font-size: 15px;
+}
+
+.bl-shop {
+  position: absolute;
+  right: 0;
+  top: 0;
+  bottom: 58px;
+  width: 580px;
+  padding: 30px 32px;
+  border-left: 1.5px solid var(--ink);
+  background: var(--paper);
+  pointer-events: auto;
+}
+.bl-shop h2 {
+  display: flex;
+  align-items: baseline;
+  margin: 14px 0 10px;
+  font: 400 16px 'JetBrains Mono', monospace;
+  letter-spacing: 0.12em;
+  color: var(--dim);
+}
+.bl-shop h2.hot {
+  color: var(--ink);
+}
+.bl-shop h2 em {
+  margin-left: auto;
+  font-style: normal;
+  letter-spacing: 0;
+  color: var(--money);
+}
+.bl-item {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 0 16px;
+  margin-bottom: 10px;
+  padding: 11px 20px 13px;
+  background: var(--card);
+  border: 1.5px solid var(--rule);
+  border-radius: 12px;
+  line-height: 1.3;
+}
+.bl-item b {
+  font-size: 26px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.bl-item .cnt {
+  font: 400 20px 'JetBrains Mono', monospace;
+  color: var(--dim);
+  text-align: right;
+}
+.bl-item small {
+  font-size: 18px;
+  color: var(--dim);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.bl-item .price {
+  font-size: 26px;
+  font-weight: 600;
+  color: var(--dim);
+  text-align: right;
+}
+.bl-item.can {
+  border-color: var(--ink);
+  cursor: pointer;
+}
+.bl-item.can .price {
+  color: var(--money);
+}
+.bl-item.can:hover {
+  background: #fff;
+}
+.bl-item.owned .cnt {
+  color: var(--coral);
+}
+.bl-item.off {
+  opacity: 0.5;
+}
+.bl-extra {
+  margin-top: 16px;
+  font: 400 15px/1.5 'JetBrains Mono', monospace;
+  color: var(--dim);
+}
+.bl-extra p {
+  margin: 0 0 4px;
+}
+.bl-extra kbd {
+  display: inline-block;
+  min-width: 26px;
+  padding: 0 6px;
+  margin-right: 6px;
+  border: 1px solid var(--dim);
+  border-bottom-width: 3px;
+  border-radius: 6px;
+  font: inherit;
+  text-align: center;
+  color: var(--ink);
+}
+
+.bl-news {
+  position: absolute;
+  inset: auto 0 0 0;
+  height: 58px;
+  padding: 0 32px;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  border-top: 1.5px solid var(--ink);
+  background: var(--paper);
+  font-size: 21px;
+  white-space: nowrap;
+}
+.bl-news i,
+.bl-news em {
+  font: 400 16px 'JetBrains Mono', monospace;
+  font-style: normal;
+  color: var(--dim);
+}
+.bl-news i {
+  letter-spacing: 0.12em;
+}
+.bl-news em {
+  margin-left: auto;
+}

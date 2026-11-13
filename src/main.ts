@@ -14,6 +14,7 @@ import { createRng } from './core/rng';
 import { AgreeGym } from './gyms/agree/AgreeGym';
 import { createLookdevUi } from './gyms/lookdev/lookdevUi';
 import { LookdevScene } from './gyms/lookdev/LookdevScene';
+import { createBlueprint } from './ui/blueprint/blueprint';
 import { createHud } from './ui/hud';
 import { mountUiScale } from './ui/scale';
 import { createTerminal } from './ui/terminal/terminal';
@@ -29,7 +30,14 @@ mountUiScale(stage, ui);
 
 // ?gym=agree — M01 · ?gym=hello — environment check · otherwise the look-dev scene
 function pickScene(): Phaser.Scene {
-  if (args.gym === 'agree') return new AgreeGym(rng, createTerminal(ui), args.debug);
+  if (args.gym === 'agree') {
+    // one 1920×1080 container: the paper blueprint below, the terminal on top of it
+    const layer = document.createElement('div');
+    layer.className = 'ui1080';
+    ui.append(layer);
+    const paper = createBlueprint(layer);
+    return new AgreeGym(rng, createTerminal(layer), paper, args.debug);
+  }
   if (args.gym === 'hello') return new HelloScene(rng, createHud(ui));
   return new LookdevScene(rng, createLookdevUi(ui, 'assets/img/scene_blueprint.webp'));
 }
