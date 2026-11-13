@@ -37,11 +37,11 @@ files: TECH.md
 
 ## Phase 4 — Environment
 files: ENV.md
-- [ ] research of the best engine setup done — check: test -s .studioigor/research/environment.md
-- [ ] full setup installed: engine, CLI, plugin/skills, MCP, tests, linter, export — check: python3 {skill}/scripts/envcheck.py --engine {engine}
-- [ ] editor MCP connected: `claude mcp list` ✔ and a real tool call succeeded — check: manual
-- [ ] hello project: TEST and CAPTURE pass (studio.py verify) — check: grep -q "^VERIFIED: yes" .studioigor/ENV.md
-- [ ] user saw the project running on their machine — check: user
+- [x] research of the best engine setup done — check: test -s .studioigor/research/environment.md
+- [ ] full setup installed: engine, CLI, plugin/skills, MCP, tests, linter, export — check: python3 {skill}/scripts/envcheck.py --engine {engine} SKIP: Windows: envcheck требует brew и ищет кэш Playwright по пути macOS; фактически всё установлено — studio.py verify прошёл, ffmpeg/magick/yt-dlp поставлены через winget
+- [ ] editor MCP connected: `claude mcp list` ✔ and a real tool call succeeded — check: manual SKIP: у веб-стека нет редактора; Playwright MCP не ставится — CLI claude нет в PATH; кадры снимает tools/capture.mjs
+- [x] hello project: TEST and CAPTURE pass (studio.py verify) — check: grep -q "^VERIFIED: yes" .studioigor/ENV.md
+- [x] user saw the project running on their machine — check: user
 
 ## Phase 5 — Assets and look-dev
 files: ASSETS.md
