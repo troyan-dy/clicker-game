@@ -1,6 +1,6 @@
 /**
  * The core loop as a conveyor of tasks (M01 «Согласие», M02 sources, M03 plan, M05 «не спрашивай» and subagents,
- * M15 promotions):
+ * M15 promotions, M16 the city: companies as one-off sources, server farms as packs of sessions):
  *
  *   sources ──► backlog ──► Claude (plan rate) ──► waiting for «Да» ──► $ per task
  *                  └──────► subagents: their own sessions, no «Да» needed ──► $
@@ -24,7 +24,7 @@ export interface Source {
   /** units owned at the start */
   start: number;
   max: number;
-  /** the screen it is sold from: 1 — the terminal, 2 — the blueprint */
+  /** the screen it is sold from: 1 — the terminal, 2 — the blueprint, 3 — the city (a company: max 1) */
   screen: number;
 }
 
@@ -37,11 +37,23 @@ export interface Grade {
   note: string;
 }
 
+/** Server capacity sold in the city: one unit is a pack of Claude sessions. */
+export interface Farm {
+  id: string;
+  name: string;
+  note: string;
+  sessions: number;
+  price: number;
+  growth: number;
+}
+
 export interface AutoConfig {
   /** one-off: the player's own terminal stops asking */
   noAsk: { name: string; note: string; price: number };
   /** scalable: a session of its own; `share` — the part of the plan's speed it gets */
   subagent: { name: string; note: string; price: number; growth: number; share: number };
+  /** one-off: the player becomes a contractor; opens the city */
+  llc: { name: string; note: string; price: number };
 }
 
 export interface PipeTuning {
@@ -49,6 +61,8 @@ export interface PipeTuning {
   pay: number;
   /** tasks that can wait for Claude; the inflow pauses above this */
   backlogMax: number;
+  /** …or this many seconds of inflow, whichever is more: the tray grows with the business */
+  backlogSeconds: number;
   /** finished tasks that can wait for a «Да»; Claude pauses above this */
   readyMax: number;
   /** «Да» that can be given in advance */
@@ -61,6 +75,7 @@ export interface PipeConfig {
   plans: readonly Plan[];
   sources: readonly Source[];
   grades: readonly Grade[];
+  farms: readonly Farm[];
   auto: AutoConfig;
 }
 
@@ -76,6 +91,9 @@ export interface PipeState {
   owned: Record<string, number>;
   noAsk: boolean;
   subagents: number;
+  llc: boolean;
+  /** units owned per farm id */
+  farms: Record<string, number>;
   /** index in cfg.grades */
   grade: number;
   presses: number;
@@ -102,6 +120,8 @@ export function createPipe(cfg: PipeConfig): PipeState {
     owned,
     noAsk: false,
     subagents: 0,
+    llc: false,
+    farms: {},
     grade: 0,
     presses: 0,
     wasted: 0,
@@ -124,9 +144,25 @@ export function claudeRate(s: PipeState, cfg: PipeConfig): number {
   return cfg.plans[s.plan.index].rate;
 }
 
-/** tasks per second all subagent sessions close on their own */
+/** Claude sessions working besides the player's own: subagents and everything in the server farms */
+export function sessionsOf(s: PipeState, cfg: PipeConfig): number {
+  let n = s.subagents;
+  for (const f of cfg.farms) n += (s.farms[f.id] ?? 0) * f.sessions;
+  return n;
+}
+
+/** tasks per second all those sessions close on their own */
 export function subagentRate(s: PipeState, cfg: PipeConfig): number {
-  return s.subagents * claudeRate(s, cfg) * cfg.auto.subagent.share;
+  return sessionsOf(s, cfg) * claudeRate(s, cfg) * cfg.auto.subagent.share;
+}
+
+/** how many tasks may wait for Claude right now */
+export function backlogCap(s: PipeState, cfg: PipeConfig): number {
+  return Math.max(cfg.tuning.backlogMax, Math.round(inflowOf(s, cfg) * cfg.tuning.backlogSeconds));
+}
+
+export function farmPrice(f: Farm, owned: number): number {
+  return Math.round(f.price * f.growth ** owned);
 }
 
 export function sourcePrice(src: Source, owned: number): number {
@@ -142,10 +178,10 @@ export function payOf(s: PipeState, cfg: PipeConfig): number {
   return cfg.tuning.pay * cfg.grades[s.grade].mult;
 }
 
-function pay(s: PipeState, cfg: PipeConfig, bySubagent: boolean): void {
-  s.money += payOf(s, cfg);
-  if (bySubagent) s.closedBySubagents++;
-  else s.closedHere++;
+function pay(s: PipeState, cfg: PipeConfig, bySubagent: boolean, tasks = 1): void {
+  s.money += payOf(s, cfg) * tasks;
+  if (bySubagent) s.closedBySubagents += tasks;
+  else s.closedHere += tasks;
 }
 
 /** Advances the conveyor by dt seconds. Returns how many tasks arrived and how many were closed without a key press. */
@@ -158,13 +194,12 @@ export function stepPipe(
   const out = { arrived: 0, here: 0, subagents: 0 };
 
   // tasks arrive
+  const cap = backlogCap(s, cfg);
   s.inflowAcc += inflowOf(s, cfg) * dt;
-  while (s.inflowAcc >= 1 && s.backlog < t.backlogMax) {
-    s.inflowAcc--;
-    s.backlog++;
-    out.arrived++;
-  }
-  if (s.backlog >= t.backlogMax) s.inflowAcc = Math.min(s.inflowAcc, 1); // the boss waits
+  out.arrived = Math.max(0, Math.min(Math.floor(s.inflowAcc), cap - s.backlog));
+  s.inflowAcc -= out.arrived;
+  s.backlog += out.arrived;
+  if (s.backlog >= cap) s.inflowAcc = Math.min(s.inflowAcc, 1); // the boss waits
 
   // Claude in the player's terminal
   const rate = claudeRate(s, cfg);
@@ -172,12 +207,11 @@ export function stepPipe(
     s.think = 0; // nothing to work on
   } else if (s.noAsk) {
     s.think += rate * dt;
-    while (s.think >= 1 && s.backlog >= 1) {
-      s.think--;
-      s.backlog--;
-      pay(s, cfg, false);
-      out.here++;
-    }
+    const n = Math.min(Math.floor(s.think), s.backlog);
+    s.think -= n;
+    s.backlog -= n;
+    pay(s, cfg, false, n);
+    out.here += n;
     if (s.backlog < 1) s.think = 0;
   } else {
     if (s.ready < t.readyMax) s.think += rate * dt;
@@ -199,12 +233,10 @@ export function stepPipe(
 
   // subagents: sessions of their own, straight from the backlog
   s.subAcc += subagentRate(s, cfg) * dt;
-  while (s.subAcc >= 1 && s.backlog >= 1) {
-    s.subAcc--;
-    s.backlog--;
-    pay(s, cfg, true);
-    out.subagents++;
-  }
+  out.subagents = Math.min(Math.floor(s.subAcc), s.backlog);
+  s.subAcc -= out.subagents;
+  s.backlog -= out.subagents;
+  pay(s, cfg, true, out.subagents);
   if (s.backlog < 1) s.subAcc = Math.min(s.subAcc, 1);
 
   return out;
@@ -263,6 +295,20 @@ export function buyNoAsk(s: PipeState, cfg: PipeConfig): boolean {
   // everything that was waiting for a «Да» is approved on the spot
   for (; s.ready > 0; s.ready--) pay(s, cfg, false);
   s.buffered = 0;
+  return true;
+}
+
+export function buyFarm(s: PipeState, cfg: PipeConfig, id: string): boolean {
+  const f = cfg.farms.find((x) => x.id === id);
+  if (!f || !spend(s, farmPrice(f, s.farms[id] ?? 0))) return false;
+  s.farms[id] = (s.farms[id] ?? 0) + 1;
+  return true;
+}
+
+/** The company of one: from now on work comes from whole companies. */
+export function buyLlc(s: PipeState, cfg: PipeConfig): boolean {
+  if (s.llc || !s.noAsk || !spend(s, cfg.auto.llc.price)) return false;
+  s.llc = true;
   return true;
 }
 

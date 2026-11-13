@@ -1,12 +1,16 @@
 import { describe, expect, it } from 'vitest';
 import autoData from '../src/data/balance/auto.json';
+import farmData from '../src/data/balance/farms.json';
 import gradeData from '../src/data/balance/grades.json';
 import planData from '../src/data/balance/plans.json';
 import sourceData from '../src/data/balance/sources.json';
 import tuningData from '../src/data/tuning/pipeline.json';
 import type { Plan } from '../src/systems/plan/plan';
 import {
+  backlogCap,
+  buyFarm,
   buyGrade,
+  buyLlc,
   buyNoAsk,
   buyPlan,
   buySource,
@@ -16,6 +20,7 @@ import {
   inflowOf,
   payOf,
   pressPipe,
+  sessionsOf,
   sourcePrice,
   stepPipe,
   type PipeConfig,
@@ -28,6 +33,7 @@ const cfg: PipeConfig = {
   plans: planData as Plan[],
   sources: sourceData as Source[],
   grades: gradeData,
+  farms: farmData,
   auto: autoData,
 };
 const DT = 1 / 60;
@@ -143,9 +149,33 @@ describe('pipeline', () => {
     pressPipe(s, cfg);
     expect(s.money - before).toBe(cfg.tuning.pay * cfg.grades[1].mult);
     expect(payOf(s, cfg)).toBeGreaterThan(junior);
+    s.money = 1e12;
     for (let i = 0; i < cfg.grades.length; i++) buyGrade(s, cfg);
     expect(s.grade).toBe(cfg.grades.length - 1); // the ladder ends
     expect(buyGrade(s, cfg)).toBe(false);
+  });
+
+  it('test_pipe_city_companies_are_hired_once_and_farms_add_sessions', () => {
+    const s = rich();
+    expect(buyLlc(s, cfg)).toBe(false); // the company comes after the terminal agrees by itself
+    buyNoAsk(s, cfg);
+    expect(buyLlc(s, cfg)).toBe(true);
+    expect(buyLlc(s, cfg)).toBe(false);
+    const company = cfg.sources.find((x) => x.screen === 3)!;
+    const before = inflowOf(s, cfg);
+    expect(buySource(s, cfg, company.id)).toBe(true);
+    expect(buySource(s, cfg, company.id)).toBe(false); // one contract per company
+    expect(inflowOf(s, cfg)).toBe(before + company.inflow);
+    expect(backlogCap(s, cfg)).toBeGreaterThan(cfg.tuning.backlogMax); // the tray grows with the flow
+    expect(buyFarm(s, cfg, cfg.farms[0].id)).toBe(true);
+    expect(sessionsOf(s, cfg)).toBe(cfg.farms[0].sessions);
+    // a second of work: everything that arrives is closed, nothing is lost in bulk steps
+    const start = s.money;
+    run(s, 10, 0);
+    const perSec = (s.money - start) / payOf(s, cfg) / 10;
+    const expected = Math.min(inflowOf(s, cfg), claudeRate(s, cfg) * (1 + cfg.auto.subagent.share * sessionsOf(s, cfg)));
+    expect(perSec).toBeGreaterThan(expected * 0.97);
+    expect(perSec).toBeLessThan(expected * 1.05);
   });
 
   it('test_pipe_prices_grow_and_money_is_required', () => {

@@ -8,7 +8,6 @@ type Pt = readonly [number, number];
 const INK = 0x262624;
 const DOT_SPEED = 520; // px per second along a connector
 const DOTS = 90;
-const TEXTURES = ['desk', 'laptop', 'office', 'tray', 'board', 'handshake', 'studio', 'box'];
 
 export interface BlueprintTopology {
   /** units owned per source id (job, freelance, …) */
@@ -47,10 +46,6 @@ export class BlueprintView {
   /** called when a square reaches a session: the task is closed there */
   onDelivered: (x: number, y: number) => void = () => undefined;
 
-  static preload(scene: Phaser.Scene): void {
-    for (const key of TEXTURES) scene.load.image(`node_${key}`, `assets/img/nodes/${key}.webp`);
-  }
-
   constructor(scene: Phaser.Scene, rng: Rng) {
     this.scene = scene;
     this.rng = rng;
@@ -78,6 +73,20 @@ export class BlueprintView {
   show(delayMs: number): void {
     this.root.setVisible(true);
     this.scene.tweens.add({ targets: this.root, alpha: 1, delay: delayMs, duration: 450 });
+  }
+
+  /** The second pull-back: the whole diagram shrinks into one node of the city — the desk lands at (x, y). */
+  shrinkTo(x: number, y: number, scale: number, ms: number): void {
+    this.scene.tweens.add({
+      targets: this.root,
+      scale,
+      x: x - BP.desk.x * scale,
+      y: y - BP.desk.y * scale,
+      alpha: 0,
+      duration: ms,
+      ease: 'Cubic.InOut',
+      onComplete: () => this.root.setVisible(false),
+    });
   }
 
   /** Brings nodes and connectors in line with what is owned. New nodes pop in. */

@@ -93,6 +93,14 @@
   color: var(--dim);
   font-size: 15px;
 }
+.bl-tag.small b {
+  color: var(--ink);
+}
+.bl-tag.mid {
+  transform: translateX(-50%);
+  text-align: center;
+  line-height: 1.35;
+}
 
 .bl-shop {
   position: absolute;

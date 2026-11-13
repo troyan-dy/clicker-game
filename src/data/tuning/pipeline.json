@@ -1,7 +1,1 @@
-{
-  "pay": 2,
-  "backlogMax": 20,
-  "readyMax": 8,
-  "buffer": 1,
-  "startMoney": 50
-}
+{ "pay": 2, "backlogMax": 20, "readyMax": 8, "buffer": 1, "startMoney": 50, "backlogSeconds": 1 }

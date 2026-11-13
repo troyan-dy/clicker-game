@@ -1,4 +1,5 @@
 import './blueprint.css';
+import { short } from '../format';
 import type { ShopShelf } from '../terminal/terminal';
 
 export interface BlueprintTag {
@@ -10,6 +11,8 @@ export interface BlueprintTag {
   hot?: boolean;
   /** a short caption without the underline */
   small?: boolean;
+  /** centred on x instead of starting at it */
+  mid?: boolean;
 }
 
 /** Everything the blueprint's HTML layer shows. The UI reads it and decides nothing. */
@@ -87,7 +90,8 @@ export function createBlueprint(layer: HTMLElement): BlueprintUi {
         void money.offsetWidth; // restart the CSS animation
         money.classList.add('pop');
       }
-      set('summary', `+$${fmt1.format(m.income)} в секунду · ${esc(m.summary)}`);
+      const income = m.income >= 1e5 ? short(Math.round(m.income / 1000) * 1000) : fmt1.format(m.income);
+      set('summary', `+$${income} в секунду · ${esc(m.summary)}`);
       set('neck', m.neck);
       set('news', esc(m.news));
       set('hint', esc(m.hint));
@@ -96,7 +100,7 @@ export function createBlueprint(layer: HTMLElement): BlueprintUi {
         m.tags
           .map(
             (t) =>
-              `<div class="bl-tag${t.hot ? ' hot' : ''}${t.small ? ' small' : ''}" style="left:${t.x}px;top:${t.y}px">${t.html}</div>`,
+              `<div class="bl-tag${t.hot ? ' hot' : ''}${t.small ? ' small' : ''}${t.mid ? ' mid' : ''}" style="left:${t.x}px;top:${t.y}px">${t.html}</div>`,
           )
           .join(''),
       );

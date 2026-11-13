@@ -1,6 +1,18 @@
 [
-  { "id": "job", "name": "Работа", "tag": "работа", "note": "стендап в 10:00, задачи в трекере", "inflow": 2, "price": 100, "growth": 1.15, "start": 1, "max": 99, "screen": 1 },
-  { "id": "freelance", "name": "Фриланс-аккаунт", "tag": "фриланс", "note": "мелкие заказы идут сами", "inflow": 0.5, "price": 15, "growth": 1.15, "start": 0, "max": 99, "screen": 1 },
-  { "id": "referral", "name": "Работа по знакомству", "tag": "по знакомству", "note": "друг поручился, собеседования не было", "inflow": 8, "price": 900, "growth": 1.15, "start": 0, "max": 99, "screen": 2 },
-  { "id": "studio", "name": "Студия «Команда»", "tag": "студия", "note": "на сайте двенадцать сотрудников, все — ты", "inflow": 40, "price": 7500, "growth": 1.15, "start": 0, "max": 99, "screen": 2 }
+  {"id": "job", "name": "Работа", "tag": "работа", "note": "стендап в 10:00, задачи в трекере", "inflow": 2, "price": 100, "growth": 1.15, "start": 1, "max": 99, "screen": 1},
+  {"id": "freelance", "name": "Фриланс-аккаунт", "tag": "фриланс", "note": "мелкие заказы идут сами", "inflow": 0.5, "price": 15, "growth": 1.15, "start": 0, "max": 99, "screen": 1},
+  {"id": "referral", "name": "Работа по знакомству", "tag": "по знакомству", "note": "друг поручился, собеседования не было", "inflow": 8, "price": 900, "growth": 1.15, "start": 0, "max": 99, "screen": 2},
+  {"id": "studio", "name": "Студия «Команда»", "tag": "студия", "note": "на сайте двенадцать сотрудников, все — ты", "inflow": 40, "price": 7500, "growth": 1.15, "start": 0, "max": 99, "screen": 2},
+  {"id": "vector", "name": "ООО «Вектор Плюс»", "tag": "Вектор Плюс", "note": "интегратор всего со всем", "inflow": 600, "price": 300000.0, "growth": 1, "start": 0, "max": 1, "screen": 3},
+  {"id": "cats", "name": "Стартап «Такси для котов»", "tag": "Такси для котов", "note": "раунд А закрыт, продукта нет", "inflow": 900, "price": 570000.0, "growth": 1, "start": 0, "max": 1, "screen": 3},
+  {"id": "creative", "name": "Агентство «Креатив и Точка»", "tag": "Креатив и Точка", "note": "лендинги к вечеру", "inflow": 1350, "price": 1080000.0, "growth": 1, "start": 0, "max": 1, "screen": 3},
+  {"id": "market", "name": "Маркетплейс «Всё и Сразу»", "tag": "Всё и Сразу", "note": "корзина падает по пятницам", "inflow": 2000, "price": 2060000.0, "growth": 1, "start": 0, "max": 1, "screen": 3},
+  {"id": "logistics", "name": "Логистика «Довезём»", "tag": "Довезём", "note": "трекинг посылок на глаз", "inflow": 3050, "price": 3910000.0, "growth": 1, "start": 0, "max": 1, "screen": 3},
+  {"id": "factory", "name": "Завод «Прогресс»", "tag": "Прогресс", "note": "учётная система 1998 года", "inflow": 4550, "price": 7430000.0, "growth": 1, "start": 0, "max": 1, "screen": 3},
+  {"id": "bank", "name": "Банк «Доверие»", "tag": "Доверие", "note": "ядро на Коболе, трогать страшно", "inflow": 6850, "price": 14110000.0, "growth": 1, "start": 0, "max": 1, "screen": 3},
+  {"id": "telecom", "name": "Телеком «Связь-Связь»", "tag": "Связь-Связь", "note": "биллинг считает сам себя", "inflow": 10250, "price": 26820000.0, "growth": 1, "start": 0, "max": 1, "screen": 3},
+  {"id": "gov", "name": "Портал «Справка о справке»", "tag": "Справка о справке", "note": "откроется после обеда", "inflow": 15400, "price": 50950000.0, "growth": 1, "start": 0, "max": 1, "screen": 3},
+  {"id": "cloud", "name": "Облако «Тучка»", "tag": "Тучка", "note": "аптайм 99,9%, остальное — ты", "inflow": 23050, "price": 96810000.0, "growth": 1, "start": 0, "max": 1, "screen": 3},
+  {"id": "consult", "name": "Консалтинг «Синергия»", "tag": "Синергия", "note": "слайды про твой же код", "inflow": 34600, "price": 183930000.0, "growth": 1, "start": 0, "max": 1, "screen": 3},
+  {"id": "everyone", "name": "Корпорация «Все Остальные»", "tag": "Все Остальные", "note": "в штате только ты", "inflow": 51900, "price": 349470000.0, "growth": 1, "start": 0, "max": 1, "screen": 3}
 ]
