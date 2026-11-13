@@ -1,7 +1,7 @@
 # studioigor — Да, Клод
 
 PROJECT: Да, Клод
-PHASE: 4 — Environment
+PHASE: 5 — Assets and look-dev
 UPDATED: 2026-11-13 22:53
 
 ## Now

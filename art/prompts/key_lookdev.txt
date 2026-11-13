@@ -1,0 +1,10 @@
+A complete wide game-screen illustration, 16:9, that sets the look of the whole game: the small cozy room of a lazy programmer who lets an AI do all his work.
+
+Composition, left to right:
+- Left third: a plump young programmer in a lilac hoodie, sitting sideways on a chunky office chair, leaning back, relaxed and a little smug, holding a mug in one hand. His other arm is stretched forward with one finger pointing down, ready to press a button.
+- Centre, lower third: a wide cream desk. On it stands a chunky cream laptop whose screen faces the viewer. On the screen: a cute orange rounded-square character with two square pixel eyes and a tiny smile (the AI). A few small warm square pixels (orange, amber, yellow) float up from the laptop like sparks.
+- On the desk in front of the laptop: one single oversized orange keyboard key with a blank top (no letter on it).
+- Right third: mostly free wall and floor space with only a small shelf and a potted plant high on the wall, because more objects will be added there later.
+- Background: sky-blue wall, a window with fluffy white clouds, a cream floor strip along the bottom.
+
+Leave the top fifth of the picture calm and empty (plain wall), a score counter will be drawn there later.
