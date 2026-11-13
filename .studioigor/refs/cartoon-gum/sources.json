@@ -1,0 +1,96 @@
+{
+  "title": "Мультяшная жвачка",
+  "text": "Правило: всё пружинит — у каждого объекта толстый тёмный контур, одна сочная заливка и блик. Настроение: субботнее утро с мультиками, ровный дневной свет без теней, азарт. Форма: пухлые скруглённые блоки, большие головы, ничего тонкого и острого. Цвет: конфетная радуга на голубом небе; золотой — только деньги.",
+  "palette": [],
+  "tags": [
+    "2D",
+    "вектор",
+    "контур",
+    "день"
+  ],
+  "items": [
+    {
+      "file": "steam-10dcc15e.jpg",
+      "url": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/346900/ss_3cb1203117f87367556cd4832f960fb9b1a25994.1920x1080.jpg?t=1793831377",
+      "page": "https://store.steampowered.com/app/346900/",
+      "title": "AdVenture Capitalist — screenshot 1",
+      "credit": "Hyper Hippo Entertainment",
+      "license": "© Hyper Hippo Entertainment — moodboard only",
+      "api": "steam",
+      "query": "AdVenture Capitalist",
+      "generated": false,
+      "note": "",
+      "w": 1328,
+      "h": 829,
+      "sha1": "10dcc15e7fea4fbe69416676236347dbf429559c"
+    },
+    {
+      "file": "steam-4abe81cd.jpg",
+      "url": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/346900/ss_f6a2d429cd0c1c8b1fc4fee602d3647ad8119c67.1920x1080.jpg?t=1793831377",
+      "page": "https://store.steampowered.com/app/346900/",
+      "title": "AdVenture Capitalist — screenshot 2",
+      "credit": "Hyper Hippo Entertainment",
+      "license": "© Hyper Hippo Entertainment — moodboard only",
+      "api": "steam",
+      "query": "AdVenture Capitalist",
+      "generated": false,
+      "note": "",
+      "w": 1328,
+      "h": 829,
+      "sha1": "4abe81cdbea0bd3d684222b114907bb5cf9cf5d2"
+    },
+    {
+      "file": "steam-da386f33.jpg",
+      "url": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/346900/ss_24fbcd72d11e70c34a041ab3c6e4fe661f111ccd.1920x1080.jpg?t=1793831377",
+      "page": "https://store.steampowered.com/app/346900/",
+      "title": "AdVenture Capitalist — screenshot 3",
+      "credit": "Hyper Hippo Entertainment",
+      "license": "© Hyper Hippo Entertainment — moodboard only",
+      "api": "steam",
+      "query": "AdVenture Capitalist",
+      "generated": false,
+      "note": "",
+      "w": 1327,
+      "h": 829,
+      "sha1": "da386f33abc457572edb13533bbfaa750734ce29"
+    },
+    {
+      "file": "steam-c66e8ab5.jpg",
+      "url": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1454400/ss_2c271b91a8b7f55699231e3bc16c4c2a9493f11e.1920x1080.jpg?t=1793915203",
+      "page": "https://store.steampowered.com/app/1454400/",
+      "title": "Cookie Clicker — screenshot 1",
+      "credit": "Orteil, DashNet",
+      "license": "© Orteil, DashNet — moodboard only",
+      "api": "steam",
+      "query": "Cookie Clicker",
+      "generated": false,
+      "note": "",
+      "w": 1920,
+      "h": 1080,
+      "sha1": "c66e8ab5a4883a61f121d0abb8333179e5a54b24"
+    },
+    {
+      "file": "steam-40b3c9b3.jpg",
+      "url": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1454400/ss_0ccbd62dbbf733bf630885d76f7bdf61af93d0be.1920x1080.jpg?t=1793915203",
+      "page": "https://store.steampowered.com/app/1454400/",
+      "title": "Cookie Clicker — screenshot 2",
+      "credit": "Orteil, DashNet",
+      "license": "© Orteil, DashNet — moodboard only",
+      "api": "steam",
+      "query": "Cookie Clicker",
+      "generated": false,
+      "note": "",
+      "w": 1920,
+      "h": 1080,
+      "sha1": "40b3c9b31e2892891b3f13c2d2bfa6c3a5a81e76"
+    }
+  ],
+  "pros": [
+    "привычно для кликеров, читается с первого кадра",
+    "дёшево: SVG/Canvas, анимация сжатием и растяжением"
+  ],
+  "cons": [
+    "похоже на сотни мобильных кликеров",
+    "сатира звучит слабее"
+  ]
+}
