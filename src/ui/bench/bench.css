@@ -1,0 +1,96 @@
+/* The bench after the credits (M30): the terminal of the first screen, set on paper. Everything is laid
+   out by terminal.css; here are only the colours of the paper and the place for the picture. */
+.tm.bench {
+  --bg: #f0eee6;
+  --panel: #faf9f5;
+  --line: #c9c5b8;
+  --text: #262624;
+  --dim: #87867f;
+  --coral: #d97757;
+  --money: #3f7d58;
+  /* the faint dot grid of drafting paper, as on the blueprint */
+  background-image: radial-gradient(#d6d2c4 1.3px, transparent 1.4px);
+  background-size: 32px 32px;
+  display: none;
+  opacity: 0;
+  transform: none;
+  transition: opacity 0.9s linear;
+}
+.tm.bench.on {
+  display: block;
+  opacity: 1;
+  animation: bn-in 0.9s linear;
+}
+.tm.bench.on.now {
+  animation: none;
+}
+@keyframes bn-in {
+  0% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+/* the big number counts slices of bread, not money: it is written in ink */
+.tm.bench .tm-money b {
+  font: 600 88px 'Source Serif 4', serif;
+  color: var(--text);
+  letter-spacing: 0;
+}
+.tm.bench .tm-neck b {
+  color: var(--coral);
+}
+/* the picture is drawn on the canvas above this place */
+.bn-view {
+  height: 412px;
+}
+.tm.bench .tm-ask {
+  margin-top: 0;
+  padding: 16px 28px 16px;
+}
+.tm.bench .tm-ask.empty .tm-opt.sel,
+.tm.bench .tm-ask.empty .tm-opt.sel .n {
+  color: var(--dim);
+}
+.tm.bench .tm-opt.sel.flash,
+.tm.bench .tm-opt.sel.flash .n {
+  color: var(--panel);
+}
+/* the second and the third answer work here: a click picks them */
+.tm.bench .tm-opt.buy:hover {
+  background: #efece2;
+}
+.tm.bench .tm-opt.buy.bought {
+  background: var(--coral);
+  color: var(--panel);
+}
+.tm.bench .tm-opt.buy.bought .note {
+  color: var(--panel);
+}
+.tm.bench .tm-task {
+  margin-top: 10px;
+}
+.tm.bench .tm-flow {
+  margin-top: 18px;
+}
+/* Claude has more to say here than a line holds, and nothing below to push away */
+.tm.bench .tm-quip {
+  display: flex;
+  align-items: baseline;
+  margin-top: 14px;
+  white-space: normal;
+  line-height: 1.4;
+}
+.tm.bench .tm-quip .tm-sq {
+  flex: none;
+}
+.tm.bench .tm-side h2 em {
+  color: var(--panel);
+}
+.tm.bench .tm-item.can:hover {
+  background: #fff;
+}
+.tm.bench .tm-item.owned b i {
+  color: var(--dim);
+}

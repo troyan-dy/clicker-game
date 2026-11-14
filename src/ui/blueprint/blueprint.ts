@@ -84,6 +84,8 @@ export interface BlueprintUi {
   toast(title: string, text: string): void;
   /** the ending: the interface gives way to the picture, and comes back */
   cut(on: boolean): void;
+  /** the bench after the credits takes the whole screen: the captions and banners of the map step aside */
+  away(on: boolean): void;
   /**
    * The ending: a line under the picture, typed letter by letter; empty — none. `kind`: «claude» —
    * Claude says it, «title» — big words in the middle of the screen, «dark» — the same over a dark picture.
@@ -261,6 +263,9 @@ export function createBlueprint(layer: HTMLElement, over: HTMLElement): Blueprin
     cut(on) {
       root.classList.toggle('cut', on);
       overRoot.classList.toggle('cut', on);
+    },
+    away(on) {
+      overRoot.classList.toggle('away', on);
     },
     caption(text, kind = 'plain') {
       window.clearInterval(typing);

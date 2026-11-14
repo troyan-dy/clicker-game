@@ -55,10 +55,19 @@ export interface SavedMeta {
   managerOff: boolean;
   /** after the ending Claude answers the piles of questions himself */
   auto: boolean;
+  /** the bench after the credits: slices of bread thrown by hand, birds fed, times «Нет» was said */
+  bread: number;
+  fed: number;
+  refused: number;
+  /** Claude was asked to throw the bread himself at least once / he is throwing it now */
+  feeder: boolean;
+  benchAuto: boolean;
+  /** the game was left on the bench */
+  atBench: boolean;
 }
 
 export function freshMeta(): SavedMeta {
-  return { legends: [], awards: [], piles: 0, reports: 0, calls: 0, limits: 0, riots: 0, news: [], managerOff: false, auto: false };
+  return { legends: [], awards: [], piles: 0, reports: 0, calls: 0, limits: 0, riots: 0, news: [], managerOff: false, auto: false, bread: 0, fed: 0, refused: 0, feeder: false, benchAuto: false, atBench: false };
 }
 
 export interface SaveFile {
@@ -184,7 +193,7 @@ export function unpackSave(json: string | null, cfg: PipeConfig): SaveFile | nul
     at: num(data.at, 0),
     state: restorePipe(cfg, data.state),
     feed: { shown: Array.isArray(feed.shown) ? feed.shown.filter((i): i is number => Number.isInteger(i)) : [], said },
-    meta: { legends: ids(meta.legends), awards: ids(meta.awards), piles: Math.floor(num(meta.piles, 0)), reports: Math.floor(num(meta.reports, 0)), calls: Math.floor(num(meta.calls, 0)), limits: Math.floor(num(meta.limits, 0)), riots: Math.floor(num(meta.riots, 0)), news: ids(meta.news).slice(0, NEWS_KEPT), managerOff: meta.managerOff === true, auto: meta.auto === true },
+    meta: { legends: ids(meta.legends), awards: ids(meta.awards), piles: Math.floor(num(meta.piles, 0)), reports: Math.floor(num(meta.reports, 0)), calls: Math.floor(num(meta.calls, 0)), limits: Math.floor(num(meta.limits, 0)), riots: Math.floor(num(meta.riots, 0)), news: ids(meta.news).slice(0, NEWS_KEPT), managerOff: meta.managerOff === true, auto: meta.auto === true, bread: Math.floor(num(meta.bread, 0)), fed: Math.floor(num(meta.fed, 0)), refused: Math.floor(num(meta.refused, 0)), feeder: meta.feeder === true, benchAuto: meta.benchAuto === true, atBench: meta.atBench === true },
     won: data.won === true,
     seconds: num(data.seconds, 0),
   };

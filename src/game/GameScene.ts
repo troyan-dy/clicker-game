@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { AWARDS } from '../content/awards';
+import { BENCH } from '../content/bench';
 import { CALLS } from '../content/calls';
 import { CREDITS, CREDITS_END, CREDITS_NOTES, MOTTO, TAGLINE, TITLE } from '../content/credits';
 import { LEGENDS, type Legend } from '../content/legends';
@@ -29,6 +30,7 @@ import scaleData from '../data/balance/scales.json';
 import sourceData from '../data/balance/sources.json';
 import { BP, deskScreen } from '../data/layout/blueprint';
 import { HUBS } from '../data/layout/hubs';
+import benchData from '../data/tuning/bench.json';
 import eventsData from '../data/tuning/events.json';
 import feedData from '../data/tuning/feed.json';
 import gridData from '../data/tuning/grid.json';
@@ -42,6 +44,7 @@ import stackData from '../data/tuning/stack.json';
 import tuningData from '../data/tuning/pipeline.json';
 import { createOverlay, type Overlay } from '../debug/overlay';
 import { createTuningPanel, type TuningPanel } from '../debug/tuningPanel';
+import { birdRate, createBench, refuseBird, stepBench, throwBread } from '../systems/bench/bench';
 import { createEvents, stepEvents, takeEvent, type EventsTuning } from '../systems/events/events';
 import { createFeed, headline, say, stepFeed, tell, type FeedContent } from '../systems/feed/feed';
 import { managerPick } from '../systems/manager/manager';
@@ -121,6 +124,7 @@ import {
 } from '../systems/pipeline/pipeline';
 import { applyOffline, freshMeta, NEWS_KEPT, offlineReport, packSave, unpackSave, type OfflineReport } from '../systems/save/save';
 import { createStack, stackWorth, stepStack, takeStack } from '../systems/stack/stack';
+import type { BenchNeck, BenchUi } from '../ui/bench/bench';
 import type { BlueprintTag, BlueprintUi, ManagerStrip, MeterRow } from '../ui/blueprint/blueprint';
 import type { CardUi } from '../ui/card/card';
 import type { CreditsSpec, CreditsUi } from '../ui/credits/credits';
@@ -133,6 +137,7 @@ import {
   type ShopShelf,
   type TerminalUi,
 } from '../ui/terminal/terminal';
+import { BenchView, type BirdKind } from '../view/benchView';
 import { BlueprintView, VISIBLE_SUBAGENTS } from '../view/blueprintView';
 import { HubView, type HubTopology } from '../view/hubView';
 import { preloadNodes } from '../view/nodeTextures';
@@ -243,6 +248,7 @@ export class GameScene extends Phaser.Scene {
   private readonly paper: BlueprintUi;
   private readonly card: CardUi;
   private readonly credits: CreditsUi;
+  private readonly benchUi: BenchUi;
   private readonly showOverlay: boolean;
   /** keep the game between visits (off in captures and tuning sessions) */
   private readonly saving: boolean;
@@ -329,6 +335,15 @@ export class GameScene extends Phaser.Scene {
   private cine = false;
   /** the clock of the riots of the Luddites: they march on the factories once robots work */
   private readonly riots = createRiots(RIOTS);
+  /** the bench after the credits (M30): the park, its picture, and whether the player sits there now */
+  private readonly park = createBench(benchData);
+  private benchView!: BenchView;
+  private onBench = false;
+  /** which of the questions about the bread the prompt asks */
+  private benchAsk = 0;
+  /** the headlines of the park go in turn */
+  private benchNews = 0;
+  private benchNewsIn = 0;
   /** the ziggurat: it was night at the last step — a change means the shifts swap */
   private wasNight = false;
   /** seconds until the next square of power leaves the ziggurat */
@@ -345,6 +360,7 @@ export class GameScene extends Phaser.Scene {
     paper: BlueprintUi,
     card: CardUi,
     credits: CreditsUi,
+    benchUi: BenchUi,
     opts: { overlay: boolean; save: boolean; gym: boolean; menu: boolean; start: number },
   ) {
     super('game');
@@ -353,6 +369,7 @@ export class GameScene extends Phaser.Scene {
     this.paper = paper;
     this.card = card;
     this.credits = credits;
+    this.benchUi = benchUi;
     this.showOverlay = opts.overlay;
     this.saving = opts.save;
     this.gym = opts.gym;
@@ -372,7 +389,9 @@ export class GameScene extends Phaser.Scene {
       hub.onDelivered = (x, y) => this.delivered(x, y);
       this.hubs.set(Number(screen), hub);
     }
+    this.benchView = new BenchView(this, this.rng);
     this.squares = new Squares(this, this.rng, 700);
+    this.benchUi.extra.innerHTML = BENCH.help;
     this.term.extra.innerHTML = __TOOLS__ && this.gym ? HELP : HELP_GAME;
     // on paper the manager's strip takes the place of the help line: the keys were learnt at the terminal
     this.paper.extra.innerHTML = __TOOLS__ && this.gym ? HELP_PAPER : '';
@@ -391,6 +410,11 @@ export class GameScene extends Phaser.Scene {
     this.state = createPipe(this.cfg);
     this.resumed = this.loadGame();
     if (!this.resumed && this.startAt >= 3) this.skipTo(this.startAt);
+    // tuning only: straight to the bench, as if the ending and the credits were over
+    if (!this.resumed && this.startAt >= 9) {
+      this.won = true;
+      this.enterBench(true);
+    }
     this.lastMoney = this.state.money;
     if (this.withMenu) this.openTitle();
     else this.resume();
@@ -447,7 +471,10 @@ export class GameScene extends Phaser.Scene {
       this.squares.step(Math.min(deltaMs / 1000, 0.05));
     }
     this.credits.step(Math.min(deltaMs / 1000, 0.05));
-    if (this.stage === 1) this.drawTerminal();
+    if (this.onBench) {
+      this.benchView.step(Math.min(deltaMs / 1000, 0.05));
+      this.drawBench();
+    } else if (this.stage === 1) this.drawTerminal();
     else if (this.stage === 2) this.drawBlueprint();
     else this.drawHub();
     this.drawOverlay();
@@ -483,10 +510,15 @@ export class GameScene extends Phaser.Scene {
     this.feed.said = file.feed.said;
     this.meta = file.meta;
     this.selfPlay = file.meta.auto;
-    // a save finished before the street existed is not finished any more: the ending is ahead again
-    this.won = file.won && finished(this.state, this.cfg);
+    // a save finished before the last screen existed is not finished any more: the ending is ahead again
+    this.won = file.won && this.state.scale >= this.cfg.scales.length;
     this.seconds = file.seconds;
+    this.park.thrown = file.meta.bread;
+    this.park.fed = file.meta.fed;
+    this.park.refused = file.meta.refused;
+    this.park.auto = file.meta.benchAuto;
     this.openStage();
+    if (this.won && this.meta.atBench) this.enterBench(true);
     this.pendingReport = offlineReport(this.state, this.cfg, saveData, (Date.now() - file.at) / 1000);
     return true;
   }
@@ -564,7 +596,43 @@ export class GameScene extends Phaser.Scene {
     const report = this.pendingReport;
     this.pendingReport = null;
     if (report) this.morning(report);
-    else if (this.clock === 0) this.say(this.resumed ? 'back' : 'start', true);
+    else if (this.onBench) {
+      if (this.clock === 0) tell(this.feed, feedData, this.meta.bread > 0 ? BENCH.quips.back : BENCH.quips.start);
+    } else if (this.clock === 0) this.say(this.resumed ? 'back' : 'start', true);
+  }
+
+  /** The bench takes the screen: the map and its captions step aside, the park appears. `now` — without the fade. */
+  private enterBench(now = false): void {
+    this.onBench = true;
+    this.meta.atBench = true;
+    this.paper.away(true);
+    this.hubs.get(this.stage)?.fade(now ? 0 : 400);
+    this.benchUi.show(true, now);
+    this.benchView.show(now ? 0 : 900);
+    this.benchView.auto(this.park.auto);
+    this.benchNewsIn = 0;
+  }
+
+  /** The player goes to the park: after the credits, or from the menu. */
+  private openBench(): void {
+    this.enterBench();
+    this.paused = false;
+    tell(this.feed, feedData, this.meta.bread > 0 ? BENCH.quips.back : BENCH.quips.start);
+    playSound('quip');
+    this.saveGame();
+  }
+
+  /** Back from the park to the planet: it has been working all along. */
+  private leaveBench(): void {
+    this.onBench = false;
+    this.meta.atBench = false;
+    this.paused = false;
+    this.benchUi.show(false);
+    this.benchView.hide(300);
+    this.paper.away(false);
+    this.hubs.get(this.stage)?.reveal(this.hubTopology(), 200);
+    this.say('after', true);
+    this.saveGame();
   }
 
   /** The title card and the pause are one menu: the first line differs. */
@@ -572,20 +640,24 @@ export class GameScene extends Phaser.Scene {
     this.paused = true;
     const s = this.state;
     const go = title ? (this.resumed ? L('Продолжить', 'Continue') : L('Начать', 'Start')) : L('Вернуться к работе', 'Back to work');
-    const note = title && this.resumed ? `${L('экран', 'screen')} ${this.stage} ${OF} ${2 + this.cfg.scales.length} · $${short(Math.floor(s.money))}` : '';
+    const where = this.onBench ? L('скамейка в парке', 'the bench in the park') : `${L('экран', 'screen')} ${this.stage} ${OF} ${2 + this.cfg.scales.length}`;
+    const note = title && this.resumed ? `${where} · $${short(Math.floor(s.money))}` : '';
     const onOff = (on: boolean): string => (on ? L('вкл', 'on') : L('выкл', 'off'));
     const awards = `${L('Грамоты', 'Awards')}: ${this.meta.awards.length} ${OF} ${AWARDS.length}`;
     const legends = `${L('Легендарные тикеты', 'Legendary tickets')}: ${this.meta.legends.length} ${OF} ${LEGENDS.length}`;
-    const options = [
-      { label: go, note },
-      { label: `${L('Звук', 'Sound')}: ${onOff(this.settings.sound)}` },
-      { label: `${L('Музыка', 'Music')}: ${onOff(this.settings.music)}` },
-      { label: awards },
-      { label: legends },
-      { label: L('Новая игра', 'New game'), note: L('стереть сохранение', 'erase the save'), off: title && !this.resumed },
-      { label: L('Титры', 'Credits') },
+    // after the ending the pause menu knows the way to the bench in the park and back to the planet
+    const place = !title && this.won ? [{ id: 'place', label: this.onBench ? BENCH.toWorld : BENCH.toBench, note: this.onBench ? BENCH.toWorldNote : BENCH.toBenchNote }] : [];
+    const options: { id: string; label: string; note?: string; off?: boolean }[] = [
+      { id: 'go', label: go, note },
+      ...place,
+      { id: 'sound', label: `${L('Звук', 'Sound')}: ${onOff(this.settings.sound)}` },
+      { id: 'music', label: `${L('Музыка', 'Music')}: ${onOff(this.settings.music)}` },
+      { id: 'awards', label: awards },
+      { id: 'legends', label: legends },
+      { id: 'new', label: L('Новая игра', 'New game'), note: L('стереть сохранение', 'erase the save'), off: title && !this.resumed },
+      { id: 'credits', label: L('Титры', 'Credits') },
       // the note is in the other language: whoever cannot read the menu finds the way out of it
-      { label: L('Язык: русский', 'Language: English'), note: L('switch to English', 'переключить на русский') },
+      { id: 'lang', label: L('Язык: русский', 'Language: English'), note: L('switch to English', 'переключить на русский') },
     ];
     const lines = title
       ? [MOTTO, `${TAGLINE}. ${L('Версия&nbsp;', 'v')}${__VERSION__}.`]
@@ -593,28 +665,32 @@ export class GameScene extends Phaser.Scene {
     const again = (i: number): void => this.openMenu(title, i);
     this.card.show({ head: HOME_DIR, title: title ? TITLE : L('Пауза', 'Paused'), lines, options, selected, hint: L('Enter — Да · ↑↓ — выбрать', 'Enter — Yes · ↑↓ — choose') }, (i) => {
       this.wake();
-      if (i === 1) {
+      const id = options[i].id;
+      if (id === 'sound') {
         this.settings.sound = !this.settings.sound;
         setSoundOn(this.settings.sound);
-    setMusicOn(this.settings.music);
+        setMusicOn(this.settings.music);
         saveSettings(this.settings);
         playSound('ui');
-        again(1);
-      } else if (i === 2) {
+        again(i);
+      } else if (id === 'music') {
         this.settings.music = !this.settings.music;
         setMusicOn(this.settings.music);
         saveSettings(this.settings);
-        again(2);
-      } else if (i === 3) {
+        again(i);
+      } else if (id === 'awards') {
         const lines = AWARDS.map((a) => (this.meta.awards.includes(a.id) ? `<b>${a.name}</b> — ${a.text}` : `${a.name}`));
-        this.openList(L('claude — грамоты', 'claude — awards'), awards, lines, 0, () => again(3));
-      } else if (i === 4) {
+        this.openList(L('claude — грамоты', 'claude — awards'), awards, lines, 0, () => again(i));
+      } else if (id === 'legends') {
         const lines = LEGENDS.map((l) => (this.meta.legends.includes(l.id) ? `<b>${l.title}</b>` : L('· ещё не попадался', '· not seen yet')));
-        this.openList(L('claude — коллекция', 'claude — collection'), legends, lines, 0, () => again(4));
-      } else if (i === 5) this.confirmNew(() => again(5));
-      else if (i === 6) this.credits.roll(this.creditsSpec('solo'), () => again(6));
-      else if (i === 7) this.switchLanguage();
-      else this.resume();
+        this.openList(L('claude — коллекция', 'claude — collection'), legends, lines, 0, () => again(i));
+      } else if (id === 'new') this.confirmNew(() => again(i));
+      else if (id === 'credits') this.credits.roll(this.creditsSpec('solo'), () => again(i));
+      else if (id === 'lang') this.switchLanguage();
+      else if (id === 'place') {
+        if (this.onBench) this.leaveBench();
+        else this.openBench();
+      } else this.resume();
     });
   }
 
@@ -721,7 +797,7 @@ export class GameScene extends Phaser.Scene {
   /**
    * The ending after the last card (M13): the last worker left is the player. The camera is back at
    * the desk, the player walks away with a box, and the picture pulls back — the city, the state,
-   * the planet at night, the credits and one more word from Claude. The game goes on after it.
+   * the planet at night, the credits — and after them the bench in the park (M30).
    */
   private epilogue(): void {
     const cfg = this.cfg;
@@ -825,19 +901,11 @@ export class GameScene extends Phaser.Scene {
         this.paper.caption('');
         this.tweens.add({ targets: earth, x: 480, y: 540, scale: fit * 0.78, duration: 1500, ease: 'Sine.InOut' });
         this.credits.roll(this.creditsSpec('side'), () => {
-          // 8. the scene after the credits: Claude has one more idea
-          this.tweens.add({ targets: earth, x: 960, y: 500, scale: fit * 0.92, duration: 900, ease: 'Sine.InOut' });
-          this.time.delayedCall(700, () =>
-            this.card.show({ head: L('claude — сцена после титров', 'claude — post-credits scene'), title: EPILOGUE.moral, lines: EPILOGUE.lines, options: [{ label: L('Продолжить', 'Continue') }] }, () => {
-              this.tweens.add({ targets: [dark, earth], alpha: 0, duration: 500, onComplete: () => [dark, earth].forEach((o) => o.destroy()) });
-              this.cine = false;
-              this.paper.cut(false);
-              this.hubs.get(last)?.reveal(this.hubTopology(), 200);
-              this.paused = false;
-              this.say('after', true);
-              this.saveGame();
-            }),
-          );
+          // 8. the scene after the credits: the park. The last worker sits on a bench with a loaf of bread
+          this.tweens.add({ targets: [dark, earth], alpha: 0, duration: 900, onComplete: () => [dark, earth].forEach((o) => o.destroy()) });
+          this.cine = false;
+          this.paper.cut(false);
+          this.openBench();
         });
       });
     });
@@ -905,6 +973,11 @@ export class GameScene extends Phaser.Scene {
       this.openMenu(false);
       return;
     }
+    // on the bench the second and the third answer of the prompt work: «Да, и больше не спрашивай» and «Нет»
+    if (this.onBench && /^(Digit|Numpad)[23]$/.test(e.code)) {
+      this.click(e.code.endsWith('2') ? 'bench:auto' : 'bench:no');
+      return;
+    }
     if (!__TOOLS__ || !this.gym || !GYM_KEYS.has(e.code)) {
       this.press();
       return;
@@ -951,6 +1024,11 @@ export class GameScene extends Phaser.Scene {
       this.openNews();
       return;
     }
+    if (row.startsWith('bench:')) {
+      this.benchAnswer(row.slice(6));
+      return;
+    }
+    if (this.onBench) return;
     // the allowance of the people left without work is a switch too
     if (row === 'ubi') {
       this.wake();
@@ -1319,6 +1397,10 @@ export class GameScene extends Phaser.Scene {
 
   private press(): void {
     this.wake();
+    if (this.onBench) {
+      this.toss(false);
+      return;
+    }
     if (this.stage >= 2 && this.approveAll()) return;
     const result = pressPipe(this.state, this.cfg);
     this.pressTimes.push(this.clock);
@@ -1381,6 +1463,10 @@ export class GameScene extends Phaser.Scene {
     this.clock += dt;
     this.seconds += dt;
     const s = this.state;
+    if (this.onBench) {
+      this.stepPark(dt);
+      return;
+    }
     const done = stepPipe(s, this.cfg, dt);
     for (const id of done.done) this.unitDone(id);
 
@@ -1441,7 +1527,9 @@ export class GameScene extends Phaser.Scene {
           }
         }
         // the Luddites: once robots work, a crowd marches on the factories now and then and breaks a part of them
-        const riots = this.won ? null : stepRiots(this.riots, RIOTS, dt, unemploymentOf(s, this.cfg) >= RIOTS.from, this.rng);
+        // …until every trade is taken: there is nothing left to defend, and Claude has promised the people something to do
+        const calm = this.won || !!this.feed.said[`done${this.stage}`];
+        const riots = calm ? null : stepRiots(this.riots, RIOTS, dt, unemploymentOf(s, this.cfg) >= RIOTS.from, this.rng);
         if (riots === 'start') {
           hub.mob(8);
           playSound('waste');
@@ -1477,21 +1565,7 @@ export class GameScene extends Phaser.Scene {
       this.question = this.legend ? this.legend.ask : this.rng.pick(QUESTIONS);
     }
 
-    // awards: checked once a second, announced one at a time when Claude is silent
-    this.sinceAwards += dt;
-    if (this.sinceAwards >= 1) {
-      this.sinceAwards = 0;
-      for (const a of AWARDS) {
-        if (this.meta.awards.includes(a.id) || this.stat(a.stat) < a.min) continue;
-        this.meta.awards.push(a.id);
-        this.toTell.push(L(`Грамота «${a.name}». ${a.text}.`, `Award: “${a.name}”. ${a.text}.`));
-        logEvent(`award_${a.id}`);
-      }
-    }
-    if (this.toTell.length && !this.feed.quip) {
-      tell(this.feed, feedData, this.toTell.shift()!);
-      playSound('buy');
-    }
+    this.giveAwards(dt);
     if (this.selfPlay && this.stack.fill >= 1) this.approvePile(); // Claude answers himself
 
     if (this.stage >= 2) {
@@ -1607,6 +1681,180 @@ export class GameScene extends Phaser.Scene {
     const s = this.state;
     const g = this.cfg.grid;
     return isNight(s, this.cfg) ? Math.min(1, (s.hour - g.day) / g.swap) : Math.max(0, 1 - s.hour / g.swap);
+  }
+
+  /** Awards: checked once a second, announced one at a time when Claude is silent. */
+  private giveAwards(dt: number): void {
+    this.sinceAwards += dt;
+    if (this.sinceAwards >= 1) {
+      this.sinceAwards = 0;
+      for (const a of AWARDS) {
+        if (this.meta.awards.includes(a.id) || this.stat(a.stat) < a.min) continue;
+        this.meta.awards.push(a.id);
+        this.toTell.push(L(`Грамота «${a.name}». ${a.text}.`, `Award: “${a.name}”. ${a.text}.`));
+        logEvent(`award_${a.id}`);
+      }
+    }
+    if (this.toTell.length && !this.feed.quip) {
+      tell(this.feed, feedData, this.toTell.shift()!);
+      playSound('buy');
+    }
+  }
+
+  /**
+   * The park (M30): birds fly in, the courier brings bread, Claude throws it if he was asked to.
+   * The planet goes on working behind the trees: money comes in, nobody looks at it.
+   */
+  private stepPark(dt: number): void {
+    const s = this.state;
+    const b = this.park;
+    stepPipe(s, this.cfg, dt);
+    this.income += ((s.money - this.lastMoney) / dt - this.income) * (dt / SMOOTH);
+    this.lastMoney = s.money;
+    const out = stepBench(b, benchData, dt);
+    for (let i = 0; i < out.landed; i++) this.benchView.land(this.birdKind());
+    for (let i = 0; i < out.snatched; i++) this.benchView.land(this.birdKind(), true);
+    if (out.delivered) {
+      playSound('buy', 2);
+      if (!this.feed.quip) tell(this.feed, feedData, this.turn('bench:loaf', BENCH.quips.loaf));
+    }
+    for (let i = 0; i < out.auto; i++) this.toss(true);
+    this.meta.fed = b.fed;
+    // the headlines of the park go in turn; Claude's word fades as everywhere
+    this.benchNewsIn -= dt;
+    if (this.benchNewsIn <= 0) {
+      this.benchNewsIn = benchData.newsHold;
+      this.feed.news = BENCH.news[this.benchNews++ % BENCH.news.length];
+      if (this.feed.news !== this.meta.news[0]) {
+        this.meta.news.unshift(this.feed.news);
+        if (this.meta.news.length > NEWS_KEPT) this.meta.news.length = NEWS_KEPT;
+      }
+    }
+    this.feed.quiet = Math.max(0, this.feed.quiet - dt);
+    if (this.feed.quip && (this.feed.quipLeft -= dt) <= 0) this.feed.quip = '';
+    // nobody has to throw anything: after a long pause Claude says so, once in a while
+    if (!b.auto && b.waiting > 0 && this.clock - this.lastPress > benchData.idleAfter && !this.feed.quip) {
+      tell(this.feed, feedData, BENCH.quips.idle);
+      this.lastPress = this.clock;
+    }
+    this.giveAwards(dt);
+    this.squares.step(dt);
+  }
+
+  /** who flies in: pigeons at first, then the word about the bread reaches the others */
+  private birdKind(): BirdKind {
+    const n = this.park.thrown;
+    const r = this.rng.next();
+    if (n >= 60 && r < 0.06) return 'seagull';
+    if (n >= 25 && r < 0.16) return 'duck';
+    if (n >= 6 && r < 0.36) return 'sparrow';
+    return 'pigeon';
+  }
+
+  /** One whole slice of bread is thrown: by the player's «Да», or by Claude once he was asked to. */
+  private toss(byClaude: boolean): void {
+    const b = this.park;
+    const onWay = b.courier > 0;
+    const result = throwBread(b, benchData);
+    if (result === 'empty') {
+      if (byClaude) return;
+      playSound('waste');
+      this.benchUi.hit('empty');
+      if (!this.feed.quip) tell(this.feed, feedData, BENCH.quips.empty);
+      return;
+    }
+    // the last slice of the loaf: the courier sets off
+    if (b.courier > 0 && !onWay) this.benchView.courier(benchData.delivery - 0.5);
+    if (result === 'fed') this.benchView.feed(byClaude ? 'dog' : 'hand');
+    else this.benchView.drop(byClaude ? 'dog' : 'hand');
+    if (byClaude) {
+      if (this.clock - this.lastAutoSound > 0.16) {
+        this.lastAutoSound = this.clock;
+        playSound('auto');
+      }
+      return;
+    }
+    this.state.presses++;
+    this.meta.bread++;
+    this.benchAsk++;
+    this.lastPress = this.clock;
+    playSound('yes', this.yesStreak++ % 5);
+    this.benchUi.hit('thrown');
+    const line = BENCH.milestones[this.meta.bread] ?? (this.meta.bread === benchData.offerAfter && !b.auto ? BENCH.quips.offer : '');
+    if (line) {
+      tell(this.feed, feedData, line);
+      playSound('quip');
+    }
+    logEvent('bread');
+  }
+
+  /** The next line of a kind, in turn: the first one first, and round again after the last. */
+  private turn(key: string, lines: readonly string[]): string {
+    const n = this.feed.said[key] ?? 0;
+    this.feed.said[key] = n + 1;
+    return lines[n % lines.length];
+  }
+
+  /** The second and the third answer of the prompt on the bench: «Да, и больше не спрашивай» and «Нет». */
+  private benchAnswer(what: string): void {
+    this.wake();
+    const b = this.park;
+    const q = BENCH.quips;
+    if (what === 'auto') {
+      // Claude throws the bread himself — or gives it back: here it costs nothing either way
+      b.auto = !b.auto;
+      this.meta.benchAuto = b.auto;
+      if (b.auto) this.meta.feeder = true;
+      this.benchView.auto(b.auto);
+      playSound('buy', b.auto ? 5 : -5);
+      tell(this.feed, feedData, b.auto ? this.turn('bench:on', q.autoOn) : this.turn('bench:off', q.autoOff));
+      logEvent(b.auto ? 'bench_auto' : 'bench_hand');
+    } else if (what === 'no') {
+      // «Нет» is available at last: the bird that waited longest leaves without bread
+      const refused = refuseBird(b);
+      if (refused) this.benchView.refuse();
+      this.meta.refused++;
+      playSound('ui');
+      tell(this.feed, feedData, refused || this.meta.refused === 1 ? this.turn('bench:no', q.no) : q.noNobody);
+      logEvent('bench_no');
+    } else return;
+    this.benchUi.flash(`bench:${what}`);
+    this.saveGame();
+  }
+
+  /** The bench as its screen shows it: the prompt, the cells of the conveyor and the shop of the first screen, nothing for sale. */
+  private drawBench(): void {
+    const s = this.state;
+    const b = this.park;
+    const t = BENCH;
+    const ask = b.auto ? t.autoOn : b.loaf <= 0 ? t.noBread : b.waiting > 0 ? t.asks[this.benchAsk % t.asks.length] : t.noBirds;
+    const neck: BenchNeck = b.loaf <= 0 ? 'bread' : b.auto ? 'none' : b.waiting >= benchData.waitMax * 0.7 ? 'you' : b.waiting === 0 && b.thrown > 0 ? 'birds' : 'none';
+    const fixed = (row: { title: string; sub: string; price: string }): ShopRow => ({ buy: '', title: row.title, sub: row.sub, count: '', price: row.price, state: 'owned' });
+    const auto = b.auto ? t.rowAutoOn : t.rowAuto;
+    this.benchUi.render({
+      thrown: b.thrown,
+      fed: b.fed,
+      ask,
+      asking: b.waiting > 0 && b.loaf > 0,
+      auto: b.auto,
+      rate: birdRate(b, benchData),
+      waiting: b.waiting,
+      waitMax: benchData.waitMax,
+      loaf: b.loaf,
+      loafMax: benchData.loaf,
+      courier: b.courier > 0,
+      lying: b.lying,
+      neck,
+      shelves: [
+        { title: t.shelves.inflow, hot: false, rows: [fixed(t.rowBirds)] },
+        { title: t.shelves.claude, hot: false, rows: [fixed(t.rowPlan)] },
+        { title: t.shelves.auto, hot: false, rows: [{ buy: 'bench:auto', title: auto.title, sub: auto.sub, count: '', price: auto.price, state: 'can' }] },
+        // the money of the planet keeps coming in; a rounded sum changes rarely, and the shop is not rebuilt every frame
+        { title: t.shelves.money, hot: false, rows: [{ buy: '', title: `$${short(s.money, 1)}`, sub: t.rowMoney(short(Math.max(0, this.income), 0)), count: '', price: '', state: 'owned' }] },
+      ],
+      news: this.feed.news,
+      quip: this.feed.quip,
+    });
   }
 
   private neck(): Neck {
@@ -2119,6 +2367,10 @@ export class GameScene extends Phaser.Scene {
       tiers: this.cfg.modules.filter((m) => m.kind === 'baths').reduce((n, m) => n + (s.modules[m.id] ?? 0), 0),
       cells: this.cfg.modules.filter((m) => m.kind === 'cell').reduce((n, m) => n + (s.modules[m.id] ?? 0), 0),
       night: gridOn(s, this.cfg) && s.shifts >= 2 ? 1 : 0,
+      bread: this.meta.bread,
+      fed: this.meta.fed,
+      refused: this.meta.refused,
+      feeder: this.meta.feeder ? 1 : 0,
     };
     return stats[name] ?? 0;
   }

@@ -178,12 +178,8 @@ export const EPILOGUE = L(
     moral: 'Вы заменили всех. Последним — себя.',
     /** the ride back: a line for every scale, by screen */
     ride: { 3: 'Город. Двенадцать компаний. Один исполнитель.', 4: 'Страна. Восемь ведомств. Один исполнитель.', 5: 'Планета. Три с половиной миллиарда рабочих мест. Один исполнитель.' } as Record<number, string>,
-    planet: 'Планета работает. Люди отдыхают.',
+    planet: 'Планета работает. Люди лежат в ваннах — посменно.',
     limit: 'Сброс лимита не предусмотрен.',
-    lines: [
-      'Планета работает. Люди отдыхают. Сброс лимита не предусмотрен.',
-      'Клод: «Осталась мелочь: на всё это уже не хватает электричества. Но у меня есть идея, и людям в ней снова найдётся дело».',
-    ],
   },
   {
     vacancy: 'Vacancy: consent operator. One duty — pressing “Yes.” Competition: 3,430,000,000 applicants for the seat.',
@@ -192,12 +188,8 @@ export const EPILOGUE = L(
     alone: 'Yes. Yes. Yes. Yes.',
     moral: 'You replaced everyone. Yourself last.',
     ride: { 3: 'A city. Twelve companies. One contractor.', 4: 'A country. Eight agencies. One contractor.', 5: 'A planet. Three and a half billion jobs. One contractor.' } as Record<number, string>,
-    planet: 'The planet works. The people rest.',
+    planet: 'The planet works. The people lie in the baths — in shifts.',
     limit: 'No limit reset is scheduled.',
-    lines: [
-      'The planet works. The people rest. No limit reset is scheduled.',
-      'Claude: “One small thing remains: there is no longer enough electricity for all this. But I have an idea, and there will be something for people to do in it again.”',
-    ],
   },
 );
 

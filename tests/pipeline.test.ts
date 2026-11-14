@@ -534,6 +534,24 @@ describe('pipeline', () => {
     expect(buyModule(s, cfg, 'tier')).toBe(false); // the ziggurat has only so many tiers
   });
 
+  it('test_manager_builds_the_ziggurat_up_before_connecting_what_it_cannot_feed', () => {
+    const s = createPipe(cfg);
+    s.noAsk = true;
+    s.scale = cfg.scales.length;
+    s.money = 1e30;
+    s.crew = 1;
+    const last = 2 + cfg.scales.length;
+    // tasks are short and there is power to spare: he connects the cheapest consumer
+    expect(managerPick(s, cfg, last, 'tasks', 1)).toBe('src:dark');
+    // everything the first tier can feed is connected: the next line would dim the rest — a tier comes first
+    s.owned.dark = 3;
+    expect(demandOf(s, cfg) + cfg.sources.find((x) => x.id === 'dark')!.draw!).toBeGreaterThan(peakOf(s, cfg));
+    expect(managerPick(s, cfg, last, 'tasks', 1)).toMatch(/^mod:(tier|plug)$/);
+    expect(managerPick(s, cfg, last, 'power', 1)).toMatch(/^mod:(tier|plug)$/);
+    // accumulators are never his call
+    expect(managerPick(s, cfg, last, 'power', 1)).not.toBe('mod:cell');
+  });
+
   it('test_night_needs_a_night_shift_or_what_the_accumulators_kept', () => {
     const s = createPipe(cfg);
     s.noAsk = true;

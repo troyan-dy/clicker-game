@@ -48,5 +48,10 @@
   "night": {"name": "Night Shift", "text": "You sleep, and the whole day is free"},
   "cell": {"name": "Saved for the Night", "text": "The first accumulator: the day works for the night too"},
   "zig_7": {"name": "Seven Tiers", "text": "The ziggurat is built to the top"},
-  "grid_8": {"name": "All Inclusive", "text": "Everything that asked for current is connected to the ziggurat"}
+  "grid_8": {"name": "All Inclusive", "text": "Everything that asked for current is connected to the ziggurat"},
+  "bread_1": {"name": "The First Slice", "text": "Whole. Crumbling it would be optimization"},
+  "boss": {"name": "World’s Best Boss", "text": "Twenty slices of bread thrown to the birds whole"},
+  "fed_100": {"name": "A Hundred Fed Birds", "text": "Nobody asked for a report. There is one"},
+  "no": {"name": "No", "text": "For the first time in the game you refused"},
+  "feeder": {"name": "Full Automation", "text": "Claude throws the bread to the birds. You sit"}
 }

@@ -819,3 +819,9 @@
 .bl-news em {
   flex: none;
 }
+
+/* the bench after the credits covers the map: its captions and banners are not there */
+.bl-over.away .bl-tags,
+.bl-over.away .bl-toast {
+  display: none;
+}

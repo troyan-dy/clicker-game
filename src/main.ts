@@ -17,6 +17,7 @@ import { playSound } from './core/sound';
 import { GameScene } from './game/GameScene';
 import { createLookdevUi } from './gyms/lookdev/lookdevUi';
 import { LookdevScene } from './gyms/lookdev/LookdevScene';
+import { createBench } from './ui/bench/bench';
 import { createBlueprint } from './ui/blueprint/blueprint';
 import { createCard } from './ui/card/card';
 import { createCredits } from './ui/credits/credits';
@@ -62,7 +63,10 @@ function pickScene(): Phaser.Scene {
     const menu = args.menu || (!gym && !args.capture);
     // a tuning session may open on a later screen: ?gym=agree&state=city|gov|planet|street|zig|finale|bench
     const start = gym ? ({ city: 3, gov: 4, planet: 5, street: 6, zig: 7, finale: 8, bench: 9 }[args.state] ?? 0) : 0;
-    return new GameScene(rng, createTerminal(layer), paper, card, credits, { overlay: args.debug, save, gym, menu, start });
+    // the terminal lies on top of the paper, the bench after the credits — on top of both
+    const term = createTerminal(layer);
+    const bench = createBench(layer);
+    return new GameScene(rng, term, paper, card, credits, bench, { overlay: args.debug, save, gym, menu, start });
   }
 }
 const hello = __TOOLS__ && args.gym === 'hello';

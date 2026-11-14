@@ -106,6 +106,7 @@ function play(seconds: number, cfg: PipeConfig = base): { t: number; what: strin
   const skipped = new WeakSet<object>();
   const riots = createRiots(RIOTS);
   let legend = false;
+  let calm = false;
   let fullFor = 0;
   const flowIncome = (): number => Math.min(inflowOf(s, cfg), planRate(s, cfg) * (1 + cfg.auto.subagent.share * sessionsOf(s, cfg))) * payOf(s, cfg);
   for (let i = 0; i < seconds * 60; i++) {
@@ -144,8 +145,10 @@ function play(seconds: number, cfg: PipeConfig = base): { t: number; what: strin
         s.money += Math.floor(flowIncome() * EVENTS.worthSeconds * (1 + bonus(s, cfg, 'calls')));
       }
     }
-    // the Luddites come to the factory as they do in the game
-    if (!won && stepRiots(riots, RIOTS, dt, cfg.lines.some((l) => l.screen === screenOf(s)) && unemploymentOf(s, cfg) >= RIOTS.from, rng) === 'hit') {
+    // the Luddites come to the factory as they do in the game — until every trade of the workshop is taken
+    const here = screenOf(s);
+    calm ||= cfg.lines.some((l) => l.screen === here) && cfg.sources.every((x) => x.screen !== here || (s.owned[x.id] ?? 0) >= x.max);
+    if (!won && !calm && stepRiots(riots, RIOTS, dt, cfg.lines.some((l) => l.screen === here) && unemploymentOf(s, cfg) >= RIOTS.from, rng) === 'hit') {
       riot(s, cfg, riotShare(s, cfg, RIOTS.share));
     }
     if (i % 30 !== 0) continue; // the bot shops twice a second

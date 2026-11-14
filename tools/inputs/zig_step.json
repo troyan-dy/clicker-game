@@ -1,0 +1,1 @@
+[{"t": 1.0, "eval": "window.__gym.fleet(80); ['checkout','coffee','courier','taxi','barber','depot','build','clinic','school','farm'].forEach((id) => window.__gym.take(id)); window.__gym.gift(1e17)"}, {"t": 5.0, "eval": "window.__gym.buy('scale')"}, {"t": 9.0, "eval": "window.__gym.buy('src:dark')"}]

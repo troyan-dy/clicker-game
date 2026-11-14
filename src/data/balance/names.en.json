@@ -59,7 +59,7 @@
     "gov": {"name": "Win a government contract", "note": "one bidder in the tender; opens the country map"},
     "top": {"name": "A deal with Anthropic", "note": "you are their biggest customer; opens the planet"},
     "street": {"name": "Buy Boston Mechanics", "note": "enough of renting packs; next — the planet’s manual labor"},
-    "zig": {"name": "Project “Bright Future”", "note": "people have something to do again — lie down; opens the ziggurat"}
+    "zig": {"name": "“Bright Future”", "note": "a project: people have something to do again — lie down; opens the ziggurat"}
   },
   "sources": {
     "job": {"name": "A job", "tag": "job", "note": "standup at 10:00, a task tracker"},

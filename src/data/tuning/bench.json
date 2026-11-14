@@ -1,0 +1,1 @@
+{ "birds": 0.5, "birdsPerSlice": 0.012, "birdsMax": 1.8, "lure": 0.3, "waitMax": 10, "lieMax": 4, "loaf": 20, "delivery": 4, "autoRate": 6, "offerAfter": 30, "newsHold": 12, "idleAfter": 45 }
