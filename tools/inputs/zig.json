@@ -1,6 +1,7 @@
 [
-  {"t": 1.0, "eval": "window.__gym.gift(3e16); window.__gym.buy('src:dark'); window.__gym.buy('src:dark'); window.__gym.buy('src:charge')"},
-  {"t": 4.0, "eval": "window.__gym.gift(2e17); window.__gym.buy('mod:tier'); window.__gym.buy('mod:tier'); window.__gym.buy('src:cooling'); window.__gym.buy('src:cooling'); window.__gym.buy('farm:core'); window.__gym.buy('farm:core')"},
-  {"t": 8.0, "eval": "window.__gym.gift(2e17); window.__gym.buy('mod:plug'); window.__gym.buy('mod:cell'); window.__gym.take('dark'); window.__gym.buy('src:lights'); window.__gym.buy('manager')"},
-  {"t": 30.0, "eval": "window.__gym.click('shifts')"}
+  {"t": 1.0, "eval": "window.__gym.gift(6e16); window.__gym.buy('src:diesel'); window.__gym.buy('mod:tier'); window.__gym.buy('net:copies')"},
+  {"t": 4.0, "eval": "window.__gym.gift(4e17); window.__gym.buy('mod:tier'); window.__gym.buy('mod:care'); window.__gym.buy('src:coal'); window.__gym.buy('src:coal'); window.__gym.buy('net:speed')"},
+  {"t": 8.0, "eval": "window.__gym.gift(6e17); window.__gym.buy('mod:plug'); window.__gym.take('diesel'); window.__gym.buy('src:gas'); window.__gym.buy('mod:tier'); window.__gym.buy('manager')"},
+  {"t": 14.0, "eval": "window.__gym.call()"},
+  {"t": 20.0, "eval": "window.__gym.buy('net:copies'); window.__gym.buy('net:copies')"}
 ]

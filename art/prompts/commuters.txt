@@ -1,0 +1,8 @@
+A sheet of three separate small line-drawn people walking to the right in one row, full length, each seen from the same three-quarter isometric angle, with wide empty margins between them. No text, no letters, no numbers, no arrows, no ground, no frame.
+
+STYLE: a deadpan-serious technical infographic, like icons for an architecture diagram in an engineering report. Plain warm ivory paper background (#F0EEE6), completely empty between the figures. Thin precise charcoal lines (#262624) of one fine, even weight. Flat muted fills used sparingly: terracotta (#D97757) as the single strong accent, plus a little soft sage (#BCD1CA), dusty blue (#6A9BCC) and sand (#D4A27F). No thick outlines, no chunky cartoon shapes, no candy colours, no gradients, no shadows on the paper. All three are drawn with the same line weight, each about the same size.
+
+LEFT TO RIGHT, three ordinary adults on their way to work in bathrobes and slippers:
+1. A man in a sage-green bathrobe with a towel over his shoulder, carrying a thermos.
+2. A woman in a dusty-blue bathrobe carrying a pillow under her arm.
+3. A man in a sand-coloured bathrobe with a sleep mask pushed up on his forehead, holding a paper coffee cup.

@@ -30,12 +30,18 @@ export interface HubLayout {
   /** the previous screen simply fades and this one appears in its place: the middle is something new */
   fresh?: boolean;
   /**
-   * The middle is a ziggurat (M28): coloured in tier by tier, the field darkens at night, a dial shows
-   * the hour, power runs to the lots. `steps` — how much of the picture's height stands with one tier, two, …
-   * `rows` — where the people lie, tier by tier, in the picture's own pixels (`size`): the height of
-   * the terrace, where it starts and ends, and the middle of the staircase that crosses it.
+   * The middle is a ziggurat (M28): a dark tower coloured in tier by tier, with capsules on its walls;
+   * the paper darkens at night, a dial shows the hour, power runs out to the lots. `steps` — how much of
+   * the picture's height stands with one tier, two, … `faces` — the front wall of every tier in the
+   * picture's own pixels (`size`): its top left corner, where it ends, the middle of the cables that
+   * cross it and its height; the walls lean by `slope` px down for every px to the right.
    */
-  grid?: { steps: readonly number[]; size: readonly [number, number]; rows: readonly (readonly [number, number, number, number])[] };
+  grid?: {
+    steps: readonly number[];
+    size: readonly [number, number];
+    slope: number;
+    faces: readonly (readonly [y: number, x0: number, x1: number, cables: number, h: number])[];
+  };
   /** the node in the middle may be wider than the others */
   homeWidth?: number;
 }
@@ -148,37 +154,38 @@ export const HUBS: Record<number, HubLayout> = {
     },
     unroll: true,
   },
-  // the ziggurat: the tallest thing on the map stands in the middle, what it feeds stands around; the servers and the accumulators — in the far row
+  // the ziggurat: the tallest thing on the map stands in the middle; the neural network it feeds — in the far
+  // row, the old power plants that people in baths replace — around
   7: {
-    home: { key: 'ziggurat', x: 670, y: 872, h: 350 },
-    homeRadius: 205,
+    home: { key: 'ziggurat', x: 670, y: 884, h: 372 },
+    homeRadius: 200,
     homeWidth: 400,
     lots: {
-      dark: { key: 'darkfactory', x: 384, y: 700, h: 138 },
-      charge: { key: 'charger', x: 956, y: 700, h: 140 },
-      cooling: { key: 'datacenter', x: 384, y: 930, h: 122 },
-      lights: { key: 'cityblock', x: 956, y: 930, h: 150 },
-      trains: { key: 'train', x: 132, y: 700, h: 120 },
-      desal: { key: 'desal', x: 1208, y: 700, h: 140 },
-      thermo: { key: 'dish', x: 132, y: 930, h: 150 },
-      archive: { key: 'archive', x: 1208, y: 930, h: 160 },
+      diesel: { key: 'diesel', x: 384, y: 700, h: 112 },
+      coal: { key: 'coalplant', x: 956, y: 700, h: 150 },
+      gas: { key: 'gasplant', x: 384, y: 930, h: 126 },
+      wind: { key: 'wind', x: 956, y: 930, h: 158 },
+      solar: { key: 'solar', x: 132, y: 700, h: 118 },
+      hydro: { key: 'hydro', x: 1208, y: 700, h: 146 },
+      nuclear: { key: 'nuclear', x: 132, y: 930, h: 150 },
+      fusion: { key: 'fusion', x: 1208, y: 930, h: 150 },
     },
     farms: {
-      core: { key: 'racks', x: 384, y: 478, h: 132, ids: ['core'] },
-      cells: { key: 'cells', x: 956, y: 478, h: 128, ids: ['cell'] },
+      net: { key: 'netcore', x: 384, y: 478, h: 150, ids: ['net'] },
     },
     maxWidth: 185,
     fresh: true,
     grid: {
-      steps: [0.19, 0.32, 0.45, 0.575, 0.7, 0.815, 1],
-      size: [758, 623],
-      rows: [
-        [513, 18, 600, 262],
-        [430, 66, 572, 283],
-        [350, 117, 546, 304],
-        [272, 165, 521, 325],
-        [195, 214, 498, 346],
-        [119, 264, 475, 366],
+      steps: [0.24, 0.374, 0.464, 0.606, 0.689, 0.794, 1],
+      size: [725, 862],
+      slope: 0.099,
+      faces: [
+        [683, 8, 513, 281, 142],
+        [572, 61, 480, 290, 89],
+        [469, 108, 456, 298, 86],
+        [370, 153, 452, 309, 95],
+        [275, 197, 434, 318, 80],
+        [186, 242, 416, 329, 85],
       ],
     },
   },

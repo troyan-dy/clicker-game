@@ -5,6 +5,7 @@ import gradeData from '../src/data/balance/grades.json';
 import lineData from '../src/data/balance/lines.json';
 import managerData from '../src/data/balance/managers.json';
 import moduleData from '../src/data/balance/modules.json';
+import netData from '../src/data/balance/net.json';
 import planData from '../src/data/balance/plans.json';
 import policeData from '../src/data/balance/police.json';
 import scaleData from '../src/data/balance/scales.json';
@@ -20,7 +21,6 @@ import type { Plan } from '../src/systems/plan/plan';
 import { createRiots, stepRiots } from '../src/systems/riots/riots';
 import { createStack, stackWorth, stepStack, takeStack } from '../src/systems/stack/stack';
 import {
-  bestShifts,
   bonus,
   bribeCost,
   buyBribe,
@@ -28,6 +28,7 @@ import {
   buyGrade,
   buyLine,
   buyModule,
+  buyNet,
   buyScale,
   buyNoAsk,
   buyPlan,
@@ -39,6 +40,7 @@ import {
   demandOf,
   farmCost,
   finished,
+  flowOf,
   gridOn,
   inflowOf,
   jobOf,
@@ -47,9 +49,9 @@ import {
   lineCost,
   locked,
   moduleCost,
+  netCost,
+  netDraw,
   payOf,
-  peakOf,
-  planRate,
   policeCost,
   pressPipe,
   riot,
@@ -60,6 +62,7 @@ import {
   stepPipe,
   subagentPrice,
   subagentRate,
+  supplyOf,
   unemploymentOf,
   type Farm,
   type Line,
@@ -79,6 +82,7 @@ const base: PipeConfig = {
   lines: lineData as Line[],
   police: policeData,
   modules: moduleData as Module[],
+  net: netData,
   grid: gridData,
   auto: autoData,
 };
@@ -108,7 +112,7 @@ function play(seconds: number, cfg: PipeConfig = base): { t: number; what: strin
   let legend = false;
   let calm = false;
   let fullFor = 0;
-  const flowIncome = (): number => Math.min(inflowOf(s, cfg), planRate(s, cfg) * (1 + cfg.auto.subagent.share * sessionsOf(s, cfg))) * payOf(s, cfg);
+  const flowIncome = (): number => flowOf(s, cfg) * payOf(s, cfg);
   for (let i = 0; i < seconds * 60; i++) {
     const t = i / 60;
     stepPipe(s, cfg, dt);
@@ -173,7 +177,7 @@ function play(seconds: number, cfg: PipeConfig = base): { t: number; what: strin
     const inflow = inflowOf(s, cfg);
     const hands = s.noAsk ? Infinity : FINGER;
     const screen = screenOf(s);
-    const income = Math.min(inflow, claudeRate(s, cfg) + subagentRate(s, cfg)) * payOf(s, cfg);
+    const income = (gridOn(s, cfg) ? inflow : Math.min(inflow, claudeRate(s, cfg) + subagentRate(s, cfg))) * payOf(s, cfg);
     // the next step up in scale: bought as soon as it costs less than a minute of income, or when this screen is done
     const scale = cfg.scales[s.scale];
     const left = cfg.sources.some((x) => x.screen === screen && (s.owned[x.id] ?? 0) < x.max);
@@ -200,19 +204,37 @@ function play(seconds: number, cfg: PipeConfig = base): { t: number; what: strin
       }
     }
 
-    // the ziggurat: the shifts that pay best are paid; power is bought before what would ask for more than there is
-    if (gridOn(s, cfg)) s.shifts = bestShifts(s, cfg);
-    const buyPower = (): void => {
-      const peak = peakOf(s, cfg);
-      const best = cfg.modules
-        .filter((m) => m.kind !== 'cell' && (s.modules[m.id] ?? 0) < (m.max ?? Infinity))
-        .map((m) => ({ m, price: moduleCost(s, cfg, m), gain: m.kind === 'baths' ? peak / (s.modules[m.id] ?? 1) : peak * (m.amount - 1) }))
+    // the ziggurat: power in, money out. What pays back soonest is bought — a block of an old plant or a step of a
+    // dial of the network — and when it would ask for more power than there is, the ziggurat is built up first
+    if (gridOn(s, cfg)) {
+      const supply = supplyOf(s, cfg);
+      const spare = supply - demandOf(s, cfg);
+      const pay = payOf(s, cfg);
+      const say = (what: string): void => {
+        log.push({ t, what: `${what} → ${supplyOf(s, cfg).toFixed(0)} ГВт при спросе ${demandOf(s, cfg).toFixed(0)}, $${(inflowOf(s, cfg) * payOf(s, cfg)).toExponential(2)}/с, $${s.money.toExponential(2)}` });
+      };
+      const grow = [
+        ...cfg.sources
+          .filter((x) => x.screen === screen && (s.owned[x.id] ?? 0) < x.max)
+          .map((x) => ({ name: x.name, price: sourceCost(s, cfg, x), gain: x.inflow * (1 + bonus(s, cfg, 'inflow')) * pay, need: x.draw ?? 0, buy: () => buySource(s, cfg, x.id) })),
+        ...cfg.net
+          .filter((p) => (s.net[p.id] ?? 0) < p.max)
+          .map((p) => ({ name: `${p.name} №${(s.net[p.id] ?? 0) + 1}`, price: netCost(s, cfg, p), gain: income * (p.yield - 1), need: netDraw(s, cfg) * (p.draw - 1), buy: () => buyNet(s, cfg, p.id) })),
+      ].sort((a, b) => a.price / a.gain - b.price / b.gain)[0];
+      if (!grow) continue;
+      if (grow.need <= spare) {
+        if (grow.buy()) say(grow.name);
+        continue;
+      }
+      const power = cfg.modules
+        .filter((m) => (s.modules[m.id] ?? 0) < (m.max ?? Infinity))
+        .map((m) => {
+          const owned = s.modules[m.id] ?? 0;
+          const gain = m.kind === 'baths' ? supply / owned : m.kind === 'plug' ? supply * (m.amount - 1) : (supply * m.amount) / (1 + m.amount * owned);
+          return { m, price: moduleCost(s, cfg, m), gain };
+        })
         .sort((a, b) => a.price / a.gain - b.price / b.gain)[0];
-      if (best && buyModule(s, cfg, best.m.id)) log.push({ t, what: `${best.m.name} №${s.modules[best.m.id]} → ${peakOf(s, cfg).toFixed(0)} ГВт при спросе ${demandOf(s, cfg).toFixed(0)}, $${s.money.toFixed(0)}` });
-    };
-    const lacks = (draw: number | undefined): boolean => gridOn(s, cfg) && demandOf(s, cfg) + (draw ?? 0) > peakOf(s, cfg);
-    if (lacks(0)) {
-      buyPower();
+      if (power && buyModule(s, cfg, power.m.id)) say(`${power.m.name} №${s.modules[power.m.id]}`);
       continue;
     }
 
@@ -234,8 +256,7 @@ function play(seconds: number, cfg: PipeConfig = base): { t: number; what: strin
         const best = cfg.sources
           .filter((x) => !x.made && (s.owned[x.id] ?? 0) < x.max && !jobOf(s, x.id) && (screen >= 3 ? x.screen === screen : x.screen <= screen))
           .sort((a, b) => cost(a) / a.inflow - cost(b) / b.inflow)[0];
-        if (best && lacks(best.draw)) buyPower();
-        else if (best && locked(s, best)) {
+        if (best && locked(s, best)) {
           if (buyBribe(s, cfg, best.id)) note(`взятка: ${best.name}`);
         } else if (best && buySource(s, cfg, best.id)) note(best.name);
       }
@@ -246,7 +267,7 @@ function play(seconds: number, cfg: PipeConfig = base): { t: number; what: strin
       const share = cfg.auto.subagent.share;
       const options = cfg.farms
         .filter((f) => f.screen === screen && (s.farms[f.id] ?? 0) < (f.max ?? Infinity))
-        .map((f) => ({ name: f.name, price: farmCost(s, cfg, f), gain: f.sessions * rate * share, buy: () => (lacks(f.draw) ? (buyPower(), false) : buyFarm(s, cfg, f.id)) }));
+        .map((f) => ({ name: f.name, price: farmCost(s, cfg, f), gain: f.sessions * rate * share, buy: () => buyFarm(s, cfg, f.id) }));
       const plan = cfg.plans[s.plan.index + 1];
       if (plan) options.push({ name: `тариф ${plan.name}`, price: plan.price, gain: (plan.rate - rate) * (1 + share * sessionsOf(s, cfg)), buy: () => buyPlan(s, cfg) });
       const best =

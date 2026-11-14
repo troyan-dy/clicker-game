@@ -21,6 +21,11 @@ const MASCOT = 'mascot';
 const POWER = 0x6a9bcc; // what runs from the ziggurat to the things it feeds
 const SUN = 0xd4a27f;
 const SPARKS = 28;
+const POD = 0xe59a84; // a capsule with a sleeper in it: warm against the dark wall
+const POD_EMPTY = 0x4a4844; // …and one that is waiting for the next shift
+const DRONES = 7;
+/** the pictures a service drone is drawn with: flying, at work, with a towel */
+const DRONE_LOOK = ['node_drone', 'node_drone_work', 'node_drone_towel'];
 
 /** What the player owns on a big screen: units of the employers and farms of sessions. */
 export interface HubTopology {
@@ -43,9 +48,10 @@ export interface HubTopology {
   /**
    * The ziggurat of the screen (M28): `built` — the part of its tiers that stands, `power` — the part of
    * the power asked for that is given, `hour` — how far the day or the night has gone, each 0..1;
-   * `tiers` — how many of them stand, `crew` — the part of the baths that is taken, 0..1.
+   * `tiers` — how many of them stand, `crew` — the part of the capsules that is taken, 0..1 (it dips
+   * while the shifts change), `bots` — how many service drones look after the tower.
    */
-  grid?: { built: number; power: number; hour: number; night: boolean; tiers: number; crew: number };
+  grid?: { built: number; power: number; hour: number; night: boolean; tiers: number; crew: number; bots: number };
 }
 
 interface Route {
@@ -100,10 +106,13 @@ export class HubView {
   private readonly sparks: Dot[] = [];
   /** the ziggurat in the middle, coloured in tier by tier */
   private zig?: Lot;
-  /** the people in the baths: a dot for a head, tier by tier, in the order they lie down */
+  /** the capsules on the walls of the tower, tier by tier, in the order people lie down in them */
   private heads?: Phaser.GameObjects.Graphics;
   private readonly beds: { x: number; y: number; tier: number }[] = [];
   private lying = '';
+  /** the service drones: where each one is, where it flies, how long it still works on the spot */
+  private readonly drones: { img: Phaser.GameObjects.Image; tx: number; ty: number; wait: number; t: number }[] = [];
+  private tiers = 0;
   private dial?: Phaser.GameObjects.Graphics;
   private resting = 0;
   private readonly rng: Rng;
@@ -172,18 +181,28 @@ export class HubView {
       this.dial = scene.add.graphics();
       this.heads = scene.add.graphics();
       this.root.add([this.dial, this.heads]);
-      // the baths stand in a row along every terrace, on both sides of the staircase
-      const zig = this.zig!.fill;
-      const k = zig.scaleX;
+      // capsules in two rows along the front wall of every tier, on both sides of the cables
+      const k = this.zig!.fill.scaleX;
       const left = layout.home.x - (layout.grid.size[0] * k) / 2;
       const top = layout.home.y - layout.grid.size[1] * k;
-      layout.grid.rows.forEach(([y, x0, x1, stair], tier) => {
-        for (let x = x0 + 10; x <= x1 - 8; x += 13) if (Math.abs(x - stair) > 46) this.beds.push({ x: left + x * k, y: top + y * k, tier });
+      layout.grid.faces.forEach(([y, x0, x1, cables, h], tier) => {
+        const rows = h > 120 ? [0.2, 0.5, 0.8] : [0.3, 0.72];
+        for (const part of rows) {
+          for (let x = x0 + 18; x <= x1 - 14; x += 27) {
+            if (Math.abs(x - cables) > 40) this.beds.push({ x: left + x * k, y: top + (y + h * part + (x - x0) * layout.grid!.slope) * k, tier });
+          }
+        }
       });
       // people lie down where they like, not from left to right
       for (let i = this.beds.length - 1; i > 0; i--) {
         const j = rng.int(0, i);
         [this.beds[i], this.beds[j]] = [this.beds[j], this.beds[i]];
+      }
+      for (let i = 0; i < DRONES; i++) {
+        const img = scene.add.image(layout.home.x, layout.home.y - 60, DRONE_LOOK[0]).setOrigin(0.5, 0.5).setVisible(false);
+        img.setScale(58 / img.height);
+        this.root.add(img);
+        this.drones.push({ img, tx: img.x, ty: img.y, wait: 0, t: rng.range(0, 6) });
       }
     }
     this.walkers = new Walkers(scene, this.root, rng);
@@ -283,7 +302,10 @@ export class HubView {
         this.scene.tweens.add({ targets: [lot.ghost, lot.fill], scale: { from: lot.scale * 1.07, to: lot.scale }, duration: 300, ease: 'Back.Out' });
       }
       if (!this.routes.has(id)) {
-        this.routes.set(id, this.spoke([place.x, place.y - 22], false));
+        // tasks run in from an employer; at the ziggurat power runs out to what it feeds
+        const route = this.spoke([place.x, place.y - 22], !!this.layout.grid);
+        route.pays = false;
+        this.routes.set(id, route);
         changed = true;
       }
     }
@@ -299,7 +321,10 @@ export class HubView {
       const scale = img.scale;
       img.setScale(scale * 0.7);
       this.scene.tweens.add({ targets: img, scale, alpha: 1, duration: 320, ease: 'Back.Out' });
-      this.routes.set(node, this.spoke(f.above ? [f.x, f.y + 6] : [f.x, f.y - f.h - 6], true));
+      const route = this.spoke(f.above ? [f.x, f.y + 6] : [f.x, f.y - f.h - 6], true);
+      // at the ziggurat it is power that runs to the node: the money comes out of it by itself
+      if (this.layout.grid) route.pays = false;
+      this.routes.set(node, route);
       changed = true;
     }
     if (changed) this.redrawLines();
@@ -328,16 +353,28 @@ export class HubView {
         this.crop(zig);
       } else this.scene.tweens.add({ targets: [zig.ghost, zig.fill], scale: { from: zig.scale * 1.04, to: zig.scale }, duration: 320, ease: 'Back.Out' });
     }
-    // the people in the baths: the tiers that stand are filled as far as the shift has lain down
+    // the capsules: on the tiers that stand, taken as far as the shift has lain down
+    this.tiers = g.tiers;
     const beds = this.beds.filter((b) => b.tier < g.tiers);
     const taken = Math.round(beds.length * Math.max(0, Math.min(1, g.crew)));
     const key = `${g.tiers}:${taken}`;
     if (this.heads && key !== this.lying) {
       this.lying = key;
-      this.heads.clear();
-      this.heads.fillStyle(INK, 1);
-      for (let i = 0; i < taken; i++) this.heads.fillCircle(beds[i].x, beds[i].y, 2.2);
+      const h = this.heads;
+      h.clear();
+      beds.forEach((b, i) => {
+        h.fillStyle(i < taken ? POD : POD_EMPTY, 1).fillEllipse(b.x, b.y, 9, 5.6);
+        h.lineStyle(1, 0xf0eee6, i < taken ? 0.9 : 0.35).strokeEllipse(b.x, b.y, 9, 5.6);
+        if (i < taken) h.fillStyle(INK, 1).fillCircle(b.x - 2, b.y, 1.2);
+      });
     }
+    // the drones that look after them: as many as were bought
+    this.drones.forEach((d, i) => {
+      const on = i < Math.min(DRONES, g.bots);
+      if (on === d.img.visible) return;
+      d.img.setVisible(on);
+      if (on) this.roam(d, true);
+    });
     // short of power, what the ziggurat feeds fades towards its outline
     const lit = 0.3 + 0.7 * g.power;
     for (const lot of this.lots.values()) lot.fill.setAlpha(lit);
@@ -362,26 +399,40 @@ export class HubView {
     if (g.night) d.fillStyle(0xcccac5, 1).fillCircle(bx + 5, by - 4, 8); // a bite out of the moon, the colour of the night paper
   }
 
-  /** The shift changes: `count` people walk to the baths from the edges of the map, or home from the baths. */
-  shift(inbound: boolean, count: number): void {
+  /**
+   * The shifts change: `count` people in bathrobes walk out of the tower towards each edge of the map,
+   * and as many walk in from there — the two columns pass each other on the way, as on the way to any job.
+   */
+  shift(count: number): void {
     const { x, y } = this.layout.home;
-    const half = Math.ceil(count / 2);
-    const edges: Pt[] = [[FIELD.x0 + 30, y + 46], [FIELD.x1 - 30, y + 46]];
-    const doors: Pt[] = [[x - 96, y + 14], [x + 96, y + 14]];
-    for (const side of [0, 1]) {
-      const n = side === 0 ? half : count - half;
-      if (n > 0) this.walkers.spawn('person', inbound ? edges[side] : doors[side], inbound ? doors[side] : edges[side], n);
+    const kind: WalkerKind = this.scene.textures.exists('node_sleeper1') ? 'sleeper' : 'person';
+    for (const side of [-1, 1]) {
+      const door: Pt = [x + side * 150, y + 26];
+      const edge: Pt = [side < 0 ? FIELD.x0 + 24 : FIELD.x1 - 24, y + 34];
+      this.walkers.spawn(kind, door, edge, count);
+      this.walkers.spawn(kind, edge, door, count);
     }
   }
 
-  /** A square of power runs from the ziggurat to the lot `id`. */
+  /** A square of power runs from the ziggurat to the lot `id`, or to the node `farm:<id>`. */
   feed(id: string): void {
     const route = this.routes.get(id);
     const dot = this.sparks.find((d) => !d.route);
     if (!route || !dot) return;
-    dot.route = { from: route.to, to: route.from, len: route.len, pays: false };
+    dot.route = route;
     dot.dist = 0;
-    dot.rect.setPosition(route.to[0], route.to[1]).setVisible(true);
+    dot.rect.setPosition(route.from[0], route.from[1]).setVisible(true);
+  }
+
+  /** A drone picks the next capsule to look after: one on a tier that stands. `now` — it appears there at once. */
+  private roam(d: { img: Phaser.GameObjects.Image; tx: number; ty: number; wait: number }, now = false): void {
+    const beds = this.beds.filter((b) => b.tier < Math.max(1, this.tiers));
+    const bed = beds[this.rng.int(0, Math.max(0, beds.length - 1))];
+    if (!bed) return;
+    // it hovers just above the capsule, a little to the side of it
+    d.tx = bed.x + this.rng.range(-6, 6);
+    d.ty = bed.y - 22;
+    if (now) d.img.setPosition(d.tx, d.ty);
   }
 
   /** `want` people with placards stand at the door of a building; the rest of them go. */
@@ -488,6 +539,27 @@ export class HubView {
       }
       const f = d.dist / len;
       d.rect.setPosition(from[0] + (to[0] - from[0]) * f, from[1] + (to[1] - from[1]) * f);
+    }
+    for (const d of this.drones) {
+      if (!d.img.visible) continue;
+      d.t += dt;
+      const dx = d.tx - d.img.x;
+      const dy = d.ty - d.img.y;
+      const far = Math.hypot(dx, dy);
+      if (far > 3) {
+        // on its way to the next capsule
+        const step = Math.min(far, 120 * dt);
+        d.img.setPosition(d.img.x + (dx / far) * step, d.img.y + (dy / far) * step + Math.sin(d.t * 5) * 0.25);
+        d.img.setFlipX(dx > 0);
+        if (d.img.texture.key !== DRONE_LOOK[0]) d.img.setTexture(DRONE_LOOK[0]);
+      } else if (d.wait <= 0) {
+        // arrived: it tops up the warm water or straightens a plug for a while
+        d.wait = this.rng.range(1.6, 3.6);
+        d.img.setTexture(DRONE_LOOK[this.rng.next() < 0.5 ? 1 : 2]);
+      } else {
+        d.img.y = d.ty + Math.sin(d.t * 4) * 1.6;
+        if ((d.wait -= dt) <= 0) this.roam(d);
+      }
     }
     this.walkers.step(dt);
   }

@@ -6,6 +6,7 @@
 import {
   claudeRate,
   createPipe,
+  gridOn,
   inflowOf,
   payOf,
   subagentRate,
@@ -124,7 +125,7 @@ export function restorePipe(cfg: PipeConfig, raw: unknown): PipeState {
   s.presses = Math.floor(num(r.presses, 0));
   s.wasted = Math.floor(num(r.wasted, 0));
   s.closedHere = Math.floor(num(r.closedHere, 0));
-  s.closedBySubagents = Math.floor(num(r.closedBySubagents, 0));
+  s.closedBySubagents = num(r.closedBySubagents, 0);
   const owned = counts(r.owned);
   for (const src of cfg.sources) {
     const n = num(owned[src.id], src.start, src.start, src.max);
@@ -151,16 +152,18 @@ export function restorePipe(cfg: PipeConfig, raw: unknown): PipeState {
   for (const [kind, id] of Object.entries(counts(r.aim))) {
     if (cfg.sources.some((x) => x.id === id && x.made === kind)) s.aim[kind] = id as string;
   }
-  // the ziggurat: its parts, its shifts, the hour of its day and what the accumulators keep
+  // the ziggurat: its parts, the dials of the network, the hour of its day
   const modules = counts(r.modules);
   for (const m of cfg.modules) {
     const n = Math.floor(num(modules[m.id], m.start ?? 0, m.start ?? 0, m.max ?? Number.MAX_VALUE));
     if (n > 0) s.modules[m.id] = n;
   }
-  s.shifts = Math.floor(num(r.shifts, 1, 1, 2));
+  const net = counts(r.net);
+  for (const p of cfg.net) {
+    const n = Math.floor(num(net[p.id], 0, 0, p.max));
+    if (n > 0) s.net[p.id] = n;
+  }
   s.hour = num(r.hour, 0, 0, cfg.grid.day + cfg.grid.night);
-  s.crew = num(r.crew, 0, 0, 1);
-  s.charge = num(r.charge, 0);
   s.power = num(r.power, 1, 0, 1);
   const farms = counts(r.farms);
   const surge = counts(r.surge);
@@ -207,7 +210,8 @@ export function offlineReport(s: PipeState, cfg: PipeConfig, tuning: SaveTuning,
   if (!(seconds >= tuning.offlineMinSeconds)) return null;
   const counted = Math.min(seconds, tuning.offlineCapHours * 3600);
   if (!s.noAsk) return { seconds: counted, tasks: 0, dollars: 0, waited: true };
-  const flow = Math.min(inflowOf(s, cfg), claudeRate(s, cfg) + subagentRate(s, cfg));
+  // at the ziggurat the network closes whatever comes in; before it — what the sessions manage
+  const flow = gridOn(s, cfg) ? inflowOf(s, cfg) : Math.min(inflowOf(s, cfg), claudeRate(s, cfg) + subagentRate(s, cfg));
   const tasks = Math.floor(flow * counted * tuning.offlineRate);
   return { seconds: counted, tasks, dollars: tasks * payOf(s, cfg), waited: false };
 }

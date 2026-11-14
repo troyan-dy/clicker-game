@@ -37,12 +37,12 @@
   "clinic": "The clinic front desks are smiling. Patients get scared and recover",
   "school": "In schools: teacher not found, grades up. The parent chats have gone quiet",
   "farm": "Harvest.json farms brought in the harvest on schedule. The weather was notified in advance",
-  "dark": "The dark factories finally threw the switch. The lights stayed off: nobody is there to look",
-  "charge": "Every “Paw” charging station is live. The robot dogs queue in silence",
-  "cooling": "The datacenter chillers are at full power. Claude thinks two degrees cooler",
-  "lights": "The night cities are lit again. The residents watch the lights from their baths, on a stream",
-  "trains": "Trains without passengers are running on every line. No delays, no complaints",
-  "desal": "The desalination plants give water to the ziggurat, the ziggurat gives current to the plants. Economists give a standing ovation",
-  "thermo": "The planet thermostat is set to seventy degrees. The argument about the window is closed for good",
-  "archive": "The archive of consents is connected and full. Every “Yes” is kept in three copies; no “No” was found in the holdings"
+  "diesel": "The last diesel generator is switched off. For the first time the village can hear the neighbor snore",
+  "coal": "The coal plants are stopped. The chimneys stay: handy for drying bathrobes",
+  "gas": "The gas stations are closed. The gas stays in the ground and is said to be pleased",
+  "wind": "The wind farms are stopped: the wind does not blow on schedule. People lie down on schedule",
+  "solar": "The solar fields are rolled up. The Sun was notified by letter, no answer yet",
+  "hydro": "The hydro dams are stopped. The reservoir water went to the baths: warm, with foam",
+  "nuclear": "The nuclear plants are retired. The engineers say lying down is calmer: nothing glows except the neighbor",
+  "fusion": "The fusion reactor is closed as unnecessary. It was twenty years from launch — as always"
 }

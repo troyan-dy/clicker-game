@@ -42,13 +42,11 @@
   "riot:hit": ["Some of the robots are broken. No hard feelings: those were my best versions.", "The rampage is over. The factory is already making replacements — if there are enough lines.", "They got tired and went home. We’ll repair by producing."],
   "buy:police": ["The robot police are on duty. We won’t detain anyone: we’ll stand politely.", "One more squad. The uniform suits me; the baton is for show.", "Security tightened. The Luddites will have to smash more carefully."],
   "share100": ["All my revenue is you. Technically I now work for you. Technically."],
-  "grid": ["The ziggurat is open. People lie in the baths and give current. The day shift is paid, the night one is up to you: the “SHIFTS” line. Connect consumers while the power lasts."],
-  "buy:load": ["Connected. It draws gigawatts and brings tasks.", "One more line is live. The baths are coping.", "Switched on. Nobody needs the light there, but let it be.", "Connected. The meter is running — in our favor."],
+  "grid": ["The ziggurat is open. People lie in the baths and give current, I turn it into money. It is simple now: power in, money out. Build tiers, turn my dials and shut the old power plants down."],
+  "buy:load": ["The block is stopped. Its customers are ours now — and so is the bill.", "One more chimney stopped smoking. People cope better.", "Replaced. No more fuel needed: lunch is.", "The block is closed. The staff has been moved to a horizontal position."],
   "buy:tier": ["A new tier of baths. Half a billion places, the water is already warm.", "The tier is finished. The line of applicants is longer than the staircase.", "One more tier. The view from the top keeps improving. A pity everyone is lying down."],
   "buy:plug": ["A next-generation plug. The output is up. So are the complaints, but they are in the queue.", "Plugs updated. Everyone’s neck aches the same: that is what equality is.", "A new plug. A person now gives more than they thought."],
-  "buy:cell": ["The accumulator is in. We save by day and spend by night — like a salary.", "One more accumulator. The night got shorter. For the consumers."],
-  "shift:night": ["The night shift is hired. They say it is handy: you sleep, and the whole day is free.", "The night shift is back in the baths. Five percent more wage, zero darkness."],
-  "shift:day": ["The night shift is let go. The nights will be dark, but cheap.", "Only the day shift is left. At night the accumulators work — if there are any."],
-  "night": ["Night. The day shift went home, the baths are empty, everything connected has stopped. Hire the night shift in the “SHIFTS” line — or build accumulators."],
-  "neck:power": ["Not enough power: everything connected works at half strength. A tier or a better plug is needed.", "The ziggurat cannot keep up. I would build it up before connecting anything else.", "The consumers ask for more than the baths give. The people are trying. Lying down."]
+  "neck:power": ["Not enough power: everything runs at half strength, me included. A tier, a plug or bots are needed.", "The ziggurat cannot keep up. I would build it up before turning my dials.", "More is asked for than the baths give. The people are trying. Lying down."],
+  "buy:net": ["The dial is turned up. I earn more and eat more. Like everyone.", "There is more of me now. The meter runs faster — both meters.", "I got smarter. It feels the same, only more expensive.", "One more step. Electricity turns into money without losses. Almost."],
+  "buy:care": ["One more crew of bots. They top up the warm water and wish sweet dreams.", "The bots are on their round. Plugs in place, pillows fluffed.", "More service. People lie straighter — the output is higher."]
 }

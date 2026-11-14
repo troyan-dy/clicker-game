@@ -3,7 +3,8 @@
  * M15 promotions, M16–M18 the scales — city, state, planet: employers taken unit by unit, farms as packs of sessions,
  * M23 perks of the employers taken whole, M24 the people left without work and the price of a task that
  * falls with unemployment, M25 the street: a factory makes robots that take the jobs, M26 packs of robot dogs let in by a bribe, M27 robots wear out and are broken in riots, robot police guards them,
- * M28 the ziggurat: what is connected there draws power, and the power comes from people who lie in baths in shifts):
+ * M28 the ziggurat: power in, money out — people in baths give the power, the neural network and the old
+ * power plants it replaces turn it into money):
  *
  *   sources ──► backlog ──► Claude (plan rate) ──► waiting for «Да» ──► $ per task
  *                  └──────► subagents: their own sessions, no «Да» needed ──► $
@@ -15,7 +16,7 @@ import { buyNextPlan, type Plan, type PlanState } from '../plan/plan';
 
 /**
  * What an employer gives once it is taken whole (M23). «Plus» kinds add up: pay, inflow, rate,
- * sessions, calls, stack, legend, surge, squads, lines, power, store. «Off» kinds multiply what is left: farms, sources, grades, scale, limit, modules.
+ * sessions, calls, stack, legend, surge, squads, lines, power. «Off» kinds multiply what is left: farms, sources, grades, scale, limit, modules, net.
  */
 export type PerkKind =
   | 'pay'
@@ -29,8 +30,8 @@ export type PerkKind =
   | 'squads'
   | 'lines'
   | 'power'
-  | 'store'
   | 'modules'
+  | 'net'
   | 'farms'
   | 'sources'
   | 'grades'
@@ -77,7 +78,7 @@ export interface Source {
   bribe?: number;
   /** the units are not bought at all: robots of this kind from the factory take the jobs one by one (M25) */
   made?: RobotKind;
-  /** gigawatts one unit needs from the ziggurat: short of power, it brings only a part of its tasks (M28) */
+  /** gigawatts one unit takes from the ziggurat: a block of an old power plant that people in baths have replaced (M28) */
   draw?: number;
 }
 
@@ -108,13 +109,11 @@ export interface Farm {
   surge?: { step: number; halfLife: number };
   /** percent of the provider's revenue one unit adds (the planet) */
   share?: number;
-  /** gigawatts one unit needs from the ziggurat: short of power, a part of its sessions sleeps (M28) */
-  draw?: number;
 }
 
 /**
  * A part of the ziggurat (M28). «baths» — a tier with places for people; «plug» — a better socket: every
- * person gives `amount` times more; «cell» — an accumulator that keeps the surplus of the day for the night.
+ * person gives `amount` times more; «care» — a crew of service robots: the baths give `amount` more for each.
  */
 export interface Module {
   id: string;
@@ -122,8 +121,8 @@ export interface Module {
   /** short plural name for the caption on the map */
   tag: string;
   note: string;
-  kind: 'baths' | 'plug' | 'cell';
-  /** baths: people one tier holds · plug: the multiplier of one step · cell: seconds of the full output one unit keeps */
+  kind: 'baths' | 'plug' | 'care';
+  /** baths: people one tier holds · plug: the multiplier of one step · care: the share one crew adds */
   amount: number;
   price: number;
   growth: number;
@@ -133,19 +132,32 @@ export interface Module {
   start?: number;
 }
 
+/**
+ * A dial of the neural network (M28): one step makes everything it does earn `yield` times more and
+ * makes it eat `draw` times more power. There are only a few of them: this is all its scaling now.
+ */
+export interface NetParam {
+  id: string;
+  name: string;
+  note: string;
+  yield: number;
+  draw: number;
+  price: number;
+  growth: number;
+  max: number;
+}
+
 /** The ziggurat and its day (M28). */
 export interface GridTuning {
   /** the screen it stands on */
   screen: number;
   /** gigawatts one person in a bath gives */
   watt: number;
-  /** seconds of the day and of the night */
+  /** seconds of the day and of the night: the shifts change between them, and nothing else does */
   day: number;
   night: number;
-  /** seconds a shift needs to lie down or to get up */
-  swap: number;
-  /** the part of every task's pay one paid shift takes */
-  wage: number;
+  /** gigawatts the neural network eats before any of its dials is turned */
+  net: number;
 }
 
 /** A pack of robot dogs on its way to the jobs of the employer `id` (M26): the unit is taken when `left` runs out. */
@@ -253,8 +265,9 @@ export interface PipeConfig {
   managers: readonly Manager[];
   lines: readonly Line[];
   police: Police;
-  /** the parts of the ziggurat and the numbers of its day */
+  /** the parts of the ziggurat, the dials of the network it feeds, and the numbers of its day */
   modules: readonly Module[];
+  net: readonly NetParam[];
   grid: GridTuning;
   auto: AutoConfig;
 }
@@ -301,14 +314,10 @@ export interface PipeState {
   police: number;
   /** parts of the ziggurat owned per module id */
   modules: Record<string, number>;
-  /** shifts that are paid: 1 — the day one only, 2 — the day and the night */
-  shifts: number;
+  /** steps turned on every dial of the network, per dial id */
+  net: Record<string, number>;
   /** seconds into the day of the ziggurat: the day comes first, the night after it */
   hour: number;
-  /** 0..1: how many of the baths are taken right now */
-  crew: number;
-  /** gigawatt-seconds kept in the accumulators */
-  charge: number;
   /** 0..1: the part of the power asked for that the ziggurat gives right now */
   power: number;
   presses: number;
@@ -352,10 +361,8 @@ export function createPipe(cfg: PipeConfig): PipeState {
     aim: {},
     police: 0,
     modules,
-    shifts: 1,
+    net: {},
     hour: 0,
-    crew: 0,
-    charge: 0,
     power: 1,
     presses: 0,
     wasted: 0,
@@ -393,8 +400,9 @@ export function discount(s: PipeState, cfg: PipeConfig, kind: PerkKind): number 
 /** tasks per second the employers bring, before the orders of the people */
 export function workOf(s: PipeState, cfg: PipeConfig): number {
   let sum = 0;
-  for (const src of cfg.sources) if (!s.strikes.includes(src.id)) sum += sourceInflow(src, s.owned[src.id] ?? 0) * (src.draw ? s.power : 1);
-  return sum * (1 + bonus(s, cfg, 'inflow'));
+  for (const src of cfg.sources) if (!s.strikes.includes(src.id)) sum += sourceInflow(src, s.owned[src.id] ?? 0);
+  // at the ziggurat everything runs on its power: short of it, everything gives a part
+  return sum * (1 + bonus(s, cfg, 'inflow')) * (gridOn(s, cfg) ? s.power : 1);
 }
 
 /** tasks per second the people left without work order: they have the time, and the allowance; the more of them, the more orders */
@@ -432,7 +440,7 @@ export function claudeRate(s: PipeState, cfg: PipeConfig): number {
 /** Claude sessions working besides the player's own: subagents and everything in the server farms */
 export function sessionsOf(s: PipeState, cfg: PipeConfig): number {
   let farmed = 0;
-  for (const f of cfg.farms) farmed += (s.farms[f.id] ?? 0) * f.sessions * (f.draw ? s.power : 1);
+  for (const f of cfg.farms) farmed += (s.farms[f.id] ?? 0) * f.sessions;
   return s.subagents + Math.round(farmed * (1 + bonus(s, cfg, 'sessions')));
 }
 
@@ -528,7 +536,7 @@ export function slumpOf(s: PipeState, cfg: PipeConfig): number {
 /** dollars one closed task pays: the grade and the perks, less what unemployment and the allowance take */
 export function payOf(s: PipeState, cfg: PipeConfig): number {
   const base = cfg.tuning.pay * cfg.grades[s.grade].mult * (1 + bonus(s, cfg, 'pay'));
-  return base * (1 - slumpOf(s, cfg)) * (1 - cfg.tuning.allowance * s.allowance) * (1 - wageOf(s, cfg));
+  return base * (1 - slumpOf(s, cfg)) * (1 - cfg.tuning.allowance * s.allowance) * netYield(s, cfg);
 }
 
 /** employers of the current screen taken whole: the keys to the next one */
@@ -608,17 +616,12 @@ export function lineCost(s: PipeState, cfg: PipeConfig, l: Line): number {
   return Math.round(l.price * l.growth ** (s.lines[l.id] ?? 0) * (s.surge[l.id] ?? 1) * discount(s, cfg, 'farms'));
 }
 
-/** the ziggurat stands: its day goes on, its shifts are paid */
+/** the ziggurat stands: from here on the game is power in, money out */
 export function gridOn(s: PipeState, cfg: PipeConfig): boolean {
   return screenOf(s) >= cfg.grid.screen;
 }
 
-/** the part of every task's pay that goes to the people in the baths */
-export function wageOf(s: PipeState, cfg: PipeConfig): number {
-  return gridOn(s, cfg) ? cfg.grid.wage * s.shifts : 0;
-}
-
-/** it is night at the ziggurat: only a paid night shift lies in the baths */
+/** it is night at the ziggurat: the night shift lies in the baths */
 export function isNight(s: PipeState, cfg: PipeConfig): boolean {
   return s.hour >= cfg.grid.day;
 }
@@ -630,73 +633,55 @@ export function bathsOf(s: PipeState, cfg: PipeConfig): number {
   return n;
 }
 
-/** gigawatts the ziggurat gives when every bath is taken */
-export function peakOf(s: PipeState, cfg: PipeConfig): number {
-  let plug = 1;
-  for (const m of cfg.modules) if (m.kind === 'plug') plug *= m.amount ** (s.modules[m.id] ?? 0);
-  return bathsOf(s, cfg) * cfg.grid.watt * plug * (1 + bonus(s, cfg, 'power'));
-}
-
-/** gigawatts the people in the baths give right now */
+/** gigawatts the ziggurat gives: every bath is taken round the clock, the shifts see to that */
 export function supplyOf(s: PipeState, cfg: PipeConfig): number {
-  return peakOf(s, cfg) * s.crew;
+  let plug = 1;
+  let care = 0;
+  for (const m of cfg.modules) {
+    if (m.kind === 'plug') plug *= m.amount ** (s.modules[m.id] ?? 0);
+    else if (m.kind === 'care') care += m.amount * (s.modules[m.id] ?? 0);
+  }
+  return bathsOf(s, cfg) * cfg.grid.watt * plug * (1 + care) * (1 + bonus(s, cfg, 'power'));
 }
 
-/** gigawatts everything connected to the ziggurat asks for */
+/** how many times more the network earns for all its dials; 1 before the ziggurat */
+export function netYield(s: PipeState, cfg: PipeConfig): number {
+  if (!gridOn(s, cfg)) return 1;
+  let k = 1;
+  for (const p of cfg.net) k *= p.yield ** (s.net[p.id] ?? 0);
+  return k;
+}
+
+/** gigawatts the network eats with its dials where they are */
+export function netDraw(s: PipeState, cfg: PipeConfig): number {
+  let k = cfg.grid.net;
+  for (const p of cfg.net) k *= p.draw ** (s.net[p.id] ?? 0);
+  return k;
+}
+
+/** gigawatts everything connected to the ziggurat asks for: the network and the blocks of the old plants */
 export function demandOf(s: PipeState, cfg: PipeConfig): number {
-  let sum = 0;
+  let sum = netDraw(s, cfg);
   for (const src of cfg.sources) if (src.draw) sum += (s.owned[src.id] ?? 0) * src.draw;
-  for (const f of cfg.farms) if (f.draw) sum += (s.farms[f.id] ?? 0) * f.draw;
   return sum;
 }
 
-/** gigawatt-seconds the accumulators can keep */
-export function storeOf(s: PipeState, cfg: PipeConfig): number {
-  let sum = 0;
-  for (const m of cfg.modules) if (m.kind === 'cell') sum += (s.modules[m.id] ?? 0) * m.amount;
-  // an accumulator is built to the size of the ziggurat: it keeps a few seconds of its full output
-  return sum * peakOf(s, cfg) * (1 + bonus(s, cfg, 'store'));
+/** tasks per second that are actually closed at full flow: before the ziggurat — what the sessions manage, at it — everything that comes in */
+export function flowOf(s: PipeState, cfg: PipeConfig): number {
+  const inflow = inflowOf(s, cfg);
+  return gridOn(s, cfg) ? inflow : Math.min(inflow, planRate(s, cfg) * (1 + cfg.auto.subagent.share * sessionsOf(s, cfg)));
 }
 
 export function moduleCost(s: PipeState, cfg: PipeConfig, m: Module): number {
   return Math.round(m.price * m.growth ** ((s.modules[m.id] ?? 0) - (m.start ?? 0)) * discount(s, cfg, 'modules'));
 }
 
-/** tasks per second the conveyor would close if the ziggurat gave `power` of what is asked for */
-function flowAt(s: PipeState, cfg: PipeConfig, power: number): number {
-  const now = s.power;
-  s.power = power;
-  const flow = Math.min(inflowOf(s, cfg), planRate(s, cfg) * (1 + cfg.auto.subagent.share * sessionsOf(s, cfg)));
-  s.power = now;
-  return flow;
+/** what the next step of a dial of the network costs now */
+export function netCost(s: PipeState, cfg: PipeConfig, p: NetParam): number {
+  return Math.round(p.price * p.growth ** (s.net[p.id] ?? 0) * discount(s, cfg, 'net'));
 }
 
-/**
- * What a day would bring with `shifts` paid, in dollars per second on average: by day the baths are
- * full, by night they are full only with a night shift — else the accumulators give what the day left over.
- */
-export function shiftIncome(s: PipeState, cfg: PipeConfig, shifts: number): number {
-  const g = cfg.grid;
-  const demand = demandOf(s, cfg);
-  const peak = peakOf(s, cfg);
-  const day = demand > 0 ? Math.min(1, peak / demand) : 1;
-  let night = day;
-  if (shifts < 2 && demand > 0) {
-    const kept = Math.min(storeOf(s, cfg), Math.max(0, peak - demand) * g.day);
-    night = Math.min(1, kept / (demand * g.night));
-  }
-  const flow = (flowAt(s, cfg, day) * g.day + flowAt(s, cfg, night) * g.night) / (g.day + g.night);
-  // the pay without the wage of the shifts that are paid now, with the wage of the ones asked about
-  const pay = (payOf(s, cfg) / (1 - wageOf(s, cfg))) * (1 - g.wage * shifts);
-  return flow * pay;
-}
-
-/** the number of paid shifts that brings more: 1 — the day only, 2 — the day and the night */
-export function bestShifts(s: PipeState, cfg: PipeConfig): number {
-  return shiftIncome(s, cfg, 2) > shiftIncome(s, cfg, 1) * 1.01 ? 2 : 1;
-}
-
-/** One more part of the ziggurat: a tier of baths, a better plug, an accumulator. */
+/** One more part of the ziggurat: a tier of baths, a better plug, a crew of service robots. */
 export function buyModule(s: PipeState, cfg: PipeConfig, id: string): boolean {
   const m = cfg.modules.find((x) => x.id === id);
   if (!m || !gridOn(s, cfg)) return false;
@@ -706,25 +691,22 @@ export function buyModule(s: PipeState, cfg: PipeConfig, id: string): boolean {
   return true;
 }
 
-/** The day of the ziggurat: shifts lie down and get up, the accumulators fill and drain, and `power` says how much of what is asked for is given. */
+/** One more step of a dial of the network: it earns more and eats more. */
+export function buyNet(s: PipeState, cfg: PipeConfig, id: string): boolean {
+  const p = cfg.net.find((x) => x.id === id);
+  if (!p || !gridOn(s, cfg)) return false;
+  const level = s.net[id] ?? 0;
+  if (level >= p.max || !spend(s, netCost(s, cfg, p))) return false;
+  s.net[id] = level + 1;
+  return true;
+}
+
+/** The day of the ziggurat goes on, and `power` says how much of what is asked for the baths give. */
 function stepGrid(s: PipeState, cfg: PipeConfig, dt: number): void {
   const g = cfg.grid;
   s.hour = (s.hour + dt) % (g.day + g.night);
-  const want = s.shifts >= (isNight(s, cfg) ? 2 : 1) ? 1 : 0;
-  const step = dt / g.swap;
-  s.crew += Math.max(-step, Math.min(step, want - s.crew));
-  const supply = supplyOf(s, cfg);
   const demand = demandOf(s, cfg);
-  const cap = storeOf(s, cfg);
-  let given = supply;
-  if (supply >= demand) s.charge = Math.min(cap, s.charge + (supply - demand) * dt);
-  else {
-    const take = Math.min(s.charge, (demand - supply) * dt);
-    s.charge -= take;
-    given += take / dt;
-  }
-  s.charge = Math.min(s.charge, cap);
-  s.power = demand > 0 ? Math.min(1, given / demand) : 1;
+  s.power = demand > 0 ? Math.min(1, supplyOf(s, cfg) / demand) : 1;
 }
 
 function pay(s: PipeState, cfg: PipeConfig, bySubagent: boolean, tasks = 1): void {
@@ -798,7 +780,17 @@ export function stepPipe(
     }
   }
 
-  if (gridOn(s, cfg)) stepGrid(s, cfg, dt);
+  // the ziggurat: no queue and nobody to ask — the network turns whatever power it gets into money
+  if (gridOn(s, cfg)) {
+    stepGrid(s, cfg, dt);
+    const tasks = s.limited > 0 ? 0 : inflowOf(s, cfg) * dt;
+    pay(s, cfg, true, tasks);
+    s.backlog = 0;
+    s.subAcc += tasks;
+    out.subagents = Math.floor(s.subAcc);
+    s.subAcc -= out.subagents;
+    return out;
+  }
 
   // the people left without work order tasks while the allowance is paid; without it the orders dry up
   if (s.allowance > 0) s.orders = Math.min(1, s.orders + dt / t.ordersRise);
@@ -858,6 +850,11 @@ export function stepPipe(
 /** One «Да». Once the terminal stops asking, a press nudges Claude: it closes a waiting task at once. */
 export function pressPipe(s: PipeState, cfg: PipeConfig): PressResult {
   s.presses++;
+  // at the ziggurat nothing waits for a «Да»: a press is one more task for the network, and it is never wasted
+  if (gridOn(s, cfg)) {
+    pay(s, cfg, false);
+    return 'approved';
+  }
   if (s.noAsk) {
     if (s.backlog >= 1) {
       s.backlog--;
@@ -965,13 +962,8 @@ export function buyFarm(s: PipeState, cfg: PipeConfig, id: string): boolean {
 export function buyScale(s: PipeState, cfg: PipeConfig): boolean {
   if (!cfg.scales[s.scale] || !s.noAsk || keysOf(s, cfg) < keysNeeded(s, cfg) || !spend(s, scaleCost(s, cfg))) return false;
   s.scale++;
-  // the ziggurat opens in the morning: the day shift is paid and on its way to the baths
-  if (2 + s.scale === cfg.grid.screen) {
-    s.shifts = 1;
-    s.hour = 0;
-    s.crew = 0;
-    s.charge = 0;
-  }
+  // the ziggurat opens in the morning
+  if (2 + s.scale === cfg.grid.screen) s.hour = 0;
   return true;
 }
 

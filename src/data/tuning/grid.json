@@ -1,1 +1,1 @@
-{ "screen": 7, "watt": 1e-7, "day": 22, "night": 18, "swap": 3, "wage": 0.05 }
+{ "screen": 7, "watt": 1e-7, "day": 36, "night": 28, "net": 40 }

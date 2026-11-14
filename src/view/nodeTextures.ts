@@ -10,7 +10,8 @@ const NODES = [
   'robofactory', 'android', 'robodog', 'supermarket', 'coffee', 'barber', 'build', 'taxi', 'pizzeria', 'farm', 'clinic', 'school', // the street
   'back_world', 'earth_night', // the flat world of the last screen, the planet of the ending
   'rest_hammock', 'rest_chess', 'rest_bench', 'rest_fishing', 'rest_picnic', 'rest_easel', // the park
-  'ziggurat', 'darkfactory', 'charger', 'train', 'desal', 'archive', 'cells', // the ziggurat and what it feeds
+  'ziggurat', 'netcore', 'diesel', 'coalplant', 'gasplant', 'wind', 'solar', 'hydro', 'nuclear', 'fusion', // the ziggurat, the network it feeds, the old power plants
+  'drone', 'drone_work', 'drone_towel', 'sleeper1', 'sleeper2', 'sleeper3', // service drones and the shifts on their way to the baths
   'bench', 'pigeon', 'pigeon_peck', 'pigeon_fly', 'sparrow', 'duck', 'seagull', // the bench after the credits
 ];
 

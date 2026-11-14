@@ -1,0 +1,8 @@
+A sheet of three separate isometric line-drawn objects standing in one row, with wide empty margins between them. No text, no letters, no numbers, no signs with writing, no arrows, no connecting lines between the objects, no frame, no people.
+
+STYLE: a deadpan-serious technical infographic, like icons for an architecture diagram in an engineering report. Plain warm ivory paper background (#F0EEE6), completely empty between the objects. Thin precise charcoal lines (#262624) of one fine, even weight. Flat muted fills used sparingly: terracotta (#D97757) as the single strong accent, plus a little soft sage (#BCD1CA), dusty blue (#6A9BCC) and sand (#D4A27F). No thick outlines, no chunky cartoon shapes, no candy colours, no gradients, no shadows on the paper. All three objects are drawn from the same isometric angle, with the same line weight, each about the same size.
+
+LEFT TO RIGHT:
+1. A nuclear power plant: two wide curved cooling towers and one small reactor building with a dome.
+2. A fusion reactor: a round hall cut open to show a large ring-shaped torus machine inside, wrapped with coils.
+3. A monumental windowless data centre: one huge dark charcoal (#262624) cube on a low base; on its front face there is one large flat terracotta (#D97757) square with two small dark vertical rectangular eyes; thick cables enter the base of the cube.

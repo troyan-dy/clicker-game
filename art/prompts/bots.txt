@@ -1,0 +1,8 @@
+A sheet of three separate small line-drawn flying service robots in one row, each seen from the side at a slight three-quarter angle, with wide empty margins between them. No text, no letters, no numbers, no arrows, no ground, no frame, no people.
+
+STYLE: a deadpan-serious technical infographic, like icons for an architecture diagram in an engineering report. Plain warm ivory paper background (#F0EEE6), completely empty between the objects. Thin precise charcoal lines (#262624) of one fine, even weight. Flat muted fills used sparingly: terracotta (#D97757) as the single strong accent, plus a little soft sage (#BCD1CA), dusty blue (#6A9BCC) and sand (#D4A27F). No thick outlines, no chunky cartoon shapes, no candy colours, no gradients, no shadows on the paper. All three objects are drawn from the same isometric angle, with the same line weight, each about the same size.
+
+LEFT TO RIGHT, the same hovering maintenance drone three times. It has a small rounded pale ivory body, its face is a plain flat terracotta (#D97757) square with two small dark vertical rectangular eyes, and six thin jointed mechanical arms hang down from its body like the legs of a spider:
+1. The drone hovering with its arms relaxed.
+2. The drone reaching down with two arms, holding a small wrench in one of them.
+3. The drone carrying a folded sage-green towel in its arms.

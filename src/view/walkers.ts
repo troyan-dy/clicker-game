@@ -3,8 +3,8 @@ import type { Rng } from '../core/rng';
 
 type Pt = readonly [number, number];
 
-/** who walks: a laid-off worker with a box, Claude in a body from the factory, or a marcher with a placard */
-export type WalkerKind = 'person' | 'android' | 'robodog' | 'mob';
+/** who walks: a laid-off worker with a box, Claude in a body from the factory, a marcher with a placard, or someone in a bathrobe on the way to a shift in the baths */
+export type WalkerKind = 'person' | 'android' | 'robodog' | 'mob' | 'sleeper';
 
 /** the pictures a kind is drawn with, its height on the screen and its speed, px per second */
 const LOOK: Record<WalkerKind, { keys: readonly string[]; h: number; speed: number }> = {
@@ -12,8 +12,9 @@ const LOOK: Record<WalkerKind, { keys: readonly string[]; h: number; speed: numb
   android: { keys: ['node_android'], h: 78, speed: 110 },
   robodog: { keys: ['node_robodog'], h: 58, speed: 170 },
   mob: { keys: ['node_picket1', 'node_picket2', 'node_picket3'], h: 86, speed: 85 },
+  sleeper: { keys: ['node_sleeper1', 'node_sleeper2', 'node_sleeper3'], h: 68, speed: 62 },
 };
-const POOL = 36;
+const POOL = 44;
 
 interface Walker {
   img: Phaser.GameObjects.Image;

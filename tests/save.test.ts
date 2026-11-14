@@ -5,6 +5,7 @@ import gradeData from '../src/data/balance/grades.json';
 import lineData from '../src/data/balance/lines.json';
 import managerData from '../src/data/balance/managers.json';
 import moduleData from '../src/data/balance/modules.json';
+import netData from '../src/data/balance/net.json';
 import planData from '../src/data/balance/plans.json';
 import policeData from '../src/data/balance/police.json';
 import scaleData from '../src/data/balance/scales.json';
@@ -44,6 +45,7 @@ const cfg: PipeConfig = {
   lines: lineData as Line[],
   police: policeData,
   modules: moduleData as Module[],
+  net: netData,
   grid: gridData,
   auto: autoData,
 };
@@ -74,13 +76,11 @@ describe('save', () => {
     s.police = 2;
     s.aim.robodog = 'depot';
     s.owned.depot = 1.25; // robots are half-way through the second unit
-    // the ziggurat: three tiers, both shifts, the middle of the day, the accumulators half full
+    // the ziggurat: three tiers, two crews of service robots, a dial of the network turned twice, the middle of the day
     s.modules.tier = 3;
-    s.modules.cell = 2;
-    s.shifts = 2;
+    s.modules.care = 2;
+    s.net.copies = 2;
     s.hour = 12.5;
-    s.crew = 0.4;
-    s.charge = 90;
     s.power = 0.7;
     const meta = { legends: ['rust'], awards: ['first_yes', 'no_ask'], piles: 4, reports: 1, calls: 3, limits: 1, riots: 2, news: ['Первая новость', 'Вторая'], managerOff: true, auto: true, bread: 31, fed: 28, refused: 2, feeder: true, benchAuto: false, atBench: true };
     const json = packSave({ at: 123, state: s, feed: { shown: [1, 4], said: { yes: 2 } }, meta, won: false, seconds: 600 });
