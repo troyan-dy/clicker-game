@@ -8,6 +8,7 @@ const NODES = [
   'person1', 'person2', 'person3', // the laid-off programmers
   'picket1', 'picket2', 'picket3', // …who did not leave
   'robofactory', 'android', 'robodog', 'supermarket', 'coffee', 'barber', 'build', 'taxi', 'pizzeria', 'farm', 'clinic', 'school', // the street
+  'back_world', 'earth_night', // the flat world of the last screen, the planet of the ending
   'rest_hammock', 'rest_chess', 'rest_bench', 'rest_fishing', 'rest_picnic', 'rest_easel', // the park
 ];
 

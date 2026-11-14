@@ -5,7 +5,7 @@ import { LEGENDS, type Legend } from '../content/legends';
 import { NEWS } from '../content/news';
 import { PICKET } from '../content/picket';
 import { QUIPS } from '../content/quips';
-import { FINALE, HUB_TEXT, SCALE_SHELF } from '../content/screens';
+import { FINALE, HUB_TEXT, RIOT_NEWS, SCALE_SHELF, SCREEN_DONE } from '../content/screens';
 import { TAKEOVERS } from '../content/takeovers';
 import { promptAt, TICKETS } from '../content/tickets';
 import { logEvent, metrics } from '../core/metrics';
@@ -19,6 +19,7 @@ import gradeData from '../data/balance/grades.json';
 import lineData from '../data/balance/lines.json';
 import managerData from '../data/balance/managers.json';
 import planData from '../data/balance/plans.json';
+import policeData from '../data/balance/police.json';
 import scaleData from '../data/balance/scales.json';
 import sourceData from '../data/balance/sources.json';
 import { BP, deskScreen } from '../data/layout/blueprint';
@@ -28,6 +29,7 @@ import feedData from '../data/tuning/feed.json';
 import limitData from '../data/tuning/limit.json';
 import managerTuning from '../data/tuning/manager.json';
 import peopleData from '../data/tuning/people.json';
+import riotData from '../data/tuning/riots.json';
 import strikeData from '../data/tuning/strikes.json';
 import saveData from '../data/tuning/save.json';
 import stackData from '../data/tuning/stack.json';
@@ -37,6 +39,7 @@ import { createTuningPanel, type TuningPanel } from '../debug/tuningPanel';
 import { createEvents, stepEvents, takeEvent, type EventsTuning } from '../systems/events/events';
 import { createFeed, headline, say, stepFeed, tell, type FeedContent } from '../systems/feed/feed';
 import { managerPick } from '../systems/manager/manager';
+import { createRiots, stepRiots, type RiotTuning } from '../systems/riots/riots';
 import { createStrikes, stepStrikes, type StrikeTuning } from '../systems/strikes/strikes';
 import type { Plan } from '../systems/plan/plan';
 import {
@@ -51,6 +54,7 @@ import {
   buyManager,
   buyNoAsk,
   buyPlan,
+  buyPolice,
   buyScale,
   buySource,
   buySubagent,
@@ -70,8 +74,12 @@ import {
   outputOf,
   payOf,
   planRate,
+  policeCost,
   pressPipe,
   replacedOf,
+  riot,
+  riotShare,
+  robotsOf,
   scaleCost,
   screenOf,
   sessionsOf,
@@ -84,6 +92,7 @@ import {
   subagentRate,
   targetOf,
   unemploymentOf,
+  wearOf,
   whole,
   type Farm,
   type Line,
@@ -133,6 +142,7 @@ const ROBOT_WORDS: Record<RobotKind, { many: string; of: string }> = {
 const ROBOT_KINDS: readonly RobotKind[] = ['android', 'robodog'];
 const EVENTS: EventsTuning = { ...eventsData, every: [eventsData.every[0], eventsData.every[1]] };
 const STRIKES: StrikeTuning = { ...strikeData, every: [strikeData.every[0], strikeData.every[1]] };
+const RIOTS: RiotTuning = { ...riotData, every: [riotData.every[0], riotData.every[1]] };
 const STRUCK_FORMS = ['здание стоит', 'здания стоят', 'зданий стоят'] as const;
 const WHOLE_FORMS = ['здание', 'здания', 'зданий'] as const;
 const IDLE_AFTER = 12; // seconds without a «Да» while requests wait
@@ -161,7 +171,7 @@ function perSecond(n: number): string {
 declare global {
   interface Window {
     /** gym-only hooks for scripted captures */
-    __gym?: { buy(what: string): boolean; click(row: string): void; take(id: string): void; strike(): void; gift(dollars: number): void; away(hours: number): void; pile(legend: boolean): void; call(): void; limit(): void };
+    __gym?: { buy(what: string): boolean; click(row: string): void; take(id: string): void; fleet(lines: number): void; strike(): void; riot(): void; gift(dollars: number): void; away(hours: number): void; pile(legend: boolean): void; call(): void; limit(): void };
   }
 }
 
@@ -212,6 +222,7 @@ export class GameScene extends Phaser.Scene {
     scales: scaleData,
     managers: managerData,
     lines: lineData as Line[],
+    police: policeData,
     auto: { noAsk: { ...autoData.noAsk }, subagent: { ...autoData.subagent } },
   };
   private state!: PipeState;
@@ -271,6 +282,8 @@ export class GameScene extends Phaser.Scene {
   private streamIn = 0;
   /** the clock of the strikes: they come while nobody is paid an allowance */
   private readonly strike = createStrikes(STRIKES);
+  /** the clock of the riots of the Luddites: they march on the factories once robots work */
+  private readonly riots = createRiots(RIOTS);
   private neckKind: Neck = 'none';
   private neckFor = 0;
   private pressTimes: number[] = [];
@@ -350,8 +363,15 @@ export class GameScene extends Phaser.Scene {
       buy: (what) => this.buy(what),
       click: (row) => this.click(row),
       take: (id) => this.takeWhole(id),
+      // a scripted capture needs factories big enough to keep what it takes
+      fleet: (lines) => {
+        for (const l of this.cfg.lines) this.state.lines[l.id] = lines;
+      },
       strike: () => {
         this.strike.wait = 0;
+      },
+      riot: () => {
+        this.riots.wait = 0;
       },
       gift: (dollars) => this.gift(dollars),
       away: (hours) => this.away(hours),
@@ -761,7 +781,8 @@ export class GameScene extends Phaser.Scene {
     } else if (what.startsWith('bribe:')) {
       const src = cfg.sources.find((x) => x.id === what.slice(6));
       ok = !!src && this.onSale(src) && buyBribe(s, cfg, src.id);
-    } else if (what === 'plan') ok = buyPlan(s, cfg);
+    } else if (what === 'police') ok = this.stage === cfg.police.screen && buyPolice(s, cfg);
+    else if (what === 'plan') ok = buyPlan(s, cfg);
     else if (what === 'noask') ok = this.stage === 1 && buyNoAsk(s, cfg);
     else if (what === 'sub') ok = this.stage === 2 && buySubagent(s, cfg);
     else if (what === 'grade') ok = this.stage >= 2 && buyGrade(s, cfg);
@@ -795,6 +816,8 @@ export class GameScene extends Phaser.Scene {
     else if (what.startsWith('farm:')) {
       const farm = this.cfg.farms.find((x) => x.id === what.slice(5));
       this.say(surged ? 'surge' : farm?.share ? 'quota' : 'buy:farm');
+      // the provider has no other customers left: said once
+      if (farm?.share && shareOf(this.state, this.cfg) >= 100 && !this.feed.said.share100) this.say('share100', true);
     } else if (what.startsWith('line:')) this.say(surged ? 'surge' : 'buy:body');
     else if (what.startsWith('bribe:')) this.say('buy:bribe');
     else this.say(`buy:${what}`, what !== 'sub');
@@ -816,6 +839,19 @@ export class GameScene extends Phaser.Scene {
     this.saveGame();
   }
 
+  /** The crowd has reached the factories (M27): a part of the working robots is broken, the police takes its share off. */
+  private riotHits(): void {
+    const s = this.state;
+    const lost = riot(s, this.cfg, riotShare(s, this.cfg, RIOTS.share));
+    playSound('waste');
+    this.paper.toast('Восстание луддитов', `сломано роботов: ${short(Math.round(lost))}${s.police ? ' · робополиция отбила часть' : ''}`);
+    headline(this.feed, feedData, RIOT_NEWS[this.meta.riots % RIOT_NEWS.length]);
+    this.meta.riots++;
+    this.say('riot:hit', true);
+    logEvent('riot');
+    this.saveGame();
+  }
+
   /** An employer is taken whole (M23): its perk works from now on; a banner, the news and Claude say so. */
   private takeover(src: Source): void {
     playSound('all');
@@ -824,6 +860,13 @@ export class GameScene extends Phaser.Scene {
     const line = TAKEOVERS[src.id];
     if (line) headline(this.feed, feedData, line);
     logEvent(`whole_${src.id}`);
+    // the last employer of a screen: the world notices that this kind of work is over
+    const done = SCREEN_DONE[src.screen];
+    if (done && !this.feed.said[`done${src.screen}`] && this.cfg.sources.every((x) => x.screen !== src.screen || whole(this.state, x))) {
+      this.feed.said[`done${src.screen}`] = 1;
+      headline(this.feed, feedData, done.news);
+      this.toTell.push(done.quip);
+    }
   }
 
   private say(on: string, force = false): void {
@@ -865,10 +908,10 @@ export class GameScene extends Phaser.Scene {
   /** A step up in scale: the whole current screen shrinks into the node in the middle of the next one. */
   private scaleUp(): void {
     const next = this.stage + 1;
-    const { home, dive } = HUBS[next];
+    const { home, unroll } = HUBS[next];
     // the desk of the blueprint lands exactly on the desk in the middle of the city
     if (this.stage === 2) this.view.shrinkTo(home.x, home.y, home.h / (BP.desk.h * BP.desk.scale), 900);
-    else if (dive) this.hubs.get(this.stage)!.diveIn(2.6, 850); // the camera goes down, not back
+    else if (unroll) this.hubs.get(this.stage)!.unroll(850); // the globe unrolls into a flat map
     else this.hubs.get(this.stage)!.shrinkTo(home.x, home.y, HUB_SHRINK, 900);
     this.stage = next;
     this.owed = { in: 0, me: 0, sub: 0 };
@@ -882,8 +925,7 @@ export class GameScene extends Phaser.Scene {
     }
     const hub = this.hubs.get(next)!;
     hub.sync(this.hubTopology());
-    if (dive) hub.emerge(350, 900);
-    else hub.show(450);
+    hub.show(450);
     // a screen where robot dogs work instead of people: Claude says how it goes once he has said his word on the purchase
     if (this.cfg.sources.some((x) => x.screen === next && x.bribe) && !this.feed.said.squads) {
       this.feed.said.squads = 1;
@@ -1110,6 +1152,13 @@ export class GameScene extends Phaser.Scene {
             if (this.rng.next() < 0.45) hub.leave(target.id, 1, s.allowance > 0);
           }
         }
+        // the Luddites: once robots work, a crowd marches on the factories now and then and breaks a part of them
+        const riots = this.won ? null : stepRiots(this.riots, RIOTS, dt, unemploymentOf(s, this.cfg) >= RIOTS.from, this.rng);
+        if (riots === 'start') {
+          hub.mob(8);
+          playSound('waste');
+          this.say('riot', true);
+        } else if (riots === 'hit') this.riotHits();
       }
       hub.step(dt);
       if (done.here > 0) this.delivered(...this.homeSpot());
@@ -1311,6 +1360,34 @@ export class GameScene extends Phaser.Scene {
         note: limited ? `лимит · сброс через ${this.limitClock()}` : neck === 'claude' ? `мало — ${needSessions}` : this.count(sessionsOf(s, cfg) + 1, SESSION_FORMS),
       },
       ...people,
+      ...this.robotRows(),
+    ];
+  }
+
+  /** The robots of the factories (M27): how many work, what the lines make against what breaks. Nothing where there is no factory. */
+  private robotRows(): MeterRow[] {
+    const s = this.state;
+    const cfg = this.cfg;
+    if (!cfg.lines.some((l) => l.screen === this.stage)) return [];
+    let working = 0;
+    let made = 0;
+    let broken = 0;
+    let short_: RobotKind | null = null;
+    for (const kind of ROBOT_KINDS) {
+      working += robotsOf(s, cfg, kind);
+      made += outputOf(s, cfg, kind);
+      broken += wearOf(s, cfg, kind);
+      // a kind that breaks faster than it is made, with jobs still to hold
+      if (wearOf(s, cfg, kind) > outputOf(s, cfg, kind) && robotsOf(s, cfg, kind) > 0) short_ = kind;
+    }
+    return [
+      {
+        label: 'РОБОТЫ',
+        value: short(Math.round(working)),
+        fill: made / Math.max(made, broken, 1e-9),
+        hot: short_ !== null,
+        note: short_ ? `${ROBOT_WORDS[short_].of} ломается больше, чем делается` : `выпуск ${short(Math.round(made))}/с · ломается ${short(Math.round(broken))}/с`,
+      },
     ];
   }
 
@@ -1371,7 +1448,7 @@ export class GameScene extends Phaser.Scene {
     const rest = s.allowance && total ? Math.ceil((slots * taken) / total) : 0;
     const struck: Record<string, boolean> = {};
     for (const id of s.strikes) struck[id] = true;
-    return { floors, farms: s.farms, picket: !s.allowance, rest, live, dogs, struck };
+    return { floors, farms: s.farms, picket: !s.allowance, rest, live, dogs, struck, guards: this.stage === this.cfg.police.screen ? s.police : 0 };
   }
 
   /** the employers of a big screen with something left to take, the cheapest next unit first */
@@ -1422,7 +1499,16 @@ export class GameScene extends Phaser.Scene {
     });
   }
 
-  /** where the robots of each kind go now: the trades of the street are not bought, they are taken over */
+  /** robot police: every unit takes a part off what a riot breaks */
+  private policeRow(): ShopRow {
+    const s = this.state;
+    const p = this.cfg.police;
+    const off = Math.round((1 - (1 - p.guard) ** s.police) * 100);
+    if (s.police >= p.max) return { buy: '', title: p.name, sub: `восстание ломает на ${off}% меньше`, count: `×${s.police}`, price: '', state: 'owned' };
+    return this.row(p.name, s.police ? `${p.note} · уже −${off}%` : p.note, s.police ? `×${s.police}` : '', 'police', policeCost(s, this.cfg));
+  }
+
+  /** where the robots of each kind go now: the trades of the last screen are not bought, they are taken over */
   private aimRows(): ShopRow[] {
     const s = this.state;
     const rows: ShopRow[] = [];
@@ -1532,7 +1618,7 @@ export class GameScene extends Phaser.Scene {
     if (this.cfg.lines.some((l) => l.screen === this.stage)) {
       return [
         { title: `${t.employers} · заменено ${taken} из ${total}`, hot: false, rows: this.aimRows() },
-        { title: farmsOff ? 'ЗАВОД' : 'ЗАВОД · больше роботов', hot: neck === 'tasks' && taken < total, bonus: farmsOff, rows: this.lineRows() },
+        { title: farmsOff ? 'ЗАВОД' : 'ЗАВОД · больше роботов', hot: neck === 'tasks' && taken < total, bonus: farmsOff, rows: [...this.lineRows(), this.policeRow()] },
         ...rest,
       ];
     }
@@ -1599,6 +1685,8 @@ export class GameScene extends Phaser.Scene {
       calls: this.meta.calls,
       limits: this.meta.limits,
       managers: s.managers.length,
+      riots: this.meta.riots,
+      police: s.police,
       replaced: replacedOf(s, this.cfg),
       whole: this.cfg.sources.filter((x) => x.perk && whole(s, x)).length,
       allowance: s.allowance ? 1 : 0,
@@ -1639,6 +1727,11 @@ export class GameScene extends Phaser.Scene {
       const left = Math.ceil((e.left / EVENTS.life) * 12) / 12;
       tags.push({ x: p.x, y: p.y - p.h + 12, mid: true, ev: i, html: `${lines[e.kind] ?? ''}<u style="width:${Math.round(left * 100)}%"></u>` });
     });
+    // the Luddites are on their way to the factories
+    if (this.riots.march > 0 && HUBS[this.stage]?.belts) {
+      const home = HUBS[this.stage].home;
+      tags.push({ x: home.x, y: home.y - home.h - 62, mid: true, alarm: true, html: `Луддиты идут на заводы<br><b>${Math.ceil(this.riots.march)} с</b>` });
+    }
     // a strike: the door is blocked until the player settles it — or starts paying the allowance
     const price = this.strikePrice();
     for (const id of this.state.strikes) {

@@ -1,0 +1,5 @@
+One isometric line-drawn object in the centre of the picture with wide empty margins around it. No text, no letters, no numbers, no arrows, no frame, no people.
+
+STYLE: a deadpan-serious technical infographic, like icons for an architecture diagram in an engineering report. Plain warm ivory paper background (#F0EEE6), completely empty around the object. Thin precise charcoal lines (#262624) of one fine, even weight. Flat muted fills used sparingly: terracotta (#D97757) as the single strong accent, plus a little soft sage (#BCD1CA), dusty blue (#6A9BCC) and sand (#D4A27F). No thick outlines, no chunky cartoon shapes, no candy colours, no gradients, no shadows on the paper.
+
+THE OBJECT: an office desk with an open laptop and a mug on it, and an empty dusty-blue office chair on wheels pushed back from the desk and turned slightly away, as if someone has just got up and left. The laptop screen is one flat dark charcoal rectangle (#262624) with a single small terracotta square in its middle.

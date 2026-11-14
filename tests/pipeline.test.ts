@@ -6,11 +6,13 @@ import gradeData from '../src/data/balance/grades.json';
 import lineData from '../src/data/balance/lines.json';
 import managerData from '../src/data/balance/managers.json';
 import planData from '../src/data/balance/plans.json';
+import policeData from '../src/data/balance/police.json';
 import scaleData from '../src/data/balance/scales.json';
 import sourceData from '../src/data/balance/sources.json';
 import tuningData from '../src/data/tuning/pipeline.json';
 import { createEvents, stepEvents, takeEvent } from '../src/systems/events/events';
 import { managerPick } from '../src/systems/manager/manager';
+import { createRiots, stepRiots } from '../src/systems/riots/riots';
 import { createStrikes, stepStrikes } from '../src/systems/strikes/strikes';
 import type { Plan } from '../src/systems/plan/plan';
 import {
@@ -22,6 +24,7 @@ import {
   buyLine,
   buyManager,
   buyNoAsk,
+  buyPolice,
   buyScale,
   buyPlan,
   buySource,
@@ -36,6 +39,9 @@ import {
   keysOf,
   payOf,
   pressPipe,
+  riot,
+  riotShare,
+  robotsOf,
   sessionsOf,
   sourceInflow,
   sourcePrice,
@@ -57,6 +63,7 @@ const cfg: PipeConfig = {
   scales: scaleData,
   managers: managerData,
   lines: lineData as Line[],
+  police: policeData,
   auto: autoData,
 };
 const DT = 1 / 60;
@@ -400,13 +407,16 @@ describe('pipeline', () => {
     const line = cfg.lines.find((l) => l.id === 'android')!;
     const first = cfg.sources.find((x) => x.made === 'android')!;
     for (let i = 0; i < 600; i++) stepPipe(s, cfg, DT);
-    expect(s.owned[first.id]).toBeCloseTo((line.rate * 10) / first.staff!, 4);
+    // ten seconds of one line, less what has worn out on the way
+    const made = (line.rate * 10) / first.staff!;
+    expect(s.owned[first.id]).toBeGreaterThan(made * (1 - cfg.tuning.wear * 10));
+    expect(s.owned[first.id]).toBeLessThan(made);
     // aimed at another employer, the robots go there
     const other = cfg.sources.filter((x) => x.made === 'android')[1];
     expect(aimAt(s, cfg, other.id)).toBe(true);
     const before = s.owned[first.id];
     for (let i = 0; i < 600; i++) stepPipe(s, cfg, DT);
-    expect(s.owned[first.id]).toBe(before);
+    expect(s.owned[first.id]).toBeLessThan(before); // nothing new comes here, and what is here wears out
     expect(s.owned[other.id]).toBeGreaterThan(0);
     // enough robots take an employer whole — and say so once
     s.lines.android = 1e6;
@@ -414,6 +424,55 @@ describe('pipeline', () => {
     for (let i = 0; i < 120; i++) done = done.concat(stepPipe(s, cfg, DT).done);
     expect(done.filter((id) => id === other.id).length).toBe(1);
     expect(s.owned[other.id]).toBe(other.max);
+  });
+
+  it('test_robots_wear_out_and_one_line_cannot_hold_everything', () => {
+    const s = createPipe(cfg);
+    s.noAsk = true;
+    s.scale = 4;
+    s.lines.android = 1;
+    const line = cfg.lines.find((l) => l.id === 'android')!;
+    // one line holds as many robots as it can replace: what it makes a second over the share that breaks a second
+    for (let i = 0; i < 60 * 1500; i++) stepPipe(s, cfg, 1 / 30);
+    const held = robotsOf(s, cfg, 'android');
+    expect(held).toBeGreaterThan((line.rate / cfg.tuning.wear) * 0.97);
+    expect(held).toBeLessThanOrEqual(line.rate / cfg.tuning.wear + 1);
+    // no lines at all: even an employer taken whole loses its robots
+    const first = cfg.sources.find((x) => x.made === 'android')!;
+    s.owned[first.id] = first.max;
+    s.lines.android = 0;
+    stepPipe(s, cfg, 1);
+    expect(s.owned[first.id]).toBeLessThan(first.max);
+    // enough lines keep a whole employer whole, and it is not announced again
+    s.owned[first.id] = first.max;
+    s.lines.android = 1e6;
+    expect(stepPipe(s, cfg, 1).done).not.toContain(first.id);
+    expect(s.owned[first.id]).toBe(first.max);
+  });
+
+  it('test_riot_breaks_robots_and_police_takes_a_part_off', () => {
+    const s = createPipe(cfg);
+    s.noAsk = true;
+    s.scale = 4;
+    s.money = 1e30;
+    for (const src of cfg.sources) if (src.made) s.owned[src.id] = src.max;
+    const all = robotsOf(s, cfg, 'android') + robotsOf(s, cfg, 'robodog');
+    expect(riotShare(s, cfg, 0.25)).toBeCloseTo(0.25);
+    expect(riot(s, cfg, 0.25)).toBeCloseTo(all * 0.25);
+    expect(robotsOf(s, cfg, 'android') + robotsOf(s, cfg, 'robodog')).toBeCloseTo(all * 0.75);
+    expect(buyPolice(s, cfg)).toBe(true);
+    expect(riotShare(s, cfg, 0.25)).toBeCloseTo(0.25 * (1 - cfg.police.guard));
+    // the clock of the riots: a march starts, then it arrives
+    const t = { from: 0.05, every: [1, 1] as const, warn: 2, share: 0.25 };
+    const st = createRiots(t);
+    const rng = createRng(7);
+    const seen: string[] = [];
+    for (let i = 0; i < 60 * 4; i++) {
+      const what = stepRiots(st, t, DT, true, rng);
+      if (what) seen.push(what);
+    }
+    expect(seen.slice(0, 2)).toEqual(['start', 'hit']);
+    expect(stepRiots(createRiots(t), t, 100, false, rng)).toBeNull(); // nothing to break yet
   });
 
   it('test_game_ends_when_the_last_screen_is_taken_whole', () => {

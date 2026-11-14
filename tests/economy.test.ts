@@ -5,14 +5,17 @@ import gradeData from '../src/data/balance/grades.json';
 import lineData from '../src/data/balance/lines.json';
 import managerData from '../src/data/balance/managers.json';
 import planData from '../src/data/balance/plans.json';
+import policeData from '../src/data/balance/police.json';
 import scaleData from '../src/data/balance/scales.json';
 import sourceData from '../src/data/balance/sources.json';
 import tuningData from '../src/data/tuning/pipeline.json';
 import eventsData from '../src/data/tuning/events.json';
+import riotData from '../src/data/tuning/riots.json';
 import stackData from '../src/data/tuning/stack.json';
 import { createRng } from '../src/core/rng';
 import { createEvents, stepEvents, takeEvent } from '../src/systems/events/events';
 import type { Plan } from '../src/systems/plan/plan';
+import { createRiots, stepRiots } from '../src/systems/riots/riots';
 import { createStack, stackWorth, stepStack, takeStack } from '../src/systems/stack/stack';
 import {
   bonus,
@@ -24,6 +27,7 @@ import {
   buyScale,
   buyNoAsk,
   buyPlan,
+  buyPolice,
   buySource,
   buySubagent,
   claudeRate,
@@ -38,7 +42,10 @@ import {
   locked,
   payOf,
   planRate,
+  policeCost,
   pressPipe,
+  riot,
+  riotShare,
   screenOf,
   sessionsOf,
   sourceCost,
@@ -61,11 +68,13 @@ const base: PipeConfig = {
   scales: scaleData,
   managers: managerData,
   lines: lineData as Line[],
+  police: policeData,
   auto: autoData,
 };
 const FINGER = 5; // presses per second of a player who keeps mashing
 
 const EVENTS = { ...eventsData, every: [eventsData.every[0], eventsData.every[1]] as const };
+const RIOTS = { ...riotData, every: [riotData.every[0], riotData.every[1]] as const };
 /** an average player: takes a full pile of questions after a few seconds, answers most of the calls */
 const PLAYER = { pileDelay: 6, callTake: 0.7, callDelay: 2 };
 
@@ -84,6 +93,7 @@ function play(seconds: number, cfg: PipeConfig = base): { t: number; what: strin
   const stack = createStack(stackData);
   const calls = createEvents(EVENTS);
   const skipped = new WeakSet<object>();
+  const riots = createRiots(RIOTS);
   let legend = false;
   let fullFor = 0;
   const flowIncome = (): number => Math.min(inflowOf(s, cfg), planRate(s, cfg) * (1 + cfg.auto.subagent.share * sessionsOf(s, cfg))) * payOf(s, cfg);
@@ -122,6 +132,10 @@ function play(seconds: number, cfg: PipeConfig = base): { t: number; what: strin
         takeEvent(calls, k);
         s.money += Math.floor(flowIncome() * EVENTS.worthSeconds * (1 + bonus(s, cfg, 'calls')));
       }
+    }
+    // the Luddites come to the factory as they do in the game
+    if (!won && stepRiots(riots, RIOTS, dt, cfg.lines.some((l) => l.screen === screenOf(s)) && unemploymentOf(s, cfg) >= RIOTS.from, rng) === 'hit') {
+      riot(s, cfg, riotShare(s, cfg, RIOTS.share));
     }
     if (i % 30 !== 0) continue; // the bot shops twice a second
     // the step of the allowance that pays best right now: what it keeps of the price and what it brings in orders against what it costs
@@ -216,6 +230,8 @@ function play(seconds: number, cfg: PipeConfig = base): { t: number; what: strin
         if (buyPlan(s, cfg)) note(`тариф ${next.name}`);
       } else if (buySubagent(s, cfg)) note(`сабагент №${s.subagents}`);
     } else if (buyNoAsk(s, cfg)) note('«не спрашивай»');
+    // robot police is bought once it costs a small part of the money
+    if (screen === cfg.police.screen && policeCost(s, cfg) * 5 <= s.money && buyPolice(s, cfg)) note('робополиция');
     // the street: lines are bought whenever they are cheap next to the money, whatever is short
     for (const l of cfg.lines) {
       const needed = l.screen === screen && cfg.sources.some((x) => x.made === l.kind && (s.owned[x.id] ?? 0) < x.max);

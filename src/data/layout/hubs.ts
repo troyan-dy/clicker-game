@@ -21,12 +21,12 @@ export interface HubLayout {
   backdrop?: { key: string; x: number; y: number; h: number; alpha: number };
   /** a pale isometric grid of streets behind everything: the distance between them, px */
   streets?: number;
-  /** the street seen close up: two roads that cross in the middle and a lawn instead of a plan */
-  roads?: boolean;
+  /** conveyor belts run from the middle to every employer: the factories of the last screen */
+  belts?: boolean;
   /** where the people freed from work rest: the feet of every group (the far ones first), their height, the caption */
   park?: { slots: readonly (readonly [number, number])[]; h: number; label: { x: number; y: number } };
-  /** the camera does not pull back to this screen: it dives into the previous one */
-  dive?: boolean;
+  /** the previous screen does not shrink into the middle of this one: its globe unrolls into this flat map */
+  unroll?: boolean;
 }
 
 const MID = { x: 670, y: 700 };
@@ -101,7 +101,7 @@ export const HUBS: Record<number, HubLayout> = {
     maxWidth: 185,
     backdrop: { key: 'globe', x: 670, y: 1010, h: 760, alpha: 0.3 },
   },
-  // the street: the camera is back on the ground; the factory in the middle, work done by hand around it, a park for the people
+  // the planet as a workshop: the same world unrolled into a flat map; the factories in the middle, the trades done by hand around them, parks for the people
   6: {
     home: { key: 'robofactory', ...MID, h: 160 },
     homeRadius: 110,
@@ -121,7 +121,8 @@ export const HUBS: Record<number, HubLayout> = {
       chips: { key: 'gpus', ...BELOW, h: 125, ids: ['chips'] },
     },
     maxWidth: 185,
-    roads: true,
+    backdrop: { key: 'back_world', x: 670, y: 1016, h: 790, alpha: 0.5 },
+    belts: true,
     park: {
       slots: [
         [95, 672],
@@ -134,6 +135,6 @@ export const HUBS: Record<number, HubLayout> = {
       h: 100,
       label: { x: 270, y: 776 },
     },
-    dive: true,
+    unroll: true,
   },
 };

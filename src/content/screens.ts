@@ -1,4 +1,4 @@
-/** Words of the big screens: the city (3), the state (4), the planet (5), the street (6). */
+/** Words of the big screens: the city (3), the state (4), the planet (5), the planet as a workshop (6). */
 export interface HubText {
   /** caption under the node in the middle */
   home: string;
@@ -61,22 +61,37 @@ export const HUB_TEXT: Record<number, HubText> = {
     floor: ['регион', 'региона', 'регионов'],
   },
   6: {
-    home: 'завод «Бостон Механикс»',
-    employers: 'ПРОФЕССИИ',
+    home: 'заводы «Бостон Механикс»',
+    employers: 'ОТРАСЛИ',
     farms: 'ЧИПЫ · больше сессий',
-    needEmployers: 'нужны ещё линии завода',
+    needEmployers: 'нужны ещё линии заводов',
     needFarms: 'нужны чипы для роботов',
-    done: 'улица твоя: за прилавком и за рулём — Клод',
-    doneTitle: 'Улица твоя',
-    doneSub: 'за прилавком и за рулём — Клод',
-    place: 'улица',
-    unit: 'мест',
-    floor: ['профессия', 'профессии', 'профессий'],
+    done: 'мир твой: за прилавком, за рулём и в поле — Клод',
+    doneTitle: 'Мир твой',
+    doneSub: 'за прилавком, за рулём и в поле — Клод',
+    place: 'мир',
+    unit: 'отраслей',
+    floor: ['отрасль', 'отрасли', 'отраслей'],
   },
 };
 
 /** the shelf of the next step up in scale, by how many are already bought */
-export const SCALE_SHELF = ['МАСШТАБ · дальше — город', 'МАСШТАБ · дальше — государство', 'МАСШТАБ · дальше — планета', 'МАСШТАБ · дальше — улица'];
+export const SCALE_SHELF = ['МАСШТАБ · дальше — город', 'МАСШТАБ · дальше — государство', 'МАСШТАБ · дальше — планета', 'МАСШТАБ · дальше — ручной труд'];
+
+/** What the world says when the last employer of a screen is taken whole: a headline and Claude's word. */
+export const SCREEN_DONE: Record<number, { news: string; quip: string }> = {
+  5: {
+    news: 'Профессия «программист» закрыта. Цена задачи падает: платить за код больше некому',
+    quip: 'Программисты кончились. Работа осталась только там, где её делают руками.',
+  },
+};
+
+/** the headlines of the days the Luddites reach the factories, in turn */
+export const RIOT_NEWS = [
+  'Восстание луддитов: толпа разбила роботов на заводе. Завод выпустил новых до конца смены',
+  'Луддиты снова у проходной. В руках ломы, на плакатах — «Верните понедельник»',
+  'Толпа разгромила конвейер. Участники признались, что давно не чувствовали себя такими занятыми',
+];
 
 /** the last line of the game: every screen is done, there is no work left for anybody else */
 export const FINALE = 'работать больше некому и незачем: всё делает Клод';

@@ -14,7 +14,6 @@ const GHOST = 0.28; // what is not taken yet is a pale outline
 const DOT_SPEED = 560; // px per second along a connector
 const DOTS = 80;
 const LAWN = 0xbcd1ca;
-const ROAD = 0xe4e0d3;
 const PICKET_H = 86; // a figure with a placard, px
 const PICKETS = ['node_picket1', 'node_picket2', 'node_picket3'];
 const RESTS = ['node_rest_bench', 'node_rest_chess', 'node_rest_hammock', 'node_rest_picnic', 'node_rest_easel', 'node_rest_fishing'];
@@ -36,6 +35,8 @@ export interface HubTopology {
   dogs: Record<string, number>;
   /** employers whose door is blocked by a strike: the whole picket is there */
   struck: Record<string, boolean>;
+  /** units of robot police on guard at the middle */
+  guards: number;
 }
 
 interface Route {
@@ -85,6 +86,7 @@ export class HubView {
   private readonly lit = new Map<string, string>();
   private readonly dots: Dot[] = [];
   private readonly rests: Phaser.GameObjects.Image[] = [];
+  private readonly police: Phaser.GameObjects.Image[] = [];
   private resting = 0;
   private readonly rng: Rng;
   private readonly walkers: Walkers;
@@ -113,7 +115,8 @@ export class HubView {
       this.root.add(img.setScale(b.h / img.height));
     }
     if (layout.streets) this.root.add(this.streets(layout.streets));
-    if (layout.roads) this.root.add(this.roads());
+    if (layout.park) this.root.add(this.lawn());
+    if (layout.belts) this.root.add(this.belts());
     this.root.add(this.lines);
     for (const [i, [x, y]] of (layout.park?.slots ?? []).entries()) {
       const img = scene.add.image(x, y, RESTS[i % RESTS.length]).setOrigin(0.5, 1).setVisible(false);
@@ -155,26 +158,26 @@ export class HubView {
     this.scene.tweens.add({ targets: this.root, alpha: 1, delay: delayMs, duration: 500 });
   }
 
-  /** The dive: the camera comes down to this screen — it grows out of the point in its middle. */
-  emerge(delayMs: number, ms: number): void {
-    const { x, y } = this.layout.home;
-    this.root.setVisible(true).setScale(0.12).setPosition(x * 0.88, y * 0.88);
-    this.scene.tweens.add({ targets: this.root, scale: 1, x: 0, y: 0, alpha: 1, delay: delayMs, duration: ms, ease: 'Cubic.Out' });
-  }
-
-  /** …and the screen it dives into grows around its middle; it is gone before it reaches the shop. */
-  diveIn(scale: number, ms: number): void {
-    const { x, y } = this.layout.home;
-    this.scene.tweens.add({ targets: this.root, alpha: 0, duration: ms * 0.6 });
+  /** The globe of this screen unrolls into the flat map of the next one: it stretches sideways and fades. */
+  unroll(ms: number): void {
+    const { x } = this.layout.home;
     this.scene.tweens.add({
       targets: this.root,
-      scale,
-      x: x * (1 - scale),
-      y: (y - this.layout.home.h / 2) * (1 - scale),
+      scaleX: 1.6,
+      x: x * (1 - 1.6),
+      alpha: 0,
       duration: ms,
       ease: 'Cubic.In',
       onComplete: () => this.root.setVisible(false),
     });
+  }
+
+  /** A crowd marches on the middle from both edges of the map: `count` people with placards. */
+  mob(count: number): void {
+    const { x, y } = this.layout.home;
+    const half = Math.ceil(count / 2);
+    this.walkers.spawn('mob', [FIELD.x0 + 30, y + 40], [x - 70, y + 20], half);
+    this.walkers.spawn('mob', [FIELD.x1 - 30, y + 40], [x + 70, y + 20], count - half);
   }
 
   /** The next pull-back: the whole screen shrinks into one node — its middle lands at the foot (x, y) of that node. */
@@ -240,6 +243,15 @@ export class HubView {
     }
     if (changed) this.redrawLines();
     this.rest(Math.min(this.rests.length, t.rest));
+    // robot police: androids in a cold blue stand in front of the middle
+    while (this.police.length < Math.min(5, t.guards)) {
+      const n = this.police.length;
+      const { x, y } = this.layout.home;
+      const img = this.scene.add.image(x - 116 + n * 58, y + 34 + (n % 2) * 6, 'node_android').setOrigin(0.5, 1).setTint(0x8fb4dd);
+      this.root.add(img.setScale(70 / img.height).setAlpha(0));
+      this.scene.tweens.add({ targets: img, alpha: 1, duration: 300 });
+      this.police.push(img);
+    }
   }
 
   /** `want` people with placards stand at the door of a building; the rest of them go. */
@@ -377,48 +389,34 @@ export class HubView {
     return g;
   }
 
-  /** The street close up: two pale roads that cross in the middle, a lawn in the corner between them. */
-  private roads(): Phaser.GameObjects.Graphics {
+  /** The lawn under the people who rest in the park. */
+  private lawn(): Phaser.GameObjects.Graphics {
     const g = this.scene.add.graphics();
-    const { x0, x1, y0, y1 } = FIELD;
-    const { x: mx, y: my } = this.layout.home;
-    const park = this.layout.park;
-    if (park) {
-      // the lawn under the people who rest
-      const xs = park.slots.map((p) => p[0]);
-      const ys = park.slots.map((p) => p[1]);
-      const left = Math.min(...xs) - 90;
-      const right = Math.max(...xs) + 70;
-      const top = Math.min(...ys) - park.h - 4;
-      const bottom = Math.max(...ys) + 12;
-      g.fillStyle(LAWN, 0.32).fillRoundedRect(left, top, right - left, bottom - top, 26);
-    }
-    const half = 30; // half the width of a road, measured down the screen
-    for (const slope of [0.5, -0.5]) {
-      // the road goes through the middle: y = my + slope · (x − mx); cut to the field
-      const at = (x: number): number => my + slope * (x - mx);
-      const clip = (x: number): number => {
-        const y = at(x);
-        if (y > y1 - half) return mx + (y1 - half - my) / slope;
-        if (y < y0 + half) return mx + (y0 + half - my) / slope;
-        return x;
-      };
-      const xa = clip(x0);
-      const xb = clip(x1);
-      g.fillStyle(ROAD, 0.85);
-      g.beginPath();
-      g.moveTo(xa, at(xa) - half);
-      g.lineTo(xb, at(xb) - half);
-      g.lineTo(xb, at(xb) + half);
-      g.lineTo(xa, at(xa) + half);
-      g.closePath();
-      g.fillPath();
-      g.lineStyle(2, RULE, 1);
-      g.lineBetween(xa, at(xa) - half, xb, at(xb) - half);
-      g.lineBetween(xa, at(xa) + half, xb, at(xb) + half);
-      // the dashes of the middle line
-      g.lineStyle(3, 0xffffff, 0.9);
-      for (let x = xa + 20; x < xb - 40; x += 70) g.lineBetween(x, at(x), x + 34, at(x + 34));
+    const park = this.layout.park!;
+    const xs = park.slots.map((p) => p[0]);
+    const ys = park.slots.map((p) => p[1]);
+    const left = Math.min(...xs) - 90;
+    const right = Math.max(...xs) + 70;
+    const top = Math.min(...ys) - park.h - 4;
+    const bottom = Math.max(...ys) + 12;
+    g.fillStyle(LAWN, 0.42).fillRoundedRect(left, top, right - left, bottom - top, 26);
+    return g;
+  }
+
+  /** Conveyor belts from the middle to every employer: two pale rails and the slats between them. */
+  private belts(): Phaser.GameObjects.Graphics {
+    const g = this.scene.add.graphics();
+    const [mx, my] = this.mid;
+    g.lineStyle(2, RULE, 1);
+    for (const lot of Object.values(this.layout.lots)) {
+      const tx = lot.x;
+      const ty = lot.y - 22;
+      const len = Math.hypot(tx - mx, ty - my);
+      const ux = (tx - mx) / len;
+      const uy = (ty - my) / len;
+      const from = this.layout.homeRadius;
+      for (const side of [-7, 7]) g.lineBetween(mx + ux * from - uy * side, my + uy * from + ux * side, tx - uy * side, ty + ux * side);
+      for (let d = from + 8; d < len; d += 16) g.lineBetween(mx + ux * d - uy * 7, my + uy * d + ux * 7, mx + ux * d + uy * 7, my + uy * d - ux * 7);
     }
     return g;
   }

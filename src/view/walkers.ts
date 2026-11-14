@@ -3,14 +3,15 @@ import type { Rng } from '../core/rng';
 
 type Pt = readonly [number, number];
 
-/** who walks: a laid-off worker with a box, or Claude in a body from the factory */
-export type WalkerKind = 'person' | 'android' | 'robodog';
+/** who walks: a laid-off worker with a box, Claude in a body from the factory, or a marcher with a placard */
+export type WalkerKind = 'person' | 'android' | 'robodog' | 'mob';
 
 /** the pictures a kind is drawn with, its height on the screen and its speed, px per second */
 const LOOK: Record<WalkerKind, { keys: readonly string[]; h: number; speed: number }> = {
   person: { keys: ['node_person1', 'node_person2', 'node_person3'], h: 62, speed: 80 },
   android: { keys: ['node_android'], h: 78, speed: 110 },
   robodog: { keys: ['node_robodog'], h: 58, speed: 170 },
+  mob: { keys: ['node_picket1', 'node_picket2', 'node_picket3'], h: 86, speed: 85 },
 };
 const POOL = 36;
 

@@ -2,7 +2,7 @@
  * The core loop as a conveyor of tasks (M01 «Согласие», M02 sources, M03 plan, M05 «не спрашивай» and subagents,
  * M15 promotions, M16–M18 the scales — city, state, planet: employers taken unit by unit, farms as packs of sessions,
  * M23 perks of the employers taken whole, M24 the people left without work and the price of a task that
- * falls with unemployment, M25 the street: a factory makes robots that take the jobs, M26 packs of robot dogs let in by a bribe):
+ * falls with unemployment, M25 the street: a factory makes robots that take the jobs, M26 packs of robot dogs let in by a bribe, M27 robots wear out and are broken in riots, robot police guards them):
  *
  *   sources ──► backlog ──► Claude (plan rate) ──► waiting for «Да» ──► $ per task
  *                  └──────► subagents: their own sessions, no «Да» needed ──► $
@@ -128,6 +128,18 @@ export interface Line {
   surge?: { step: number; halfLife: number };
 }
 
+/** Robot police (M27): every unit takes a part off what a riot breaks. */
+export interface Police {
+  screen: number;
+  name: string;
+  note: string;
+  price: number;
+  growth: number;
+  max: number;
+  /** the part of a riot's damage one unit takes off: 0.3 leaves 70% */
+  guard: number;
+}
+
 /** Claude the manager of one screen: a one-off hire. */
 export interface Manager {
   screen: number;
@@ -177,6 +189,8 @@ export interface PipeTuning {
   slump: number;
   /** discounts of one kind never leave less than this part of a price, however many employers give them */
   discountFloor: number;
+  /** the share of the working robots that breaks every second: the factory replaces them before it makes new ones (M27) */
+  wear: number;
   /** finished tasks that can wait for a «Да»; Claude pauses above this */
   readyMax: number;
   /** «Да» that can be given in advance */
@@ -194,6 +208,7 @@ export interface PipeConfig {
   scales: readonly Scale[];
   managers: readonly Manager[];
   lines: readonly Line[];
+  police: Police;
   auto: AutoConfig;
 }
 
@@ -235,6 +250,8 @@ export interface PipeState {
   lines: Record<string, number>;
   /** the employer the robots of a kind go to first, by kind */
   aim: Record<string, string>;
+  /** units of robot police bought */
+  police: number;
   presses: number;
   wasted: number;
   /** tasks closed in the player's terminal / by subagents */
@@ -272,6 +289,7 @@ export function createPipe(cfg: PipeConfig): PipeState {
     jobs: [],
     lines: {},
     aim: {},
+    police: 0,
     presses: 0,
     wasted: 0,
     closedHere: 0,
@@ -484,6 +502,39 @@ export function targetOf(s: PipeState, cfg: PipeConfig, kind: RobotKind): Source
   return aimed ?? cfg.sources.find((x) => x.made === kind && !whole(s, x));
 }
 
+/** robots of a kind at work: the jobs of the `made` employers they have taken */
+export function robotsOf(s: PipeState, cfg: PipeConfig, kind: RobotKind): number {
+  let n = 0;
+  for (const src of cfg.sources) if (src.made === kind) n += (s.owned[src.id] ?? 0) * (src.staff ?? 0);
+  return n;
+}
+
+/** robots of a kind that break every second: the more of them work, the more the factory has to replace */
+export function wearOf(s: PipeState, cfg: PipeConfig, kind: RobotKind): number {
+  return robotsOf(s, cfg, kind) * cfg.tuning.wear;
+}
+
+/** the part of the working robots a riot breaks, after the robot police has taken its share off */
+export function riotShare(s: PipeState, cfg: PipeConfig, share: number): number {
+  return share * (1 - cfg.police.guard) ** s.police;
+}
+
+/** A riot reaches the factory: `share` of the robots at every employer is broken. Returns how many robots are lost. */
+export function riot(s: PipeState, cfg: PipeConfig, share: number): number {
+  let lost = 0;
+  for (const src of cfg.sources) {
+    if (!src.made || !src.staff) continue;
+    const owned = s.owned[src.id] ?? 0;
+    lost += owned * share * src.staff;
+    s.owned[src.id] = owned * (1 - share);
+  }
+  return lost;
+}
+
+export function policeCost(s: PipeState, cfg: PipeConfig): number {
+  return Math.round(cfg.police.price * cfg.police.growth ** s.police);
+}
+
 /** what the next line of that kind costs now: the shortage and the perks included */
 export function lineCost(s: PipeState, cfg: PipeConfig, l: Line): number {
   return Math.round(l.price * l.growth ** (s.lines[l.id] ?? 0) * (s.surge[l.id] ?? 1) * discount(s, cfg, 'farms'));
@@ -528,19 +579,30 @@ export function stepPipe(
     out.done.push(job.id);
   }
 
-  // the factory: robots of a kind go to the employer they are aimed at, then to the others in order
+  // the factory. Working robots wear out everywhere; what the lines make goes first to the employers that
+  // were whole (to keep them so), then to the one the robots are aimed at, then to the others in order.
+  // When the lines make less than breaks, the robots at work dwindle — the whole employers last of all.
   for (const kind of ROBOTS) {
     let robots = outputOf(s, cfg, kind) * dt;
-    for (let pass = 0; pass < 2 && robots > 0; pass++) {
+    const wasWhole: Record<string, boolean> = {};
+    for (const src of cfg.sources) {
+      if (src.made !== kind) continue;
+      const owned = s.owned[src.id] ?? 0;
+      wasWhole[src.id] = owned >= src.max;
+      if (owned > 0) s.owned[src.id] = owned * (1 - t.wear * dt);
+    }
+    for (let pass = 0; pass < 3 && robots > 0; pass++) {
       for (const src of cfg.sources) {
-        if (src.made !== kind || !src.staff || (pass === 0) !== (src.id === s.aim[kind])) continue;
+        if (src.made !== kind || !src.staff) continue;
+        const turn = wasWhole[src.id] ? 0 : src.id === s.aim[kind] ? 1 : 2;
+        if (turn !== pass) continue;
         const owned = s.owned[src.id] ?? 0;
         if (owned >= src.max) continue;
         const units = Math.min(src.max - owned, robots / src.staff);
         robots -= units * src.staff;
         const now = owned + units >= src.max - 1e-9 ? src.max : owned + units;
         s.owned[src.id] = now;
-        if (now >= src.max) out.done.push(src.id);
+        if (now >= src.max && !wasWhole[src.id]) out.done.push(src.id);
         if (robots <= 0) break;
       }
     }
@@ -663,6 +725,13 @@ export function buyLine(s: PipeState, cfg: PipeConfig, id: string): boolean {
   if (!l || !spend(s, lineCost(s, cfg, l))) return false;
   s.lines[id] = (s.lines[id] ?? 0) + 1;
   if (l.surge) s.surge[id] = (s.surge[id] ?? 1) * l.surge.step;
+  return true;
+}
+
+/** One more unit of robot police at the factory. */
+export function buyPolice(s: PipeState, cfg: PipeConfig): boolean {
+  if (s.police >= cfg.police.max || !spend(s, policeCost(s, cfg))) return false;
+  s.police++;
   return true;
 }
 
