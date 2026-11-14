@@ -80,7 +80,7 @@ files:
 
 ## Phase 10 — Release
 files:
-- [ ] platform requirements research — check: ls .studioigor/research/release-*.md
+- [x] platform requirements research — check: ls .studioigor/research/release-*.md
 - [x] no stubs, debug, cheat keys, console.log — check: manual
 - [ ] soak session with no leaks or degradation; saves compatible — check: manual SKIP: пользователь отказался от часового прогона; короткие прогоны 3 мин (captures/street/07-soak) и 75 с (captures/release/00-soak-smoke): 0 ошибок, память 16–26 МБ ровная; формат сохранения не менялся (SAVE_VERSION 1, недостающие поля получают значения по умолчанию)
 - [x] end credits/CREDITS built from the license registry — check: manual
