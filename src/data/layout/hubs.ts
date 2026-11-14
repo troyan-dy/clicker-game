@@ -25,8 +25,6 @@ export interface HubLayout {
   roads?: boolean;
   /** where the people freed from work rest: the feet of every group (the far ones first), their height, the caption */
   park?: { slots: readonly (readonly [number, number])[]; h: number; label: { x: number; y: number } };
-  /** bodies walk from the middle to the place they take; employers listed here get a robot dog, the rest an android */
-  dogs?: readonly string[];
   /** the camera does not pull back to this screen: it dives into the previous one */
   dive?: boolean;
 }
@@ -120,8 +118,7 @@ export const HUBS: Record<number, HubLayout> = {
       farm: { key: 'farm', x: 1190, y: 930, h: 150 },
     },
     farms: {
-      android: { key: 'android', ...ABOVE, h: 120, ids: ['android'], above: true },
-      dogs: { key: 'robodog', ...BELOW, h: 100, ids: ['dogs'] },
+      chips: { key: 'gpus', ...BELOW, h: 125, ids: ['chips'] },
     },
     maxWidth: 185,
     roads: true,
@@ -137,7 +134,6 @@ export const HUBS: Record<number, HubLayout> = {
       h: 84,
       label: { x: 270, y: 756 },
     },
-    dogs: ['courier', 'depot', 'farm'],
     dive: true,
   },
 };

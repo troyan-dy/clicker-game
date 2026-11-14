@@ -109,7 +109,28 @@ export function restorePipe(cfg: PipeConfig, raw: unknown): PipeState {
   s.closedHere = Math.floor(num(r.closedHere, 0));
   s.closedBySubagents = Math.floor(num(r.closedBySubagents, 0));
   const owned = counts(r.owned);
-  for (const src of cfg.sources) s.owned[src.id] = Math.floor(num(owned[src.id], src.start, src.start, src.max));
+  for (const src of cfg.sources) {
+    const n = num(owned[src.id], src.start, src.start, src.max);
+    s.owned[src.id] = src.made ? n : Math.floor(n); // robots take the jobs of a `made` employer little by little
+  }
+  s.squads = Math.floor(num(r.squads, 0, 0, cfg.squads.max - cfg.squads.start));
+  for (const raw of Array.isArray(r.jobs) ? r.jobs : []) {
+    const job = counts(raw);
+    const src = cfg.sources.find((x) => x.id === job.id);
+    if (!src?.work || s.owned[src.id] >= src.max || s.jobs.some((j) => j.id === src.id) || s.jobs.length >= cfg.squads.start + s.squads) continue;
+    const total = num(job.total, src.work, 0.1);
+    s.jobs.push({ id: src.id, left: num(job.left, total, 0, total), total });
+  }
+  const lines = counts(r.lines);
+  for (const l of cfg.lines) {
+    const n = Math.floor(num(lines[l.id], 0));
+    if (n > 0) s.lines[l.id] = n;
+    const m = num(counts(r.surge)[l.id], 1, 1);
+    if (l.surge && m > 1) s.surge[l.id] = m;
+  }
+  for (const [kind, id] of Object.entries(counts(r.aim))) {
+    if (cfg.sources.some((x) => x.id === id && x.made === kind)) s.aim[kind] = id as string;
+  }
   const farms = counts(r.farms);
   const surge = counts(r.surge);
   for (const f of cfg.farms) {

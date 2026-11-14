@@ -3,10 +3,12 @@ import { createRng } from '../src/core/rng';
 import autoData from '../src/data/balance/auto.json';
 import farmData from '../src/data/balance/farms.json';
 import gradeData from '../src/data/balance/grades.json';
+import lineData from '../src/data/balance/lines.json';
 import managerData from '../src/data/balance/managers.json';
 import planData from '../src/data/balance/plans.json';
 import scaleData from '../src/data/balance/scales.json';
 import sourceData from '../src/data/balance/sources.json';
+import squadData from '../src/data/balance/squads.json';
 import tuningData from '../src/data/tuning/pipeline.json';
 import { createEvents, stepEvents, takeEvent } from '../src/systems/events/events';
 import { managerPick } from '../src/systems/manager/manager';
@@ -14,12 +16,15 @@ import type { Plan } from '../src/systems/plan/plan';
 import {
   backlogCap,
   buyFarm,
+  aimAt,
   buyGrade,
+  buyLine,
   buyManager,
   buyNoAsk,
   buyScale,
   buyPlan,
   buySource,
+  buySquad,
   buySubagent,
   claudeRate,
   createPipe,
@@ -33,7 +38,9 @@ import {
   sourceInflow,
   sourcePrice,
   stepPipe,
+  unemploymentOf,
   type Farm,
+  type Line,
   type PipeConfig,
   type PipeState,
   type Source,
@@ -47,6 +54,8 @@ const cfg: PipeConfig = {
   farms: farmData as Farm[],
   scales: scaleData,
   managers: managerData,
+  squads: squadData,
+  lines: lineData as Line[],
   auto: autoData,
 };
 const DT = 1 / 60;
@@ -261,16 +270,17 @@ describe('pipeline', () => {
     s.noAsk = true;
     const max = (id: string): number => cfg.sources.find((x) => x.id === id)!.max;
     const pay = payOf(s, cfg);
-    s.owned.bank = max('bank') - 1; // «+10% за задачу» once the bank is taken whole
+    const perk = (id: string): number => cfg.sources.find((x) => x.id === id)!.perk!.value;
+    s.owned.bank = max('bank') - 1; // more for every task once the bank is taken whole
     expect(payOf(s, cfg)).toBe(pay);
     s.owned.bank = max('bank');
-    expect(payOf(s, cfg)).toBeCloseTo(pay * 1.1);
-    // discounts multiply: servers 10% and 15% off
+    expect(payOf(s, cfg)).toBeCloseTo(pay * (1 + perk('bank')));
+    // discounts multiply: both employers make the servers cheaper
     const rack = cfg.farms.find((f) => f.id === 'rack')!;
     const before = farmCost(s, cfg, rack);
     s.owned.logistics = max('logistics');
     s.owned.cloud = max('cloud');
-    expect(farmCost(s, cfg, rack)).toBe(Math.round(before * 0.9 * 0.85));
+    expect(farmCost(s, cfg, rack)).toBe(Math.round(before * (1 - perk('logistics')) * (1 - perk('cloud'))));
     // and the purchase takes the discounted price
     s.money = farmCost(s, cfg, rack);
     expect(buyFarm(s, cfg, 'rack')).toBe(true);
@@ -280,16 +290,83 @@ describe('pipeline', () => {
   it('test_allowance_costs_a_share_of_the_pay_and_brings_orders', () => {
     const s = createPipe(cfg);
     s.noAsk = true;
+    s.scale = 1; // the city: people are out of work there
     s.owned.vector = 2;
     const work = inflowOf(s, cfg);
-    const pay = payOf(s, cfg);
+    const u = unemploymentOf(s, cfg);
+    const t = cfg.tuning;
     s.allowance = true;
-    expect(payOf(s, cfg)).toBeCloseTo(pay * (1 - cfg.tuning.allowance));
-    run(s, cfg.tuning.ordersRise + 1, 0);
-    expect(inflowOf(s, cfg)).toBeCloseTo(work * (1 + cfg.tuning.orders));
+    // the allowance takes its share of the pay; the price itself falls less
+    expect(payOf(s, cfg)).toBeCloseTo(t.pay * (1 - t.slump * t.relief * u) * (1 - t.allowance));
+    run(s, t.ordersRise + 1, 0);
+    expect(inflowOf(s, cfg)).toBeCloseTo(work * (1 + t.orders * u)); // the more people are out of work, the more they order
     s.allowance = false;
     run(s, cfg.tuning.ordersFade + 1, 0);
     expect(inflowOf(s, cfg)).toBeCloseTo(work); // without the allowance the orders dry up
+  });
+
+  it('test_unemployment_lowers_the_price_of_a_task_and_the_allowance_keeps_it', () => {
+    const s = createPipe(cfg);
+    s.noAsk = true;
+    s.scale = 1; // the city
+    const full = payOf(s, cfg);
+    expect(unemploymentOf(s, cfg)).toBe(0);
+    const city = cfg.sources.filter((x) => x.screen === 3);
+    for (const src of city) if (!src.perk || src.perk.kind !== 'pay') s.owned[src.id] = src.max; // everybody but the bank: no pay perk in the way
+    const u = unemploymentOf(s, cfg);
+    expect(u).toBeGreaterThan(0.5);
+    expect(payOf(s, cfg)).toBeCloseTo(full * (1 - cfg.tuning.slump * u));
+    s.allowance = true;
+    expect(payOf(s, cfg)).toBeCloseTo(full * (1 - cfg.tuning.slump * cfg.tuning.relief * u) * (1 - cfg.tuning.allowance));
+    // a new market: nobody is out of work there yet
+    s.scale = 2;
+    s.allowance = false;
+    expect(payOf(s, cfg)).toBeCloseTo(full);
+  });
+
+  it('test_squad_takes_a_unit_over_time_and_one_squad_does_one_job', () => {
+    const s = createPipe(cfg);
+    s.noAsk = true;
+    s.scale = 3; // the planet
+    s.money = 1e15;
+    const exchange = cfg.sources.find((x) => x.id === 'exchange')!;
+    expect(buySource(s, cfg, 'exchange')).toBe(true);
+    expect(s.owned.exchange).toBe(0); // paid for, not taken yet
+    expect(buySource(s, cfg, 'exchange')).toBe(false); // the squad is there already
+    expect(buySource(s, cfg, 'shipping')).toBe(false); // and there is no other squad
+    expect(buySquad(s, cfg)).toBe(true);
+    expect(buySource(s, cfg, 'shipping')).toBe(true);
+    let done: string[] = [];
+    for (let i = 0; i < (exchange.work! + 0.5) * 60; i++) done = done.concat(stepPipe(s, cfg, DT).done);
+    expect(done).toContain('exchange');
+    expect(s.owned.exchange).toBe(1);
+    expect(s.jobs.some((j) => j.id === 'exchange')).toBe(false);
+  });
+
+  it('test_factory_robots_take_the_jobs_and_go_where_they_are_aimed', () => {
+    const s = createPipe(cfg);
+    s.noAsk = true;
+    s.scale = 4; // the street
+    s.money = 1e16;
+    expect(buySource(s, cfg, 'checkout')).toBe(false); // these jobs are not for sale
+    expect(buyLine(s, cfg, 'android')).toBe(true);
+    const line = cfg.lines.find((l) => l.id === 'android')!;
+    const first = cfg.sources.find((x) => x.made === 'android')!;
+    for (let i = 0; i < 600; i++) stepPipe(s, cfg, DT);
+    expect(s.owned[first.id]).toBeCloseTo((line.rate * 10) / first.staff!, 4);
+    // aimed at another employer, the robots go there
+    const other = cfg.sources.filter((x) => x.made === 'android')[1];
+    expect(aimAt(s, cfg, other.id)).toBe(true);
+    const before = s.owned[first.id];
+    for (let i = 0; i < 600; i++) stepPipe(s, cfg, DT);
+    expect(s.owned[first.id]).toBe(before);
+    expect(s.owned[other.id]).toBeGreaterThan(0);
+    // enough robots take an employer whole — and say so once
+    s.lines.android = 1e6;
+    let done: string[] = [];
+    for (let i = 0; i < 120; i++) done = done.concat(stepPipe(s, cfg, DT).done);
+    expect(done.filter((id) => id === other.id).length).toBe(1);
+    expect(s.owned[other.id]).toBe(other.max);
   });
 
   it('test_game_ends_when_the_last_screen_is_taken_whole', () => {

@@ -16,10 +16,12 @@ import { playSound, setSoundOn, unlockSound } from '../core/sound';
 import autoData from '../data/balance/auto.json';
 import farmData from '../data/balance/farms.json';
 import gradeData from '../data/balance/grades.json';
+import lineData from '../data/balance/lines.json';
 import managerData from '../data/balance/managers.json';
 import planData from '../data/balance/plans.json';
 import scaleData from '../data/balance/scales.json';
 import sourceData from '../data/balance/sources.json';
+import squadData from '../data/balance/squads.json';
 import { BP, deskScreen } from '../data/layout/blueprint';
 import { HUBS } from '../data/layout/hubs';
 import eventsData from '../data/tuning/events.json';
@@ -37,15 +39,18 @@ import { createFeed, headline, say, stepFeed, tell, type FeedContent } from '../
 import { managerPick } from '../systems/manager/manager';
 import type { Plan } from '../systems/plan/plan';
 import {
+  aimAt,
   backlogCap,
   bonus,
   buyFarm,
   buyGrade,
+  buyLine,
   buyManager,
   buyNoAsk,
   buyPlan,
   buyScale,
   buySource,
+  buySquad,
   buySubagent,
   claudeRate,
   createPipe,
@@ -54,7 +59,10 @@ import {
   finished,
   gradeCost,
   inflowOf,
+  jobOf,
+  lineCost,
   ordersOf,
+  outputOf,
   payOf,
   planRate,
   pressPipe,
@@ -64,14 +72,21 @@ import {
   sessionsOf,
   shareOf,
   sourceCost,
+  slumpOf,
   sourceInflow,
+  squadPrice,
+  squadsOf,
   stepPipe,
   subagentPrice,
   subagentRate,
+  targetOf,
+  unemploymentOf,
   whole,
   type Farm,
+  type Line,
   type PipeConfig,
   type PipeState,
+  type RobotKind,
   type Source,
 } from '../systems/pipeline/pipeline';
 import { applyOffline, freshMeta, offlineReport, packSave, unpackSave, type OfflineReport } from '../systems/save/save';
@@ -106,7 +121,13 @@ const FEED: FeedContent = { news: NEWS, quips: QUIPS };
 /** approvals after which Claude says something nice about the player's judgement */
 const YES_MILESTONES = [3, 15, 40, 90, 160, 260];
 /** semitones of the purchase sound by what was bought: work is the base note, capacity is lower, promotions are higher */
-const BUY_PITCH: Record<string, number> = { src: 0, sub: 2, farm: -5, plan: 4, noask: 5, grade: 7, scale: -12 };
+const BUY_PITCH: Record<string, number> = { src: 0, sub: 2, squad: 2, farm: -5, line: -5, plan: 4, noask: 5, grade: 7, scale: -12 };
+/** the bodies of the factory in words: «сюда идут андроиды», «ждёт андроидов» */
+const ROBOT_WORDS: Record<RobotKind, { many: string; of: string }> = {
+  android: { many: 'андроиды', of: 'андроидов' },
+  robodog: { many: 'робособаки', of: 'робособак' },
+};
+const ROBOT_KINDS: readonly RobotKind[] = ['android', 'robodog'];
 const EVENTS: EventsTuning = { ...eventsData, every: [eventsData.every[0], eventsData.every[1]] };
 const IDLE_AFTER = 12; // seconds without a «Да» while requests wait
 const NECK_AFTER = 14; // seconds the same bottleneck lasts before Claude mentions it
@@ -134,7 +155,7 @@ function perSecond(n: number): string {
 declare global {
   interface Window {
     /** gym-only hooks for scripted captures */
-    __gym?: { buy(what: string): boolean; click(row: string): void; gift(dollars: number): void; away(hours: number): void; pile(legend: boolean): void; call(): void; limit(): void };
+    __gym?: { buy(what: string): boolean; click(row: string): void; take(id: string): void; gift(dollars: number): void; away(hours: number): void; pile(legend: boolean): void; call(): void; limit(): void };
   }
 }
 
@@ -184,6 +205,8 @@ export class GameScene extends Phaser.Scene {
     farms: farmData as Farm[],
     scales: scaleData,
     managers: managerData,
+    squads: squadData,
+    lines: lineData as Line[],
     auto: { noAsk: { ...autoData.noAsk }, subagent: { ...autoData.subagent } },
   };
   private state!: PipeState;
@@ -239,6 +262,8 @@ export class GameScene extends Phaser.Scene {
   /** a placard of the picket being read out: at which employer, what it says, seconds left */
   private slogan: { at: string; text: string; left: number } | null = null;
   private sloganIn = 4;
+  /** seconds until the next body walks from the factory to the employer it takes */
+  private streamIn = 0;
   private neckKind: Neck = 'none';
   private neckFor = 0;
   private pressTimes: number[] = [];
@@ -317,6 +342,7 @@ export class GameScene extends Phaser.Scene {
     window.__gym = {
       buy: (what) => this.buy(what),
       click: (row) => this.click(row),
+      take: (id) => this.takeWhole(id),
       gift: (dollars) => this.gift(dollars),
       away: (hours) => this.away(hours),
       pile: (legend) => this.forcePile(legend),
@@ -416,7 +442,7 @@ export class GameScene extends Phaser.Scene {
       const best = early.reduce((a, b) => (sourceCost(s, cfg, a) / a.inflow <= sourceCost(s, cfg, b) / b.inflow ? a : b));
       if (!free(() => buySource(s, cfg, best.id))) break;
     }
-    for (const src of cfg.sources) if (src.screen >= 3 && src.screen < screen) while (free(() => buySource(s, cfg, src.id)));
+    for (const src of cfg.sources) if (src.screen >= 3 && src.screen < screen) s.owned[src.id] = src.max;
     while (screenOf(s) < screen && free(() => buyScale(s, cfg)));
     // promotions cheaper than the step that brought the player here
     const step = cfg.scales[s.scale - 1].price;
@@ -428,7 +454,8 @@ export class GameScene extends Phaser.Scene {
       free(() => buyFarm(s, cfg, best.id));
     }
     s.surge = {};
-    const first = cfg.sources.filter((x) => x.screen === screen).map((x) => sourceCost(s, cfg, x));
+    // money for the first purchases of this screen: units of its employers, or lines of its factory
+    const first = [...cfg.sources.filter((x) => x.screen === screen && !x.made).map((x) => sourceCost(s, cfg, x)), ...cfg.lines.filter((l) => l.screen === screen).map((l) => lineCost(s, cfg, l))];
     s.money = Math.min(...first) * 3;
     this.openStage();
   }
@@ -622,6 +649,14 @@ export class GameScene extends Phaser.Scene {
     return `${short(n)} ${n >= 1e6 ? forms[2] : plural(n, forms)}`;
   }
 
+  /** gym-only: an employer is taken whole at once, as a scripted capture needs it */
+  private takeWhole(id: string): void {
+    const src = this.cfg.sources.find((x) => x.id === id);
+    if (!src || whole(this.state, src)) return;
+    this.state.owned[id] = src.max;
+    this.taken(src);
+  }
+
   /** gym-only: money from nowhere, not counted as income */
   private gift(dollars: number): void {
     this.state.money += dollars;
@@ -639,6 +674,16 @@ export class GameScene extends Phaser.Scene {
       this.say(this.state.allowance ? 'ubi:on' : 'ubi:off', true);
       this.slogan = null;
       this.saveGame();
+      return;
+    }
+    // a click on an employer of the street sends the robots of its kind there first
+    if (row.startsWith('aim:')) {
+      this.wake();
+      if (aimAt(this.state, this.cfg, row.slice(4))) {
+        playSound('ui');
+        this.paper.flash(row, 'bought');
+        this.saveGame();
+      }
       return;
     }
     // a hired manager is a switch: a click tells him to wait or to go on
@@ -669,7 +714,7 @@ export class GameScene extends Phaser.Scene {
     const s = this.state;
     const cfg = this.cfg;
     const before = s.money;
-    const surged = what.startsWith('farm:') && (s.surge[what.slice(5)] ?? 1) > 1.3; // bought in a shortage
+    const surged = (what.startsWith('farm:') || what.startsWith('line:')) && (s.surge[what.slice(5)] ?? 1) > 1.3; // bought in a shortage
     let ok = false;
     if (what.startsWith('src:')) {
       const src = cfg.sources.find((x) => x.id === what.slice(4));
@@ -677,7 +722,11 @@ export class GameScene extends Phaser.Scene {
     } else if (what.startsWith('farm:')) {
       const farm = cfg.farms.find((x) => x.id === what.slice(5));
       ok = !!farm && farm.screen === this.stage && buyFarm(s, cfg, farm.id);
-    } else if (what === 'plan') ok = buyPlan(s, cfg);
+    } else if (what.startsWith('line:')) {
+      const line = cfg.lines.find((x) => x.id === what.slice(5));
+      ok = !!line && line.screen === this.stage && buyLine(s, cfg, line.id);
+    } else if (what === 'squad') ok = this.stage === cfg.squads.screen && buySquad(s, cfg);
+    else if (what === 'plan') ok = buyPlan(s, cfg);
     else if (what === 'noask') ok = this.stage === 1 && buyNoAsk(s, cfg);
     else if (what === 'sub') ok = this.stage === 2 && buySubagent(s, cfg);
     else if (what === 'grade') ok = this.stage >= 2 && buyGrade(s, cfg);
@@ -688,9 +737,12 @@ export class GameScene extends Phaser.Scene {
     if (quiet) playSound('auto');
     else playSound('buy', BUY_PITCH[what.split(':')[0]] ?? 0);
     if (what.startsWith('src:')) {
-      this.layOff(what.slice(4));
-      const src = cfg.sources.find((x) => x.id === what.slice(4));
-      if (src?.perk && whole(s, src)) this.takeover(src);
+      const src = cfg.sources.find((x) => x.id === what.slice(4))!;
+      if (src.work) {
+        // the unit is only paid for: a squad of robot dogs runs there, the rest happens when it is done
+        this.hubs.get(this.stage)?.arrive(src.id, 'robodog', 2);
+        if (!this.feed.said.squads) this.say('squads', true);
+      } else this.taken(src);
     }
     logEvent(`buy_${what}`);
     if (what === 'noask') this.pullBack();
@@ -708,14 +760,34 @@ export class GameScene extends Phaser.Scene {
     if (what.startsWith('src:')) this.say(this.stage >= STREET ? 'buy:place' : this.stage >= 3 ? 'buy:employer' : 'buy:src');
     else if (what.startsWith('farm:')) {
       const farm = this.cfg.farms.find((x) => x.id === what.slice(5));
-      this.say(surged ? 'surge' : farm?.share ? 'quota' : this.stage >= STREET ? 'buy:body' : 'buy:farm');
-    } else this.say(`buy:${what}`, what !== 'sub');
+      this.say(surged ? 'surge' : farm?.share ? 'quota' : 'buy:farm');
+    } else if (what.startsWith('line:')) this.say(surged ? 'surge' : 'buy:body');
+    else this.say(`buy:${what}`, what !== 'sub');
     // the lines of the managers go by screen: the second one is the director of the city
   }
 
-  /** An employer is taken whole (M23): its perk works from now on; the news and Claude say so. */
+  /** A unit of an employer is taken: the people walk out, and a whole employer gives its perk. */
+  private taken(src: Source): void {
+    this.layOff(src.id);
+    if (src.perk && whole(this.state, src)) this.takeover(src);
+  }
+
+  /** A squad has finished a unit, or the robots of the factory have taken an employer whole. */
+  private unitDone(id: string): void {
+    const src = this.cfg.sources.find((x) => x.id === id);
+    if (!src) return;
+    if (src.work) {
+      playSound('buy', 7);
+      if (this.stage === src.screen) this.hubs.get(this.stage)!.back(id);
+    }
+    this.taken(src);
+    this.saveGame();
+  }
+
+  /** An employer is taken whole (M23): its perk works from now on; a banner, the news and Claude say so. */
   private takeover(src: Source): void {
     playSound('all');
+    this.paper.toast(`${src.tag} — целиком`, `теперь ${src.perk!.text}`);
     tell(this.feed, feedData, `${src.tag} — целиком. Теперь ${src.perk!.text}.`);
     const line = TAKEOVERS[src.id];
     if (line) headline(this.feed, feedData, line);
@@ -936,6 +1008,7 @@ export class GameScene extends Phaser.Scene {
     this.seconds += dt;
     const s = this.state;
     const done = stepPipe(s, this.cfg, dt);
+    for (const id of done.done) this.unitDone(id);
 
     if (this.stage === 2) {
       // squares on the connectors: at most a handful per second on each, however fast the tasks go
@@ -980,6 +1053,19 @@ export class GameScene extends Phaser.Scene {
           }
         }
         if (!sent) this.delivered(...this.homeSpot());
+      }
+      // the street: bodies walk from the factory to the employers they are taking, people walk out of there
+      if (this.cfg.lines.some((l) => l.screen === this.stage)) {
+        this.streamIn -= dt;
+        if (this.streamIn <= 0) {
+          this.streamIn = 0.8;
+          for (const kind of ROBOT_KINDS) {
+            const target = outputOf(s, this.cfg, kind) > 0 ? targetOf(s, this.cfg, kind) : undefined;
+            if (!target) continue;
+            hub.arrive(target.id, kind);
+            if (this.rng.next() < 0.45) hub.leave(target.id, 1, s.allowance);
+          }
+        }
       }
       hub.step(dt);
       if (done.here > 0) this.delivered(...this.homeSpot());
@@ -1114,16 +1200,26 @@ export class GameScene extends Phaser.Scene {
     const limited = s.limited > 0;
     const short_ = limited || neck === 'claude';
     const pct = Math.round(cfg.tuning.allowance * 100);
-    // from the city on there are people left without work: they order tasks while an allowance is paid
+    // from the city on there are people left without work: the more of them, the cheaper a task; an allowance keeps the price
+    const u = unemploymentOf(s, cfg);
+    const drop = Math.round(slumpOf(s, cfg) * 100);
+    const t = cfg.tuning;
+    // what the allowance would do to the income right now: the price it keeps and the orders it brings against what it costs
+    const paid = (1 - t.slump * t.relief * u) * (1 - t.allowance) * (neck === 'tasks' ? 1 + t.orders : 1);
+    const pays = paid > 1 - t.slump * u;
     const people: MeterRow[] =
       this.stage >= 3
         ? [
             {
               label: 'ЛЮДИ',
-              value: `+${perSecond(ordersOf(s, cfg))}`,
-              fill: s.orders,
-              hot: !s.allowance && neck === 'tasks' && !done,
-              note: s.allowance ? `заказывают · пособие ${pct}% · клик: отмена` : `пикет · клик: платить пособие ${pct}%`,
+              value: `${Math.round(u * 100)}%`,
+              fill: u,
+              hot: s.allowance !== pays,
+              note: s.allowance
+                ? pays
+                  ? `цена −${drop}% · заказы +${perSecond(ordersOf(s, cfg))} · клик: отмена`
+                  : `пособие ${pct}% не окупается · клик: отмена`
+                : `без работы · цена −${drop}% · клик: пособие ${pct}%`,
               row: 'ubi',
             },
           ]
@@ -1151,6 +1247,12 @@ export class GameScene extends Phaser.Scene {
     return { title, sub, count, buy, price: `$${short(cost)}`, state: this.state.money >= cost ? 'can' : 'poor' };
   }
 
+  /** what the perks of whole employers take off the prices of a kind, as a shelf says it; nothing — no discount yet */
+  private off(kind: 'farms' | 'sources' | 'grades' | 'scale', what = 'скидка'): string | undefined {
+    const left = discount(this.state, this.cfg, kind);
+    return left < 0.995 ? `${what} ${Math.round((1 - left) * 100)}%` : undefined;
+  }
+
   /** kinds of work on sale: the terminal sells the first ones, the blueprint all four */
   private sourceRows(): ShopRow[] {
     const s = this.state;
@@ -1171,52 +1273,103 @@ export class GameScene extends Phaser.Scene {
       hub.leave(id, count, this.state.allowance);
       // the first picket: Claude points at the line of the table that deals with it
       if (!this.state.allowance && !this.feed.said.picket) this.say('picket', true);
-      // on the street a body from the factory takes the place
-      if (this.stage >= STREET) hub.arrive(id);
     }
   }
 
   private hubTopology(): HubTopology {
     const s = this.state;
     const floors: Record<string, number> = {};
+    const live: Record<string, boolean> = {};
+    const squads: Record<string, boolean> = {};
     let taken = 0;
     let total = 0;
     for (const src of this.cfg.sources) {
       if (src.screen !== this.stage) continue;
       const owned = s.owned[src.id] ?? 0;
-      floors[src.id] = owned / src.max;
+      // a squad at work colours its unit in as it goes; robots take a `made` employer little by little
+      const job = jobOf(s, src.id);
+      floors[src.id] = (owned + (job ? 1 - job.left / job.total : 0)) / src.max;
+      if (job) squads[src.id] = true;
+      if (job || (src.made && owned < src.max)) live[src.id] = true;
       taken += owned;
       total += src.max;
     }
     // the park fills up as the work is taken — while the allowance is paid; without it the people stand with placards
     const slots = HUBS[this.stage]?.park?.slots.length ?? 0;
     const rest = s.allowance && total ? Math.ceil((slots * taken) / total) : 0;
-    return { floors, farms: s.farms, picket: !s.allowance, rest };
+    return { floors, farms: s.farms, picket: !s.allowance, rest, live, squads };
   }
 
   /** the employers of a big screen with something left to take, the cheapest next unit first */
   private offer(): Source[] {
     const s = this.state;
     return this.cfg.sources
-      .filter((src) => src.screen === this.stage && (s.owned[src.id] ?? 0) < src.max)
+      .filter((src) => src.screen === this.stage && !src.made && !jobOf(s, src.id) && (s.owned[src.id] ?? 0) < src.max)
       .sort((a, b) => sourceCost(s, this.cfg, a) - sourceCost(s, this.cfg, b));
   }
 
-  /** the shop lists the three cheapest next units; the map sells every building */
-  private employerRows(): ShopRow[] {
+  /** the shop lists the cheapest next units, `limit` of them; the map sells every building */
+  private employerRows(limit: number): ShopRow[] {
     const s = this.state;
     const left = this.offer();
     const t = HUB_TEXT[this.stage];
-    if (!left.length) return [{ buy: '', title: t.doneTitle, sub: t.doneSub, count: '', price: '', state: 'owned' }];
-    return left.slice(0, 3).map((src) => {
+    if (!left.length) {
+      // the last units are on their way: the squads are still out
+      if (s.jobs.length) return [{ buy: '', title: 'Отряды заканчивают работу', sub: 'последние единицы уже оплачены', count: '', price: '', state: 'owned' }];
+      return [{ buy: '', title: t.doneTitle, sub: t.doneSub, count: '', price: '', state: 'owned' }];
+    }
+    const idle = s.jobs.length < squadsOf(s, this.cfg);
+    return left.slice(0, limit).map((src) => {
       const owned = s.owned[src.id] ?? 0;
       // what the whole employer gives is the reason to choose it: the note says it on every unit
       const perk = src.perk ? ` · ★ ${src.perk.text}` : '';
       const cost = sourceCost(s, this.cfg, src);
       // a long name does not fit next to the price: the short one from the map stands in
       const title = src.name.length + short(cost).length > 29 ? src.tag : src.name;
-      return this.row(title, `+${perSecond(src.inflow)} · ${owned + 1} из ${src.max}${perk}`, '', `src:${src.id}`, cost);
+      const row = this.row(title, `+${perSecond(src.inflow)} · ${owned + 1} из ${src.max}${perk}`, '', `src:${src.id}`, cost);
+      // where squads do the work a unit needs a free one
+      return src.work && !idle ? { ...row, state: 'poor' as const } : row;
     });
+  }
+
+  /** the squads of robot dogs: how many are free, and one more for sale */
+  private squadRow(): ShopRow {
+    const s = this.state;
+    const q = this.cfg.squads;
+    const all = squadsOf(s, this.cfg);
+    const free = all - s.jobs.length;
+    const sub = `свободно ${free} из ${all} · ${q.note}`;
+    if (all >= q.max) return { buy: '', title: q.name, sub: `свободно ${free} из ${all}`, count: 'максимум', price: '', state: 'owned' };
+    return this.row(q.name, sub, `×${all}`, 'squad', squadPrice(s, this.cfg));
+  }
+
+  /** the lines of the factory: robots a second for money */
+  private lineRows(): ShopRow[] {
+    const s = this.state;
+    const more = 1 + bonus(s, this.cfg, 'lines');
+    return this.cfg.lines.filter((l) => l.screen === this.stage).map((l) => {
+      const owned = s.lines[l.id] ?? 0;
+      const surge = s.surge[l.id] ?? 1;
+      const note = surge > 1.02 ? `дефицит +${Math.round((surge - 1) * 100)}%, остывает` : l.note;
+      return this.row(l.name, `+${short(l.rate * more)} ${ROBOT_WORDS[l.kind].of}/с · ${note}`, owned ? `×${owned}` : '', `line:${l.id}`, lineCost(s, this.cfg, l));
+    });
+  }
+
+  /** where the robots of each kind go now: the trades of the street are not bought, they are taken over */
+  private aimRows(): ShopRow[] {
+    const s = this.state;
+    const rows: ShopRow[] = [];
+    for (const kind of ROBOT_KINDS) {
+      const src = targetOf(s, this.cfg, kind);
+      if (!src) continue;
+      const owned = s.owned[src.id] ?? 0;
+      const left = (src.max - owned) * (src.staff ?? 0);
+      const perk = src.perk ? ` · ★ ${src.perk.text}` : '';
+      const who = ROBOT_WORDS[kind].many;
+      rows.push({ buy: '', title: `${who[0].toUpperCase()}${who.slice(1)} → ${src.tag} · ${Math.floor((owned / src.max) * 100)}%`, sub: `ещё ${short(left)} человек${perk}`, count: '', price: '', state: 'owned' });
+    }
+    const t = HUB_TEXT[this.stage];
+    return rows.length ? rows : [{ buy: '', title: t.doneTitle, sub: t.doneSub, count: '', price: '', state: 'owned' }];
   }
 
   private farmRows(): ShopRow[] {
@@ -1261,7 +1414,7 @@ export class GameScene extends Phaser.Scene {
   private scaleShelf(): ShopShelf[] {
     const next = this.cfg.scales[this.state.scale];
     if (!next) return [];
-    return [{ title: SCALE_SHELF[this.state.scale], hot: false, rows: [this.row(next.name, next.note, '', 'scale', scaleCost(this.state, this.cfg))] }];
+    return [{ title: SCALE_SHELF[this.state.scale], hot: false, bonus: this.off('scale'), rows: [this.row(next.name, next.note, '', 'scale', scaleCost(this.state, this.cfg))] }];
   }
 
   private terminalShelves(neck: Neck): ShopShelf[] {
@@ -1297,12 +1450,22 @@ export class GameScene extends Phaser.Scene {
 
   private hubShelves(neck: Neck, taken: number, total: number): ShopShelf[] {
     const t = HUB_TEXT[this.stage];
-    return [
-      { title: `${t.employers} · ${taken} из ${total} ${t.floor[2]}`, hot: neck === 'tasks' && taken < total, rows: this.employerRows() },
-      { title: t.farms, hot: neck === 'claude', rows: this.farmRows() },
-      { title: 'УЛУЧШЕНИЯ · быстрее и дороже', hot: false, rows: [...this.planRows(false), ...this.gradeRows()] },
-      ...this.scaleShelf(),
-    ];
+    const upgrades: ShopShelf = { title: 'УЛУЧШЕНИЯ · быстрее и дороже', hot: false, bonus: this.off('grades', 'повышения: скидка'), rows: [...this.planRows(false), ...this.gradeRows()] };
+    const rest: ShopShelf[] = [{ title: t.farms, hot: neck === 'claude', bonus: this.off('farms'), rows: this.farmRows() }, upgrades, ...this.scaleShelf()];
+    const employers = `${t.employers} · ${taken} из ${total}`;
+    // the street: the trades are taken over by robots — the shop sells the lines that make them
+    if (this.cfg.lines.some((l) => l.screen === this.stage)) {
+      return [
+        { title: `${t.employers} · заменено ${taken} из ${total}`, hot: false, rows: this.aimRows() },
+        { title: 'ЗАВОД · больше роботов', hot: neck === 'tasks' && taken < total, bonus: this.off('farms'), rows: this.lineRows() },
+        ...rest,
+      ];
+    }
+    // the planet: units are taken by squads of robot dogs — the squads are sold with the units
+    if (this.cfg.squads.screen === this.stage) {
+      return [{ title: employers, hot: neck === 'tasks' && taken < total, bonus: this.off('sources'), rows: [this.squadRow(), ...this.employerRows(2)] }, ...rest];
+    }
+    return [{ title: employers, hot: neck === 'tasks' && taken < total, bonus: this.off('sources'), rows: this.employerRows(3) }, ...rest];
   }
 
   private drawTerminal(): void {
@@ -1417,7 +1580,12 @@ export class GameScene extends Phaser.Scene {
     if (s.limited > 0) return `лимит исчерпан · сброс через ${this.limitClock()}`;
     const pay = `$${fmt1.format(payOf(s, this.cfg))} за задачу`;
     const share = shareOf(s, this.cfg);
-    // on the planet the line also carries the share of the provider's revenue, so the grade gives way
+    // what moves the price besides the grade is said next to it: the perks of whole employers, unemployment, the allowance
+    const perks = Math.round(bonus(s, this.cfg, 'pay') * 100);
+    const drop = Math.round(slumpOf(s, this.cfg) * 100);
+    const why = `${perks ? ` · здания +${perks}%` : ''}${drop ? ` · безработица −${drop}%` : ''}${s.allowance ? ` · пособие −${Math.round(this.cfg.tuning.allowance * 100)}%` : ''}`;
+    // the grade is named while nothing else moves the price; on the planet the share of the provider's revenue stands in for it
+    if (why) return `${pay}${why}`;
     return share > 0 && this.stage < STREET ? `${pay} · твоя доля в выручке Anthropic: ${share}%` : `${this.cfg.grades[s.grade].name.toLowerCase()}: ${pay}`;
   }
 
@@ -1469,16 +1637,25 @@ export class GameScene extends Phaser.Scene {
     const neck = this.state.limited > 0 ? 'none' : this.neck();
     this.hubs.get(this.stage)!.sync(this.hubTopology());
 
-    // the numbers of the middle live in the line under the money: connectors arrive at it from every side
-    const tags: BlueprintTag[] = [{ x: layout.home.x, y: layout.home.y + 4, mid: true, small: true, html: t.home }];
     const employers = cfg.sources.filter((src) => src.screen === this.stage);
+    const factory = cfg.lines.some((l) => l.screen === this.stage);
+    const squadsHere = cfg.squads.screen === this.stage;
+    const idle = s.jobs.length < squadsOf(s, cfg);
+    // the middle: on the street it is the factory and what it makes, on the planet — the squads that are free
+    let home = t.home;
+    if (factory) {
+      const made = ROBOT_KINDS.map((k) => ({ k, n: outputOf(s, cfg, k) })).filter((x) => x.n > 0);
+      if (made.length) home += `<br><b>${made.map((x) => `${short(x.n)} ${ROBOT_WORDS[x.k].of}/с`).join('<br>')}</b>`;
+    } else if (squadsHere) home += `<br><b>отрядов свободно: ${squadsOf(s, cfg) - s.jobs.length} из ${squadsOf(s, cfg)}</b>`;
+    const tags: BlueprintTag[] = [{ x: layout.home.x, y: layout.home.y + 4, mid: true, small: true, html: home }];
     // the map sells itself: a caption and the building above it buy the next unit of that employer
     let taken = 0;
     let total = 0;
     for (const src of employers) {
       const owned = s.owned[src.id] ?? 0;
-      taken += owned;
-      total += src.max;
+      // the trades of the street are counted whole: robots take them little by little
+      taken += factory ? (owned >= src.max ? 1 : 0) : owned;
+      total += factory ? 1 : src.max;
       const lot = layout.lots[src.id];
       if (!lot) continue;
       // the third line is what the whole employer gives: pale until it is earned, coral once it works
@@ -1487,9 +1664,30 @@ export class GameScene extends Phaser.Scene {
         tags.push({ x: lot.x, y: lot.y + 4, mid: true, small: true, html: `${src.tag} · целиком<br><b>+${short(sourceInflow(src, owned))}/с</b>${perk}` });
         continue;
       }
-      const price = sourceCost(s, cfg, src);
+      if (src.made) {
+        // not for sale: the robots of its kind come here by themselves; a click sends them here first
+        const here = targetOf(s, cfg, src.made)?.id === src.id && outputOf(s, cfg, src.made) > 0;
+        const words = ROBOT_WORDS[src.made];
+        tags.push({
+          x: lot.x,
+          y: lot.y + 4,
+          mid: true,
+          small: true,
+          buy: here ? undefined : `aim:${src.id}`,
+          can: true,
+          html: `${src.tag} · ${Math.floor((owned / src.max) * 100)}%<br><b>${here ? `▶ сюда идут ${words.many}` : `ждёт ${words.of} · клик`}</b>${perk}`,
+        });
+        continue;
+      }
       const head = owned ? `${src.tag} · ${owned}/${src.max}` : src.tag;
-      tags.push({ x: lot.x, y: lot.y + 4, mid: true, small: true, buy: `src:${src.id}`, can: s.money >= price, html: `${head}<br><b>${owned ? 'ещё ' : ''}${t.floor[0]} · $${short(price)}</b>${perk}` });
+      const job = jobOf(s, src.id);
+      if (job) {
+        tags.push({ x: lot.x, y: lot.y + 4, mid: true, small: true, html: `${head}<br><b>отряд работает · ${Math.ceil(job.left)} с</b>${perk}` });
+        continue;
+      }
+      const price = sourceCost(s, cfg, src);
+      const can = s.money >= price && (!src.work || idle);
+      tags.push({ x: lot.x, y: lot.y + 4, mid: true, small: true, buy: `src:${src.id}`, can, html: `${head}<br><b>${owned ? 'ещё ' : ''}${t.floor[0]} · $${short(price)}</b>${perk}` });
     }
     const park = layout.park;
     if (park) tags.push({ x: park.label.x, y: park.label.y, mid: true, small: true, html: s.allowance ? 'парк · свободные люди отдыхают' : 'парк пуст · все на пикете' });

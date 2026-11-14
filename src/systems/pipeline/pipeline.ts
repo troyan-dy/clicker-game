@@ -1,7 +1,8 @@
 /**
  * The core loop as a conveyor of tasks (M01 «Согласие», M02 sources, M03 plan, M05 «не спрашивай» and subagents,
  * M15 promotions, M16–M18 the scales — city, state, planet: employers taken unit by unit, farms as packs of sessions,
- * M23 perks of the employers taken whole, M24 the people left without work, M25 the street):
+ * M23 perks of the employers taken whole, M24 the people left without work and the price of a task that
+ * falls with unemployment, M25 the street: a factory makes robots that take the jobs, M26 squads of robot dogs):
  *
  *   sources ──► backlog ──► Claude (plan rate) ──► waiting for «Да» ──► $ per task
  *                  └──────► subagents: their own sessions, no «Да» needed ──► $
@@ -13,9 +14,27 @@ import { buyNextPlan, type Plan, type PlanState } from '../plan/plan';
 
 /**
  * What an employer gives once it is taken whole (M23). «Plus» kinds add up: pay, inflow, rate,
- * sessions, calls, stack, surge. «Off» kinds multiply what is left: farms, sources, grades, scale, limit.
+ * sessions, calls, stack, surge, squads, lines. «Off» kinds multiply what is left: farms, sources, grades, scale, limit.
  */
-export type PerkKind = 'pay' | 'inflow' | 'rate' | 'sessions' | 'calls' | 'stack' | 'surge' | 'farms' | 'sources' | 'grades' | 'scale' | 'limit';
+export type PerkKind =
+  | 'pay'
+  | 'inflow'
+  | 'rate'
+  | 'sessions'
+  | 'calls'
+  | 'stack'
+  | 'surge'
+  | 'squads'
+  | 'lines'
+  | 'farms'
+  | 'sources'
+  | 'grades'
+  | 'scale'
+  | 'limit';
+
+/** a body Claude works in: the factory of the street makes them */
+export type RobotKind = 'android' | 'robodog';
+const ROBOTS: readonly RobotKind[] = ['android', 'robodog'];
 
 export interface Perk {
   kind: PerkKind;
@@ -47,6 +66,10 @@ export interface Source {
   staff?: number;
   /** what the employer gives once every unit is bought */
   perk?: Perk;
+  /** seconds a squad of robot dogs needs to take one unit: the unit is not bought at once (M26) */
+  work?: number;
+  /** the units are not bought at all: robots of this kind from the factory take the jobs one by one (M25) */
+  made?: RobotKind;
 }
 
 /** A step of the career ladder: every closed task pays `mult` times the base. */
@@ -76,6 +99,43 @@ export interface Farm {
   surge?: { step: number; halfLife: number };
   /** percent of the provider's revenue one unit adds (the planet) */
   share?: number;
+}
+
+/** Squads of robot dogs (M26): a unit of an employer with `work` is taken by a free squad, and that takes time. */
+export interface Squads {
+  /** the screen they are sold on */
+  screen: number;
+  name: string;
+  note: string;
+  price: number;
+  growth: number;
+  /** squads the player has without buying any */
+  start: number;
+  max: number;
+}
+
+/** A squad at work: the unit of the employer `id` is taken when `left` runs out. */
+export interface Job {
+  id: string;
+  left: number;
+  total: number;
+}
+
+/** A production line of the factory (M25): it makes robots of one kind, they take the jobs of the employers `made` of that kind. */
+export interface Line {
+  id: string;
+  name: string;
+  /** short plural name for the caption on the map */
+  tag: string;
+  note: string;
+  kind: RobotKind;
+  /** robots per second one line makes */
+  rate: number;
+  price: number;
+  growth: number;
+  screen: number;
+  /** a shortage, as with the farms */
+  surge?: { step: number; halfLife: number };
 }
 
 /** Claude the manager of one screen: a one-off hire. */
@@ -114,11 +174,15 @@ export interface PipeTuning {
   shareFrom: number;
   /** the people left without work (M24): the part of every task's pay the allowance takes */
   allowance: number;
-  /** …the extra tasks they order while it is paid, as a share of the inflow */
+  /** …the extra tasks they order while it is paid, as a share of the inflow — when everybody is out of work */
   orders: number;
   /** …seconds for the orders to grow to full / to dry up without the allowance */
   ordersRise: number;
   ordersFade: number;
+  /** the part of a task's price lost when everybody on the screen's market is out of work */
+  slump: number;
+  /** …the part of that loss that stays when the allowance is paid: people who are paid do not undercut */
+  relief: number;
   /** finished tasks that can wait for a «Да»; Claude pauses above this */
   readyMax: number;
   /** «Да» that can be given in advance */
@@ -135,6 +199,8 @@ export interface PipeConfig {
   /** in the order they are bought: the city, the state, the planet */
   scales: readonly Scale[];
   managers: readonly Manager[];
+  squads: Squads;
+  lines: readonly Line[];
   auto: AutoConfig;
 }
 
@@ -166,6 +232,14 @@ export interface PipeState {
   allowance: boolean;
   /** 0..1: how much of their orders the people place now */
   orders: number;
+  /** squads of robot dogs bought on top of the ones given */
+  squads: number;
+  /** squads at work */
+  jobs: Job[];
+  /** production lines owned per line id */
+  lines: Record<string, number>;
+  /** the employer the robots of a kind go to first, by kind */
+  aim: Record<string, string>;
   presses: number;
   wasted: number;
   /** tasks closed in the player's terminal / by subagents */
@@ -198,6 +272,10 @@ export function createPipe(cfg: PipeConfig): PipeState {
     limited: 0,
     allowance: false,
     orders: 0,
+    squads: 0,
+    jobs: [],
+    lines: {},
+    aim: {},
     presses: 0,
     wasted: 0,
     closedHere: 0,
@@ -233,14 +311,14 @@ export function workOf(s: PipeState, cfg: PipeConfig): number {
   return sum * (1 + bonus(s, cfg, 'inflow'));
 }
 
-/** tasks per second the people left without work order: they have the time, and the allowance */
+/** tasks per second the people left without work order: they have the time, and the allowance; the more of them, the more orders */
 export function ordersOf(s: PipeState, cfg: PipeConfig): number {
-  return workOf(s, cfg) * cfg.tuning.orders * s.orders;
+  return workOf(s, cfg) * cfg.tuning.orders * s.orders * unemploymentOf(s, cfg);
 }
 
 /** tasks per second coming in: the employers and the orders of the people */
 export function inflowOf(s: PipeState, cfg: PipeConfig): number {
-  return workOf(s, cfg) * (1 + cfg.tuning.orders * s.orders);
+  return workOf(s, cfg) + ordersOf(s, cfg);
 }
 
 /** tasks per second `owned` units of a source bring; an employer taken whole brings more */
@@ -336,9 +414,61 @@ export function subagentPrice(cfg: PipeConfig, owned: number): number {
   return Math.round(cfg.auto.subagent.price * cfg.auto.subagent.growth ** owned);
 }
 
-/** dollars one closed task pays: the grade, the perks, less the allowance if it is paid */
+/** the share of the people on the current screen's market whose work the player has taken: 0 — nobody, 1 — everybody */
+export function unemploymentOf(s: PipeState, cfg: PipeConfig): number {
+  const screen = screenOf(s);
+  if (screen < 3) return 0;
+  let all = 0;
+  let out = 0;
+  for (const src of cfg.sources) {
+    if (src.screen !== screen || !src.staff) continue;
+    all += src.max * src.staff;
+    out += Math.max(0, (s.owned[src.id] ?? 0) - src.start) * src.staff;
+  }
+  return all > 0 ? Math.min(1, out / all) : 0;
+}
+
+/** the share of a task's price lost to the competition for the jobs that are left; the allowance keeps most of it */
+export function slumpOf(s: PipeState, cfg: PipeConfig): number {
+  return cfg.tuning.slump * unemploymentOf(s, cfg) * (s.allowance ? cfg.tuning.relief : 1);
+}
+
+/** dollars one closed task pays: the grade and the perks, less what unemployment and the allowance take */
 export function payOf(s: PipeState, cfg: PipeConfig): number {
-  return cfg.tuning.pay * cfg.grades[s.grade].mult * (1 + bonus(s, cfg, 'pay')) * (s.allowance ? 1 - cfg.tuning.allowance : 1);
+  const base = cfg.tuning.pay * cfg.grades[s.grade].mult * (1 + bonus(s, cfg, 'pay'));
+  return base * (1 - slumpOf(s, cfg)) * (s.allowance ? 1 - cfg.tuning.allowance : 1);
+}
+
+/** squads of robot dogs the player has */
+export function squadsOf(s: PipeState, cfg: PipeConfig): number {
+  return cfg.squads.start + s.squads;
+}
+
+/** the squad at work at an employer, if there is one */
+export function jobOf(s: PipeState, id: string): Job | undefined {
+  return s.jobs.find((j) => j.id === id);
+}
+
+export function squadPrice(s: PipeState, cfg: PipeConfig): number {
+  return Math.round(cfg.squads.price * cfg.squads.growth ** s.squads);
+}
+
+/** robots of a kind the factory makes every second */
+export function outputOf(s: PipeState, cfg: PipeConfig, kind: RobotKind): number {
+  let sum = 0;
+  for (const l of cfg.lines) if (l.kind === kind) sum += (s.lines[l.id] ?? 0) * l.rate;
+  return sum * (1 + bonus(s, cfg, 'lines'));
+}
+
+/** the employer the robots of a kind are taking now: the one they are aimed at, else the first one left in order */
+export function targetOf(s: PipeState, cfg: PipeConfig, kind: RobotKind): Source | undefined {
+  const aimed = cfg.sources.find((x) => x.id === s.aim[kind] && x.made === kind && !whole(s, x));
+  return aimed ?? cfg.sources.find((x) => x.made === kind && !whole(s, x));
+}
+
+/** what the next line of that kind costs now: the shortage and the perks included */
+export function lineCost(s: PipeState, cfg: PipeConfig, l: Line): number {
+  return Math.round(l.price * l.growth ** (s.lines[l.id] ?? 0) * (s.surge[l.id] ?? 1) * discount(s, cfg, 'farms'));
 }
 
 function pay(s: PipeState, cfg: PipeConfig, bySubagent: boolean, tasks = 1): void {
@@ -352,9 +482,10 @@ export function stepPipe(
   s: PipeState,
   cfg: PipeConfig,
   dt: number,
-): { arrived: number; here: number; subagents: number } {
+): { arrived: number; here: number; subagents: number; done: string[] } {
   const t = cfg.tuning;
-  const out = { arrived: 0, here: 0, subagents: 0 };
+  /** `done` — employers where a unit was just taken by a squad, or that the robots have just taken whole */
+  const out = { arrived: 0, here: 0, subagents: 0, done: [] as string[] };
 
   if (s.limited > 0) s.limited = Math.max(0, s.limited - dt);
 
@@ -363,6 +494,38 @@ export function stepPipe(
   for (const f of cfg.farms) {
     const m = s.surge[f.id];
     if (f.surge && m > 1) s.surge[f.id] = 1 + (m - 1) * 0.5 ** ((dt * calm) / f.surge.halfLife);
+  }
+  for (const l of cfg.lines) {
+    const m = s.surge[l.id];
+    if (l.surge && m > 1) s.surge[l.id] = 1 + (m - 1) * 0.5 ** ((dt * calm) / l.surge.halfLife);
+  }
+
+  // squads at work: the unit is taken when the time is up
+  for (let i = s.jobs.length - 1; i >= 0; i--) {
+    const job = s.jobs[i];
+    job.left -= dt;
+    if (job.left > 0) continue;
+    s.jobs.splice(i, 1);
+    s.owned[job.id] = (s.owned[job.id] ?? 0) + 1;
+    out.done.push(job.id);
+  }
+
+  // the factory: robots of a kind go to the employer they are aimed at, then to the others in order
+  for (const kind of ROBOTS) {
+    let robots = outputOf(s, cfg, kind) * dt;
+    for (let pass = 0; pass < 2 && robots > 0; pass++) {
+      for (const src of cfg.sources) {
+        if (src.made !== kind || !src.staff || (pass === 0) !== (src.id === s.aim[kind])) continue;
+        const owned = s.owned[src.id] ?? 0;
+        if (owned >= src.max) continue;
+        const units = Math.min(src.max - owned, robots / src.staff);
+        robots -= units * src.staff;
+        const now = owned + units >= src.max - 1e-9 ? src.max : owned + units;
+        s.owned[src.id] = now;
+        if (now >= src.max) out.done.push(src.id);
+        if (robots <= 0) break;
+      }
+    }
   }
 
   // the people left without work order tasks while the allowance is paid; without it the orders dry up
@@ -453,8 +616,40 @@ export function buySource(s: PipeState, cfg: PipeConfig, id: string): boolean {
   const src = cfg.sources.find((x) => x.id === id);
   if (!src) return false;
   const owned = s.owned[id] ?? 0;
-  if (owned >= src.max || !spend(s, sourceCost(s, cfg, src))) return false;
-  s.owned[id] = owned + 1;
+  if (src.made || owned >= src.max) return false; // the jobs of a `made` employer are taken by robots, not bought
+  if (!src.work) {
+    if (!spend(s, sourceCost(s, cfg, src))) return false;
+    s.owned[id] = owned + 1;
+    return true;
+  }
+  // a free squad goes there: the unit is paid for now and taken when the squad is done
+  if (jobOf(s, id) || s.jobs.length >= squadsOf(s, cfg) || !spend(s, sourceCost(s, cfg, src))) return false;
+  const total = src.work / (1 + bonus(s, cfg, 'squads'));
+  s.jobs.push({ id, left: total, total });
+  return true;
+}
+
+/** One more squad of robot dogs: one more unit can be taken at the same time. */
+export function buySquad(s: PipeState, cfg: PipeConfig): boolean {
+  if (squadsOf(s, cfg) >= cfg.squads.max || !spend(s, squadPrice(s, cfg))) return false;
+  s.squads++;
+  return true;
+}
+
+/** One more production line of the factory. */
+export function buyLine(s: PipeState, cfg: PipeConfig, id: string): boolean {
+  const l = cfg.lines.find((x) => x.id === id);
+  if (!l || !spend(s, lineCost(s, cfg, l))) return false;
+  s.lines[id] = (s.lines[id] ?? 0) + 1;
+  if (l.surge) s.surge[id] = (s.surge[id] ?? 1) * l.surge.step;
+  return true;
+}
+
+/** The robots of its kind go to this employer first. False — it is not theirs to take, or it is taken already. */
+export function aimAt(s: PipeState, cfg: PipeConfig, id: string): boolean {
+  const src = cfg.sources.find((x) => x.id === id);
+  if (!src?.made || whole(s, src)) return false;
+  s.aim[src.made] = id;
   return true;
 }
 

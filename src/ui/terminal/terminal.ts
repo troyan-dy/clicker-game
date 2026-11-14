@@ -19,6 +19,8 @@ export interface ShopShelf {
   title: string;
   /** this shelf removes the current bottleneck */
   hot: boolean;
+  /** what the perks do to this shelf, said after the title: «скидка 28%» */
+  bonus?: string;
   rows: ShopRow[];
 }
 

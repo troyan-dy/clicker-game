@@ -2,7 +2,7 @@ import type Phaser from 'phaser';
 import type { Rng } from '../core/rng';
 import type { HubLayout } from '../data/layout/hubs';
 import { CORAL } from './squares';
-import { Walkers } from './walkers';
+import { Walkers, type WalkerKind } from './walkers';
 
 type Pt = readonly [number, number];
 
@@ -30,6 +30,10 @@ export interface HubTopology {
   picket: boolean;
   /** how many groups of people rest in the park, if the screen has one */
   rest: number;
+  /** employers that are being taken right now, little by little: the colour follows without a jump */
+  live: Record<string, boolean>;
+  /** employers where a squad of robot dogs is at work */
+  squads: Record<string, boolean>;
 }
 
 interface Route {
@@ -58,6 +62,8 @@ interface Lot {
   pickets: Phaser.GameObjects.Image[];
   /** Claude on the roof of a building taken whole */
   flag?: Phaser.GameObjects.Image;
+  /** a robot dog of the squad that works here */
+  dog?: Phaser.GameObjects.Image;
 }
 
 /**
@@ -192,16 +198,24 @@ export class HubView {
       // those whose work was taken stand at the door: one, two when the whole building is gone
       this.picket(lot, place, t.picket && target > 0 ? (target >= 1 ? 2 : 1) : 0);
       if (target >= 1 && !lot.flag) this.raiseFlag(lot, place, lot.target > 0);
+      this.guard(lot, place, !!t.squads[id]);
       if (target === lot.target) continue;
       const first = lot.target === 0;
       lot.target = target;
-      // the colour climbs to the new floor, the building gives a little jump
-      this.scene.tweens.add({ targets: lot, shown: target, duration: first ? 0 : 380, ease: 'Cubic.Out', onUpdate: () => this.crop(lot) });
-      if (first) {
+      if (t.live[id]) {
+        // taken little by little: the colour simply follows
+        this.scene.tweens.killTweensOf(lot);
         lot.shown = target;
         this.crop(lot);
+      } else {
+        // the colour climbs to the new floor, the building gives a little jump
+        this.scene.tweens.add({ targets: lot, shown: target, duration: first ? 0 : 380, ease: 'Cubic.Out', onUpdate: () => this.crop(lot) });
+        if (first) {
+          lot.shown = target;
+          this.crop(lot);
+        }
+        this.scene.tweens.add({ targets: [lot.ghost, lot.fill], scale: { from: lot.scale * 1.07, to: lot.scale }, duration: 300, ease: 'Back.Out' });
       }
-      this.scene.tweens.add({ targets: [lot.ghost, lot.fill], scale: { from: lot.scale * 1.07, to: lot.scale }, duration: 300, ease: 'Back.Out' });
       if (!this.routes.has(id)) {
         this.routes.set(id, this.spoke([place.x, place.y - 22], false));
         changed = true;
@@ -239,6 +253,22 @@ export class HubView {
     while (lot.pickets.length > want) {
       const img = lot.pickets.pop()!;
       this.scene.tweens.add({ targets: img, alpha: 0, duration: 400, onComplete: () => img.destroy() });
+    }
+  }
+
+  /** A robot dog of the squad stands at the door while the squad works there. */
+  private guard(lot: Lot, place: { x: number; y: number }, on: boolean): void {
+    if (on === !!lot.dog) return;
+    if (on) {
+      const img = this.scene.add.image(place.x + 64, place.y + 8, 'node_robodog').setOrigin(0.5, 1).setFlipX(true);
+      const scale = 46 / img.height;
+      this.root.add(img.setScale(scale).setAlpha(0));
+      this.scene.tweens.add({ targets: img, alpha: 1, delay: 900, duration: 250 });
+      lot.dog = img;
+    } else {
+      const img = lot.dog!;
+      lot.dog = undefined;
+      this.scene.tweens.add({ targets: img, alpha: 0, duration: 250, onComplete: () => img.destroy() });
     }
   }
 
@@ -291,13 +321,20 @@ export class HubView {
     } else this.walkers.spawn('person', from, [left ? FIELD.x0 + 20 : FIELD.x1 - 20, place.y + 4], count);
   }
 
-  /** A body from the factory in the middle walks to the place it takes at an employer. */
-  arrive(id: string): void {
+  /** `count` bodies of a kind walk from the middle to an employer: a robot to the job it takes, a squad to its work. */
+  arrive(id: string, kind: WalkerKind, count = 1): void {
     const place = this.layout.lots[id];
     if (!place) return;
     const { x, y } = this.layout.home;
-    const kind = this.layout.dogs?.includes(id) ? 'robodog' : 'android';
-    this.walkers.spawn(kind, [x + (place.x < x ? -50 : 50), y + 2], [place.x + (place.x < x ? 40 : -40), place.y + 4], 1);
+    this.walkers.spawn(kind, [x + (place.x < x ? -50 : 50), y + 2], [place.x + (place.x < x ? 40 : -40), place.y + 4], count);
+  }
+
+  /** The squad that worked at an employer runs back to the middle. */
+  back(id: string): void {
+    const place = this.layout.lots[id];
+    if (!place) return;
+    const { x, y } = this.layout.home;
+    this.walkers.spawn('robodog', [place.x + (place.x < x ? 40 : -40), place.y + 4], [x + (place.x < x ? -50 : 50), y + 2], 2);
   }
 
   step(dt: number): void {

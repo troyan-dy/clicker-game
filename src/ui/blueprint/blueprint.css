@@ -78,7 +78,8 @@
   margin: 10px auto 0;
   padding-top: 9px;
   border-top: 1.5px solid var(--ink);
-  font-size: 24px;
+  font-size: 22px;
+  white-space: nowrap;
 }
 /* the conveyor at a glance: a small table with bars, the line that runs short is coral */
 .bl-meter {
@@ -101,7 +102,7 @@
 }
 .bl-mrow {
   display: grid;
-  grid-template-columns: 96px 200px 150px minmax(0, 1fr);
+  grid-template-columns: 96px 170px 150px minmax(0, 1fr);
   align-items: center;
   gap: 0 14px;
   height: 24px;
@@ -231,6 +232,78 @@
   bottom: 0;
   height: 3px;
   background: var(--coral);
+}
+
+/* a banner over the map: an employer is taken whole and gives its perk */
+.bl-toast {
+  position: absolute;
+  left: 670px;
+  top: 322px;
+  padding: 16px 30px 18px 76px;
+  border-radius: 14px;
+  outline: 2px solid var(--coral);
+  background: #262624;
+  color: #f0eee6;
+  font: 400 21px/1.35 'JetBrains Mono', monospace;
+  white-space: nowrap;
+  opacity: 0;
+  transform: translate(-50%, 0);
+  pointer-events: none;
+}
+.bl-toast.on {
+  animation: bl-toast 3.4s ease-out forwards;
+}
+@keyframes bl-toast {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, 14px) scale(0.86);
+  }
+  7% {
+    opacity: 1;
+    transform: translate(-50%, 0) scale(1.05);
+  }
+  12% {
+    transform: translate(-50%, 0) scale(1);
+  }
+  86% {
+    opacity: 1;
+    transform: translate(-50%, 0) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -10px) scale(1);
+  }
+}
+.bl-toast b {
+  display: block;
+  font-size: 28px;
+  font-weight: 700;
+}
+.bl-toast span {
+  color: #e8a48c;
+}
+.bl-toast i {
+  position: absolute;
+  left: 26px;
+  top: 24px;
+  width: 30px;
+  height: 25px;
+  background: var(--coral);
+}
+.bl-toast i::before,
+.bl-toast i::after {
+  content: '';
+  position: absolute;
+  top: 8px;
+  width: 4px;
+  height: 8px;
+  background: #262624;
+}
+.bl-toast i::before {
+  left: 8px;
+}
+.bl-toast i::after {
+  right: 8px;
 }
 
 /* a caption that sells: it and the picture above it are one button */
@@ -459,6 +532,13 @@
   color: var(--dim);
 }
 .bl-shop h2.hot {
+  color: var(--coral);
+}
+/* what the perks do to the shelf: a discount is said in coral */
+.bl-shop h2 b {
+  margin-left: 12px;
+  font-weight: 700;
+  letter-spacing: 0;
   color: var(--coral);
 }
 .bl-shop h2 em {

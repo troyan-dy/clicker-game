@@ -75,6 +75,8 @@ export interface BlueprintUi {
   show(now?: boolean): void;
   /** the shop row `row` answers a click: bought, or not enough money */
   flash(row: string, kind: 'bought' | 'denied'): void;
+  /** a banner over the map for a few seconds: something big has just happened */
+  toast(title: string, text: string): void;
   /** below the shop: a gym puts its help here */
   extra: HTMLElement;
 }
@@ -100,8 +102,9 @@ export function createBlueprint(layer: HTMLElement, over: HTMLElement): Blueprin
   </div></div>`,
   );
   const root = layer.lastElementChild as HTMLElement;
-  over.insertAdjacentHTML('afterbegin', '<div class="bl-over"><div class="bl-tags"></div></div>');
+  over.insertAdjacentHTML('afterbegin', '<div class="bl-over"><div class="bl-tags"></div><div class="bl-toast"><i></i><b></b><span></span></div></div>');
   const overRoot = over.firstElementChild as HTMLElement;
+  const toast = overRoot.querySelector<HTMLElement>('.bl-toast')!;
   const q = <T extends HTMLElement>(sel: string): T => root.querySelector<T>(sel)!;
   const money = q('.bl-money b');
   const quip = q('.bl-quip');
@@ -191,7 +194,7 @@ export function createBlueprint(layer: HTMLElement, over: HTMLElement): Blueprin
       );
       let html = '';
       for (const shelf of m.shelves) {
-        html += `<h2 class="${shelf.hot ? 'hot' : ''}">${esc(shelf.title)}${shelf.hot ? '<em>сейчас нужно</em>' : ''}</h2>`;
+        html += `<h2 class="${shelf.hot ? 'hot' : ''}">${esc(shelf.title)}${shelf.bonus ? `<b>${esc(shelf.bonus)}</b>` : ''}${shelf.hot ? '<em>сейчас нужно</em>' : ''}</h2>`;
         for (const r of shelf.rows) {
           html += `<div class="bl-item ${r.state}" data-row="${r.buy}"${r.state === 'can' && r.buy ? ` data-buy="${r.buy}"` : ''}>
             <b>${esc(r.title)}${r.count ? `<i>${esc(r.count)}</i>` : ''}</b><span class="price">${esc(r.price)}</span>
@@ -206,6 +209,13 @@ export function createBlueprint(layer: HTMLElement, over: HTMLElement): Blueprin
     flash(row, kind) {
       mark = { row, cls: kind, until: performance.now() + 260 };
       showMark();
+    },
+    toast(title, text) {
+      toast.querySelector('b')!.textContent = title;
+      toast.querySelector('span')!.textContent = text;
+      toast.classList.remove('on');
+      void toast.offsetWidth; // restart the CSS animation
+      toast.classList.add('on');
     },
   };
 }
