@@ -1,4 +1,4 @@
-# Art bible — Да, Клод
+# Art bible — Yes-Driven Development
 
 <!-- Phase 2 (references/style.md). Brief. Changes only by the user's decision. -->
 

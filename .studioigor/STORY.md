@@ -1,4 +1,4 @@
-# Story — Да, Клод
+# Story — Yes-Driven Development
 
 <!-- Filled in if the game has a story (references/narrative.md). If there is no story —
 one line "No story: <why>" and that's it. Brief, in bullet points. -->

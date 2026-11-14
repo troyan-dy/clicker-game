@@ -1,4 +1,4 @@
-# Technology — Да, Клод
+# Technology — Yes-Driven Development
 
 <!-- Phase 3 (references/stack.md). ENGINE — one of: godot, godot-mono, unity,
 unreal, web, defold, bevy (read by studio.py and envcheck.py). DIMENSION — 2D or 3D

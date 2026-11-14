@@ -1,6 +1,6 @@
-# Да, Клод — project rules (studioigor)
+# Yes-Driven Development — project rules (studioigor)
 
-The game "Да, Клод" is built with the studioigor pipeline. The agent leads the user step by step
+The game "Yes-Driven Development" (working title «Да, Клод») is built with the studioigor pipeline. The agent leads the user step by step
 from idea to release; the user decides taste and direction and plays often. Run the
 pipeline work through the studioigor skill (`C:\Users\Дмитрий\.claude\skills\studioigor/SKILL.md`, phase rules in
 `C:\Users\Дмитрий\.claude\skills\studioigor/references/`).

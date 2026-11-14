@@ -1,4 +1,4 @@
-# Assets — Да, Клод
+# Assets — Yes-Driven Development
 
 <!-- Phase 5 (references/assets.md). -->
 

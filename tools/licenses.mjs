@@ -9,7 +9,7 @@ const PARTS = [
 ];
 
 const game = JSON.parse(fs.readFileSync('package.json', 'utf8'));
-let out = `Да, Клод ${game.version} — third-party licences\n\n`;
+let out = `Yes-Driven Development ${game.version} — third-party licences\n\n`;
 out += 'Music: "In the Lobby" by Umplix — CC0 1.0 (public domain), https://opengameart.org/content/in-the-lobby\n';
 out += 'Pictures: generated with an image model from the author\'s descriptions.\n';
 for (const [name, pkg, file, url] of PARTS) {

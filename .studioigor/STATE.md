@@ -1,6 +1,6 @@
-# studioigor — Да, Клод
+# studioigor — Yes-Driven Development
 
-PROJECT: Да, Клод
+PROJECT: Yes-Driven Development
 PHASE: done
 UPDATED: 2026-11-14 15:50
 

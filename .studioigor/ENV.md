@@ -1,4 +1,4 @@
-# Environment — Да, Клод
+# Environment — Yes-Driven Development
 
 <!-- Phase 4 (references/environment.md). Commands verified by a real run.
 VERIFIED is switched only by `studio.py verify`. CAPTURE writes images to
@@ -41,7 +41,7 @@ TEST: npx tsc --noEmit && npx vitest run
 BUILD: npm run build
 CAPTURE: npm run build:gym && node tools/capture.mjs --dir dist-gym --url "/?gym=hello" --out .studioigor/captures/hello --duration 5 --every 1 --inputs tools/inputs/hello.json --wait-for "window.__GAME__?.ready" --seed 7
 EDITOR: none — the code is in the repository
-DEPLOY: python tools/publish.py — собирает релиз и отправляет `dist/` веткой gh-pages в origin (GitHub Pages: https://troyan-dy.github.io/clicker-game/); только по слову пользователя
+DEPLOY: python tools/publish.py — собирает релиз и отправляет `dist/` веткой gh-pages в origin (GitHub Pages: https://troyan-dy.github.io/yes-driven-development/); только по слову пользователя
 
 ## Pitfalls
 - Windows: скрипты студии запускать с `PYTHONIOENCODING=utf-8 PYTHONUTF8=1`; `refs.py` — ещё и с `PYTHONPATH=.studioigor/tools/pyshim` (заглушка fcntl)

@@ -1,4 +1,4 @@
-# Concept — Да, Клод
+# Concept — Yes-Driven Development
 
 <!-- Phase 1. Brief: one line per slot. A source tag on each slot:
 [user] the user answered · [stated] was in the original phrase ·

@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { AWARDS } from '../content/awards';
 import { CALLS } from '../content/calls';
+import { CREDITS, CREDITS_END, CREDITS_NOTES, MOTTO, TAGLINE, TITLE } from '../content/credits';
 import { LEGENDS, type Legend } from '../content/legends';
 import { NEWS } from '../content/news';
 import { PICKET } from '../content/picket';
@@ -105,6 +106,7 @@ import { applyOffline, freshMeta, NEWS_KEPT, offlineReport, packSave, unpackSave
 import { createStack, stackWorth, stepStack, takeStack } from '../systems/stack/stack';
 import type { BlueprintTag, BlueprintUi, ManagerStrip, MeterRow } from '../ui/blueprint/blueprint';
 import type { CardUi } from '../ui/card/card';
+import type { CreditsSpec, CreditsUi } from '../ui/credits/credits';
 import { plural, short } from '../ui/format';
 import {
   tasksPhrase,
@@ -183,15 +185,6 @@ const HELP = `
   <p><kbd>Tab</kbd>настройки <kbd>O</kbd>цифры <kbd>P</kbd>сохранить</p>`;
 const HELP_PAPER = `<p>ГИМ · <kbd>M</kbd>деньги <kbd>R</kbd>заново <kbd>T</kbd>замедление <kbd>Tab</kbd>настройки</p>`;
 const HELP_GAME = `<p>любая клавиша — «Да» · покупки — кликом · <kbd>Esc</kbd>меню</p>`;
-const CREDITS = [
-  'Идея и вкус — автор игры. Остальное сделал Клод, автор согласился.',
-  'Движок: Phaser 4 — Phaser Studio Inc., MIT',
-  'Шрифты: JetBrains Mono — JetBrains, OFL · Source Serif 4 — Adobe, OFL',
-  'Звук: ZzFX — Frank Force, MIT · музыка: «In the Lobby» — Umplix, CC0',
-  'Картинки нарисованы нейросетью по описаниям',
-  'Тексты лицензий — в файле LICENSES.txt рядом с игрой',
-];
-
 /**
  * The game: one conveyor of tasks seen from further and further away. With `gym` it is the same scene
  * for tuning and captures: no menu, no saving, extra keys.
@@ -205,6 +198,7 @@ export class GameScene extends Phaser.Scene {
   private readonly term: TerminalUi;
   private readonly paper: BlueprintUi;
   private readonly card: CardUi;
+  private readonly credits: CreditsUi;
   private readonly showOverlay: boolean;
   /** keep the game between visits (off in captures and tuning sessions) */
   private readonly saving: boolean;
@@ -300,6 +294,7 @@ export class GameScene extends Phaser.Scene {
     term: TerminalUi,
     paper: BlueprintUi,
     card: CardUi,
+    credits: CreditsUi,
     opts: { overlay: boolean; save: boolean; gym: boolean; menu: boolean; start: number },
   ) {
     super('game');
@@ -307,6 +302,7 @@ export class GameScene extends Phaser.Scene {
     this.term = term;
     this.paper = paper;
     this.card = card;
+    this.credits = credits;
     this.showOverlay = opts.overlay;
     this.saving = opts.save;
     this.gym = opts.gym;
@@ -352,7 +348,7 @@ export class GameScene extends Phaser.Scene {
     window.addEventListener('keydown', (e) => this.onKey(e));
     window.addEventListener('pointerdown', (e) => {
       const el = e.target as HTMLElement;
-      if (el.closest('.lil-gui') || this.card.open) return;
+      if (el.closest('.lil-gui') || this.card.open || this.cine || this.credits.rolling) return;
       const ev = el.closest<HTMLElement>('[data-ev]')?.dataset.ev;
       if (ev !== undefined) {
         this.wake();
@@ -400,6 +396,7 @@ export class GameScene extends Phaser.Scene {
       this.view.step(Math.min(deltaMs / 1000, 0.05));
       this.squares.step(Math.min(deltaMs / 1000, 0.05));
     }
+    this.credits.step(Math.min(deltaMs / 1000, 0.05));
     if (this.stage === 1) this.drawTerminal();
     else if (this.stage === 2) this.drawBlueprint();
     else this.drawHub();
@@ -531,9 +528,9 @@ export class GameScene extends Phaser.Scene {
       { label: 'Новая игра', note: 'стереть сохранение', off: title && !this.resumed },
       { label: 'Титры' },
     ];
-    const lines = title ? ['Клод работает. Вы соглашаетесь.', `Кликер про одну клавишу и очень много работ. Версия ${__VERSION__}.`] : ['Клод подождёт. Сессии — тоже: мир стоит, пока открыто меню.'];
+    const lines = title ? [MOTTO, `${TAGLINE}. Версия ${__VERSION__}.`] : ['Клод подождёт. Сессии — тоже: мир стоит, пока открыто меню.'];
     const again = (i: number): void => this.openMenu(title, i);
-    this.card.show({ head: 'claude — ~/работа/все-сразу', title: title ? 'Да, Клод' : 'Пауза', lines, options, selected, hint: 'Enter — Да · ↑↓ — выбрать' }, (i) => {
+    this.card.show({ head: 'claude — ~/работа/все-сразу', title: title ? TITLE : 'Пауза', lines, options, selected, hint: 'Enter — Да · ↑↓ — выбрать' }, (i) => {
       this.wake();
       if (i === 1) {
         this.settings.sound = !this.settings.sound;
@@ -554,7 +551,7 @@ export class GameScene extends Phaser.Scene {
         const lines = LEGENDS.map((l) => (this.meta.legends.includes(l.id) ? `<b>${l.title}</b>` : '· ещё не попадался'));
         this.openList('claude — коллекция', `Легендарные тикеты: ${this.meta.legends.length} из ${LEGENDS.length}`, lines, 0, () => again(4));
       } else if (i === 5) this.confirmNew(() => again(5));
-      else if (i === 6) this.card.show({ head: 'claude — титры', title: 'Да, Клод', lines: CREDITS, options: [{ label: 'Да' }] }, () => again(6));
+      else if (i === 6) this.credits.roll(this.creditsSpec('solo'), () => again(6));
       else this.resume();
     });
   }
@@ -578,6 +575,11 @@ export class GameScene extends Phaser.Scene {
       if (more && i === 0) this.openList(head, title, lines, page + 1, back, per);
       else back();
     });
+  }
+
+  /** The credits: after the ending they roll past the planet, from the menu — over a dark screen. */
+  private creditsSpec(place: 'side' | 'solo'): CreditsSpec {
+    return { title: TITLE, tagline: `${TAGLINE} · версия ${__VERSION__}`, blocks: CREDITS, notes: CREDITS_NOTES, end: CREDITS_END, place };
   }
 
   private openTitle(): void {
@@ -630,7 +632,7 @@ export class GameScene extends Phaser.Scene {
   /**
    * The ending after the last card (M13): the last worker left is the player. The camera is back at
    * the desk, the player walks away with a box, and the picture pulls back — the city, the state,
-   * the planet at night. The game goes on after it.
+   * the planet at night, the credits and one more word from Claude. The game goes on after it.
    */
   private epilogue(): void {
     const cfg = this.cfg;
@@ -729,16 +731,24 @@ export class GameScene extends Phaser.Scene {
       playSound('finale');
       this.time.delayedCall(2600, () => this.paper.caption(EPILOGUE.planet, 'dark'));
       this.time.delayedCall(6400, () => this.paper.caption(EPILOGUE.limit, 'dark'));
+      // 7. the credits: the planet moves aside and the names roll past it
       this.time.delayedCall(10400, () => {
         this.paper.caption('');
-        this.card.show({ head: 'claude — эпилог', title: EPILOGUE.moral, lines: EPILOGUE.lines, options: [{ label: 'Продолжить' }] }, () => {
-          this.tweens.add({ targets: [dark, earth], alpha: 0, duration: 500, onComplete: () => [dark, earth].forEach((o) => o.destroy()) });
-          this.cine = false;
-          this.paper.cut(false);
-          this.hubs.get(last)?.reveal(this.hubTopology(), 200);
-          this.paused = false;
-          this.say('after', true);
-          this.saveGame();
+        this.tweens.add({ targets: earth, x: 480, y: 540, scale: fit * 0.78, duration: 1500, ease: 'Sine.InOut' });
+        this.credits.roll(this.creditsSpec('side'), () => {
+          // 8. the scene after the credits: Claude has one more idea
+          this.tweens.add({ targets: earth, x: 960, y: 500, scale: fit * 0.92, duration: 900, ease: 'Sine.InOut' });
+          this.time.delayedCall(700, () =>
+            this.card.show({ head: 'claude — сцена после титров', title: EPILOGUE.moral, lines: EPILOGUE.lines, options: [{ label: 'Продолжить' }] }, () => {
+              this.tweens.add({ targets: [dark, earth], alpha: 0, duration: 500, onComplete: () => [dark, earth].forEach((o) => o.destroy()) });
+              this.cine = false;
+              this.paper.cut(false);
+              this.hubs.get(last)?.reveal(this.hubTopology(), 200);
+              this.paused = false;
+              this.say('after', true);
+              this.saveGame();
+            }),
+          );
         });
       });
     });
@@ -792,6 +802,8 @@ export class GameScene extends Phaser.Scene {
 
   private onKey(e: KeyboardEvent): void {
     if (this.card.key(e)) return;
+    // the ending and the credits: the world stands still, a key only hurries the credits
+    if (this.cine || this.credits.rolling) return;
     if (e.repeat) return;
     if (e.code === 'Escape') {
       this.openMenu(false);

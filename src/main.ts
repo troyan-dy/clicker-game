@@ -17,6 +17,7 @@ import { createLookdevUi } from './gyms/lookdev/lookdevUi';
 import { LookdevScene } from './gyms/lookdev/LookdevScene';
 import { createBlueprint } from './ui/blueprint/blueprint';
 import { createCard } from './ui/card/card';
+import { createCredits } from './ui/credits/credits';
 import { createHud } from './ui/hud';
 import { mountUiScale } from './ui/scale';
 import { createTerminal } from './ui/terminal/terminal';
@@ -48,13 +49,15 @@ function pickScene(): Phaser.Scene {
     mountUiScale(stage, top);
     const over = top.firstElementChild as HTMLElement;
     const paper = createBlueprint(layer, over);
+    // the credits roll above the picture and below the dialogs
+    const credits = createCredits(over);
     const card = createCard(over, () => playSound('ui'));
     // a gym saves and shows the menu only when asked; a capture never touches the player's save
     const save = !args.capture && (gym ? args.save : true);
     const menu = args.menu || (!gym && !args.capture);
     // a tuning session may open on a later screen: ?gym=agree&state=city|gov|planet|street|finale
     const start = gym ? ({ city: 3, gov: 4, planet: 5, street: 6, finale: 7 }[args.state] ?? 0) : 0;
-    return new GameScene(rng, createTerminal(layer), paper, card, { overlay: args.debug, save, gym, menu, start });
+    return new GameScene(rng, createTerminal(layer), paper, card, credits, { overlay: args.debug, save, gym, menu, start });
   }
 }
 const hello = __TOOLS__ && args.gym === 'hello';
