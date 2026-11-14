@@ -185,7 +185,6 @@
 .bl-ask b {
   color: #7cc68d;
   font-weight: 700;
-  white-space: nowrap;
 }
 .bl-ask u {
   display: block;
@@ -369,7 +368,7 @@
 }
 .bl-extra {
   margin-top: 14px;
-  font: 400 16px/1.5 'JetBrains Mono', monospace;
+  font: 400 15px/1.5 'JetBrains Mono', monospace;
   color: var(--dim);
 }
 .bl-extra p {

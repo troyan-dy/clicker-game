@@ -5,6 +5,9 @@ import { CORAL } from './squares';
 type Pt = readonly [number, number];
 
 const INK = 0x262624;
+const RULE = 0xc9c5b8;
+/** the part of the screen a map may draw on: left of the shop, between the header and the news */
+const FIELD = { x0: 16, x1: 1324, y0: 284, y1: 1012 };
 const GHOST = 0.2; // what is not bought yet is a pale outline
 const OFFER = 0.55; // …and the employers that hire right now stand out of it
 const DOT_SPEED = 560; // px per second along a connector
@@ -63,6 +66,7 @@ export class HubView {
       const img = scene.add.image(b.x, b.y, `node_${b.key}`).setOrigin(0.5, 1).setAlpha(b.alpha);
       this.root.add(img.setScale(b.h / img.height));
     }
+    if (layout.streets) this.root.add(this.streets(layout.streets));
     this.root.add(this.lines);
 
     // far rows first, so that nearer nodes overlap them
@@ -155,6 +159,25 @@ export class HubView {
       const f = d.dist / len;
       d.rect.setPosition(from[0] + (to[0] - from[0]) * f, from[1] + (to[1] - from[1]) * f);
     }
+  }
+
+  /** A city plan: two families of pale lines at the isometric angle, `gap` px apart. */
+  private streets(gap: number): Phaser.GameObjects.Graphics {
+    const g = this.scene.add.graphics();
+    g.lineStyle(2, RULE, 0.9);
+    const { x0, x1, y0, y1 } = FIELD;
+    for (const slope of [0.5, -0.5]) {
+      // y = slope · x + c; every line is cut to the field
+      for (let c = -1200; c <= 2200; c += gap) {
+        const xa = Math.max(x0, Math.min(x1, (slope > 0 ? y0 - c : y1 - c) / slope));
+        const xb = Math.max(x0, Math.min(x1, (slope > 0 ? y1 - c : y0 - c) / slope));
+        const ya = slope * xa + c;
+        const yb = slope * xb + c;
+        if (xb - xa < 4 || ya < y0 - 1 || ya > y1 + 1 || yb < y0 - 1 || yb > y1 + 1) continue;
+        g.lineBetween(xa, ya, xb, yb);
+      }
+    }
+    return g;
   }
 
   private fit(img: Phaser.GameObjects.Image, h: number): number {

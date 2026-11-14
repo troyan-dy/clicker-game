@@ -19,6 +19,8 @@ export interface HubLayout {
   maxWidth: number;
   /** a pale picture behind everything */
   backdrop?: { key: string; x: number; y: number; h: number; alpha: number };
+  /** a pale isometric grid of streets behind everything: the distance between them, px */
+  streets?: number;
 }
 
 const MID = { x: 670, y: 700 };
@@ -49,6 +51,7 @@ export const HUBS: Record<number, HubLayout> = {
       dc: { key: 'datacenter', ...ABOVE, h: 125, ids: ['dc'], above: true },
     },
     maxWidth: 185,
+    streets: 190,
   },
   // the state: the city is a block in the middle, ministries stand in a ring around it
   4: {
@@ -69,6 +72,7 @@ export const HUBS: Record<number, HubLayout> = {
       campus: { key: 'datacenter', ...ABOVE, h: 125, ids: ['campus'], above: true },
     },
     maxWidth: 185,
+    backdrop: { key: 'back_state', x: 670, y: 1010, h: 740, alpha: 0.4 },
   },
   // the planet: the country is an island in the middle of a globe
   5: {
