@@ -1,0 +1,173 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <title>look-dev: башни с капсулами</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        background: #1f1e1d;
+      }
+      canvas {
+        display: block;
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="c" width="1920" height="1080"></canvas>
+    <script>
+      // Look-dev of the last screen: dark towers studded with red capsules, lightning between them.
+      // Everything is drawn by code, so the same routine can go into the game and grow with the purchases.
+      const c = document.getElementById('c');
+      const g = c.getContext('2d');
+      const BG = '#1f1e1d';
+      const BODY = '#2a2927';
+      const EDGE = 'rgba(240,238,230,0.55)';
+      const DIM = 'rgba(240,238,230,0.18)';
+      const POD = '#e0603c';
+      const CORE = '#f3a070';
+      const BOLT = '#cfe0f4';
+      let seed = 7;
+      const rnd = () => ((seed = (seed * 1664525 + 1013904223) >>> 0) / 4294967296);
+
+      g.fillStyle = BG;
+      g.fillRect(0, 0, 1920, 1080);
+      // the faint dot grid of the drafting paper, in the dark
+      g.fillStyle = 'rgba(240,238,230,0.07)';
+      for (let y = 16; y < 1080; y += 32) for (let x = 16; x < 1340; x += 32) g.fillRect(x, y, 2, 2);
+
+      /** a capsule: a bud with a pointed top; `on` — somebody sleeps in it */
+      function pod(x, y, s, on) {
+        g.beginPath();
+        g.moveTo(x, y - 9 * s);
+        g.bezierCurveTo(x + 5.5 * s, y - 4 * s, x + 5 * s, y + 4 * s, x, y + 7 * s);
+        g.bezierCurveTo(x - 5 * s, y + 4 * s, x - 5.5 * s, y - 4 * s, x, y - 9 * s);
+        if (on) {
+          g.fillStyle = POD;
+          g.fill();
+          g.fillStyle = CORE;
+          g.beginPath();
+          g.ellipse(x, y + 0.5 * s, 1.7 * s, 3 * s, 0, 0, Math.PI * 2);
+          g.fill();
+        } else {
+          g.strokeStyle = DIM;
+          g.lineWidth = 1;
+          g.stroke();
+        }
+      }
+
+      /** a tower: a dark cylinder, rings of capsules on its front, cables down the side */
+      function tower(x, base, rx, h, rings, filled, s = 1) {
+        const ry = rx * 0.3;
+        // body
+        g.fillStyle = BODY;
+        g.beginPath();
+        g.moveTo(x - rx, base);
+        g.lineTo(x - rx, base - h);
+        g.ellipse(x, base - h, rx, ry, 0, Math.PI, 0);
+        g.lineTo(x + rx, base);
+        g.ellipse(x, base, rx, ry, 0, 0, Math.PI);
+        g.fill();
+        g.strokeStyle = EDGE;
+        g.lineWidth = 1.5;
+        g.stroke();
+        // the top
+        g.beginPath();
+        g.ellipse(x, base - h, rx, ry, 0, 0, Math.PI * 2);
+        g.fillStyle = '#34322f';
+        g.fill();
+        g.stroke();
+        // mast
+        g.beginPath();
+        g.moveTo(x, base - h);
+        g.lineTo(x, base - h - 46 * s);
+        g.stroke();
+        // rings of capsules, from the ground up
+        const gap = h / (rings + 0.6);
+        let n = 0;
+        const total = rings * Math.floor((rx * 2.6) / (13 * s));
+        for (let r = 0; r < rings; r++) {
+          const cy = base - gap * (r + 0.7);
+          g.strokeStyle = DIM;
+          g.lineWidth = 1;
+          g.beginPath();
+          g.ellipse(x, cy + 8 * s, rx, ry, 0, 0.08, Math.PI - 0.08);
+          g.stroke();
+          const count = Math.floor((rx * 2.6) / (13 * s));
+          for (let i = 0; i < count; i++) {
+            const a = 0.12 + ((Math.PI - 0.24) * (i + 0.5)) / count;
+            const px = x + Math.cos(a) * rx * 0.98;
+            const py = cy + Math.sin(a) * ry;
+            // the ones at the sides are seen edge-on: narrower
+            pod(px, py, s * (0.55 + 0.45 * Math.sin(a)), n < filled * total);
+            n++;
+          }
+        }
+      }
+
+      /** lightning between two points: a jagged line with a branch */
+      function bolt(x0, y0, x1, y1, branch = true) {
+        g.strokeStyle = BOLT;
+        g.lineWidth = 1.6;
+        g.beginPath();
+        g.moveTo(x0, y0);
+        const steps = 9;
+        let bx = 0;
+        let by = 0;
+        for (let i = 1; i <= steps; i++) {
+          const t = i / steps;
+          const x = x0 + (x1 - x0) * t + (i < steps ? (rnd() - 0.5) * 46 : 0);
+          const y = y0 + (y1 - y0) * t + (i < steps ? (rnd() - 0.5) * 34 : 0);
+          g.lineTo(x, y);
+          if (i === 4) {
+            bx = x;
+            by = y;
+          }
+        }
+        g.stroke();
+        if (branch) {
+          g.lineWidth = 1;
+          g.beginPath();
+          g.moveTo(bx, by);
+          g.lineTo(bx + 30 + rnd() * 30, by + 40 + rnd() * 20);
+          g.lineTo(bx + 20 + rnd() * 30, by + 80 + rnd() * 30);
+          g.stroke();
+        }
+      }
+
+      // far towers first: smaller, paler
+      g.globalAlpha = 0.45;
+      tower(250, 610, 70, 330, 9, 1, 0.55);
+      tower(1120, 590, 78, 360, 10, 1, 0.6);
+      g.globalAlpha = 0.7;
+      tower(470, 760, 105, 470, 11, 1, 0.8);
+      tower(930, 740, 100, 440, 10, 0.7, 0.8);
+      g.globalAlpha = 1;
+      bolt(250, 280 - 25, 470, 290 - 37);
+      bolt(930, 300 - 37, 1120, 230 - 28, false);
+      // the near tower: the one being filled now
+      tower(690, 960, 150, 640, 13, 0.62, 1.1);
+      bolt(470, 290 - 37, 690, 320 - 50);
+      bolt(690, 320 - 50, 930, 300 - 37);
+
+      // a queue of people at the foot (placeholders for the sprites in bathrobes)
+      g.fillStyle = '#bcd1ca';
+      for (let i = 0; i < 16; i++) {
+        const x = 60 + i * 30;
+        const y = 1010 - i * 1.5;
+        g.fillRect(x, y - 30, 12, 26);
+        g.beginPath();
+        g.arc(x + 6, y - 36, 6, 0, Math.PI * 2);
+        g.fill();
+      }
+      // the shop panel
+      g.strokeStyle = '#3d3a36';
+      g.lineWidth = 1;
+      g.beginPath();
+      g.moveTo(1340, 0);
+      g.lineTo(1340, 1080);
+      g.stroke();
+    </script>
+  </body>
+</html>
