@@ -7,10 +7,11 @@ import managerData from '../src/data/balance/managers.json';
 import planData from '../src/data/balance/plans.json';
 import scaleData from '../src/data/balance/scales.json';
 import sourceData from '../src/data/balance/sources.json';
-import squadData from '../src/data/balance/squads.json';
 import tuningData from '../src/data/tuning/pipeline.json';
 import type { Plan } from '../src/systems/plan/plan';
 import {
+  bribeCost,
+  buyBribe,
   buyFarm,
   buyGrade,
   buyLine,
@@ -18,7 +19,6 @@ import {
   buyNoAsk,
   buyPlan,
   buySource,
-  buySquad,
   buySubagent,
   claudeRate,
   createPipe,
@@ -27,12 +27,12 @@ import {
   inflowOf,
   jobOf,
   lineCost,
+  locked,
   payOf,
   pressPipe,
   screenOf,
   sessionsOf,
   sourceCost,
-  squadsOf,
   stepPipe,
   subagentPrice,
   subagentRate,
@@ -51,7 +51,6 @@ const base: PipeConfig = {
   farms: farmData as Farm[],
   scales: scaleData,
   managers: managerData,
-  squads: squadData,
   lines: lineData as Line[],
   auto: autoData,
 };
@@ -118,12 +117,13 @@ function play(seconds: number, cfg: PipeConfig = base): { t: number; what: strin
         const best = lines.sort((a, b) => lineCost(s, cfg, a) / a.rate - lineCost(s, cfg, b) / b.rate)[0];
         if (buyLine(s, cfg, best.id)) note(best.name);
       } else {
-        // not enough tasks: the cheapest inflow per dollar; where squads do the work, one squad per employer
+        // not enough tasks: the cheapest inflow per dollar; where robot dogs do the work — a bribe first, one pack at a time
+        const cost = (x: Source): number => (locked(s, x) ? bribeCost(s, cfg, x) : sourceCost(s, cfg, x));
         const best = cfg.sources
           .filter((x) => !x.made && (s.owned[x.id] ?? 0) < x.max && !jobOf(s, x.id) && (screen >= 3 ? x.screen === screen : x.screen <= screen))
-          .sort((a, b) => sourceCost(s, cfg, a) / a.inflow - sourceCost(s, cfg, b) / b.inflow)[0];
-        if (best?.work && s.jobs.length >= squadsOf(s, cfg)) {
-          if (buySquad(s, cfg)) note('отряд робособак');
+          .sort((a, b) => cost(a) / a.inflow - cost(b) / b.inflow)[0];
+        if (best && locked(s, best)) {
+          if (buyBribe(s, cfg, best.id)) note(`взятка: ${best.name}`);
         } else if (best && buySource(s, cfg, best.id)) note(best.name);
       }
     } else if (screen >= 3) {

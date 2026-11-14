@@ -21,7 +21,6 @@ import managerData from '../data/balance/managers.json';
 import planData from '../data/balance/plans.json';
 import scaleData from '../data/balance/scales.json';
 import sourceData from '../data/balance/sources.json';
-import squadData from '../data/balance/squads.json';
 import { BP, deskScreen } from '../data/layout/blueprint';
 import { HUBS } from '../data/layout/hubs';
 import eventsData from '../data/tuning/events.json';
@@ -42,6 +41,8 @@ import {
   aimAt,
   backlogCap,
   bonus,
+  bribeCost,
+  buyBribe,
   buyFarm,
   buyGrade,
   buyLine,
@@ -50,7 +51,6 @@ import {
   buyPlan,
   buyScale,
   buySource,
-  buySquad,
   buySubagent,
   claudeRate,
   createPipe,
@@ -61,6 +61,7 @@ import {
   inflowOf,
   jobOf,
   lineCost,
+  locked,
   ordersOf,
   outputOf,
   payOf,
@@ -74,8 +75,6 @@ import {
   sourceCost,
   slumpOf,
   sourceInflow,
-  squadPrice,
-  squadsOf,
   stepPipe,
   subagentPrice,
   subagentRate,
@@ -121,7 +120,7 @@ const FEED: FeedContent = { news: NEWS, quips: QUIPS };
 /** approvals after which Claude says something nice about the player's judgement */
 const YES_MILESTONES = [3, 15, 40, 90, 160, 260];
 /** semitones of the purchase sound by what was bought: work is the base note, capacity is lower, promotions are higher */
-const BUY_PITCH: Record<string, number> = { src: 0, sub: 2, squad: 2, farm: -5, line: -5, plan: 4, noask: 5, grade: 7, scale: -12 };
+const BUY_PITCH: Record<string, number> = { src: 0, sub: 2, bribe: -3, farm: -5, line: -5, plan: 4, noask: 5, grade: 7, scale: -12 };
 /** the bodies of the factory in words: «сюда идут андроиды», «ждёт андроидов» */
 const ROBOT_WORDS: Record<RobotKind, { many: string; of: string }> = {
   android: { many: 'андроиды', of: 'андроидов' },
@@ -205,7 +204,6 @@ export class GameScene extends Phaser.Scene {
     farms: farmData as Farm[],
     scales: scaleData,
     managers: managerData,
-    squads: squadData,
     lines: lineData as Line[],
     auto: { noAsk: { ...autoData.noAsk }, subagent: { ...autoData.subagent } },
   };
@@ -725,8 +723,10 @@ export class GameScene extends Phaser.Scene {
     } else if (what.startsWith('line:')) {
       const line = cfg.lines.find((x) => x.id === what.slice(5));
       ok = !!line && line.screen === this.stage && buyLine(s, cfg, line.id);
-    } else if (what === 'squad') ok = this.stage === cfg.squads.screen && buySquad(s, cfg);
-    else if (what === 'plan') ok = buyPlan(s, cfg);
+    } else if (what.startsWith('bribe:')) {
+      const src = cfg.sources.find((x) => x.id === what.slice(6));
+      ok = !!src && this.onSale(src) && buyBribe(s, cfg, src.id);
+    } else if (what === 'plan') ok = buyPlan(s, cfg);
     else if (what === 'noask') ok = this.stage === 1 && buyNoAsk(s, cfg);
     else if (what === 'sub') ok = this.stage === 2 && buySubagent(s, cfg);
     else if (what === 'grade') ok = this.stage >= 2 && buyGrade(s, cfg);
@@ -739,9 +739,8 @@ export class GameScene extends Phaser.Scene {
     if (what.startsWith('src:')) {
       const src = cfg.sources.find((x) => x.id === what.slice(4))!;
       if (src.work) {
-        // the unit is only paid for: a squad of robot dogs runs there, the rest happens when it is done
-        this.hubs.get(this.stage)?.arrive(src.id, 'robodog', 2);
-        if (!this.feed.said.squads) this.say('squads', true);
+        // the pack of robot dogs is bought and runs there: the rest happens when it has taken the jobs
+        this.hubs.get(this.stage)?.arrive(src.id, 'robodog', 3);
       } else this.taken(src);
     }
     logEvent(`buy_${what}`);
@@ -762,6 +761,7 @@ export class GameScene extends Phaser.Scene {
       const farm = this.cfg.farms.find((x) => x.id === what.slice(5));
       this.say(surged ? 'surge' : farm?.share ? 'quota' : 'buy:farm');
     } else if (what.startsWith('line:')) this.say(surged ? 'surge' : 'buy:body');
+    else if (what.startsWith('bribe:')) this.say('buy:bribe');
     else this.say(`buy:${what}`, what !== 'sub');
     // the lines of the managers go by screen: the second one is the director of the city
   }
@@ -776,10 +776,7 @@ export class GameScene extends Phaser.Scene {
   private unitDone(id: string): void {
     const src = this.cfg.sources.find((x) => x.id === id);
     if (!src) return;
-    if (src.work) {
-      playSound('buy', 7);
-      if (this.stage === src.screen) this.hubs.get(this.stage)!.back(id);
-    }
+    if (src.work) playSound('buy', 7);
     this.taken(src);
     this.saveGame();
   }
@@ -846,6 +843,11 @@ export class GameScene extends Phaser.Scene {
     hub.sync(this.hubTopology());
     if (dive) hub.emerge(350, 900);
     else hub.show(450);
+    // a screen where robot dogs work instead of people: Claude says how it goes once he has said his word on the purchase
+    if (this.cfg.sources.some((x) => x.screen === next && x.bribe) && !this.feed.said.squads) {
+      this.feed.said.squads = 1;
+      this.toTell.push(QUIPS.squads[0]);
+    }
     playSound('scale');
     logEvent(`scale_${next}`);
   }
@@ -1280,7 +1282,7 @@ export class GameScene extends Phaser.Scene {
     const s = this.state;
     const floors: Record<string, number> = {};
     const live: Record<string, boolean> = {};
-    const squads: Record<string, boolean> = {};
+    const dogs: Record<string, number> = {};
     let taken = 0;
     let total = 0;
     for (const src of this.cfg.sources) {
@@ -1289,7 +1291,8 @@ export class GameScene extends Phaser.Scene {
       // a squad at work colours its unit in as it goes; robots take a `made` employer little by little
       const job = jobOf(s, src.id);
       floors[src.id] = (owned + (job ? 1 - job.left / job.total : 0)) / src.max;
-      if (job) squads[src.id] = true;
+      // the robot dogs that took the jobs stay at the door, and so does the pack that is at work
+      if (src.work) dogs[src.id] = Math.min(3, owned) + (job ? 1 : 0);
       if (job || (src.made && owned < src.max)) live[src.id] = true;
       taken += owned;
       total += src.max;
@@ -1297,7 +1300,7 @@ export class GameScene extends Phaser.Scene {
     // the park fills up as the work is taken — while the allowance is paid; without it the people stand with placards
     const slots = HUBS[this.stage]?.park?.slots.length ?? 0;
     const rest = s.allowance && total ? Math.ceil((slots * taken) / total) : 0;
-    return { floors, farms: s.farms, picket: !s.allowance, rest, live, squads };
+    return { floors, farms: s.farms, picket: !s.allowance, rest, live, dogs };
   }
 
   /** the employers of a big screen with something left to take, the cheapest next unit first */
@@ -1305,7 +1308,12 @@ export class GameScene extends Phaser.Scene {
     const s = this.state;
     return this.cfg.sources
       .filter((src) => src.screen === this.stage && !src.made && !jobOf(s, src.id) && (s.owned[src.id] ?? 0) < src.max)
-      .sort((a, b) => sourceCost(s, this.cfg, a) - sourceCost(s, this.cfg, b));
+      .sort((a, b) => this.nextCost(a) - this.nextCost(b));
+  }
+
+  /** what the next step at an employer costs: the bribe that opens it, or its next unit */
+  private nextCost(src: Source): number {
+    return locked(this.state, src) ? bribeCost(this.state, this.cfg, src) : sourceCost(this.state, this.cfg, src);
   }
 
   /** the shop lists the cheapest next units, `limit` of them; the map sells every building */
@@ -1314,33 +1322,21 @@ export class GameScene extends Phaser.Scene {
     const left = this.offer();
     const t = HUB_TEXT[this.stage];
     if (!left.length) {
-      // the last units are on their way: the squads are still out
-      if (s.jobs.length) return [{ buy: '', title: 'Отряды заканчивают работу', sub: 'последние единицы уже оплачены', count: '', price: '', state: 'owned' }];
+      // the last units are on their way: the packs of robot dogs are still at work
+      if (s.jobs.length) return [{ buy: '', title: 'Стаи заканчивают работу', sub: 'последние рабочие места уже оплачены', count: '', price: '', state: 'owned' }];
       return [{ buy: '', title: t.doneTitle, sub: t.doneSub, count: '', price: '', state: 'owned' }];
     }
-    const idle = s.jobs.length < squadsOf(s, this.cfg);
     return left.slice(0, limit).map((src) => {
       const owned = s.owned[src.id] ?? 0;
       // what the whole employer gives is the reason to choose it: the note says it on every unit
       const perk = src.perk ? ` · ★ ${src.perk.text}` : '';
+      // a bribe opens the door before the first pack of robot dogs
+      if (locked(s, src)) return this.row(`Взятка: ${src.tag}`, `пустить робособак${perk}`, '', `bribe:${src.id}`, bribeCost(s, this.cfg, src));
       const cost = sourceCost(s, this.cfg, src);
       // a long name does not fit next to the price: the short one from the map stands in
       const title = src.name.length + short(cost).length > 29 ? src.tag : src.name;
-      const row = this.row(title, `+${perSecond(src.inflow)} · ${owned + 1} из ${src.max}${perk}`, '', `src:${src.id}`, cost);
-      // where squads do the work a unit needs a free one
-      return src.work && !idle ? { ...row, state: 'poor' as const } : row;
+      return this.row(title, `+${perSecond(src.inflow)} · ${src.work ? 'стая ' : ''}${owned + 1} из ${src.max}${perk}`, '', `src:${src.id}`, cost);
     });
-  }
-
-  /** the squads of robot dogs: how many are free, and one more for sale */
-  private squadRow(): ShopRow {
-    const s = this.state;
-    const q = this.cfg.squads;
-    const all = squadsOf(s, this.cfg);
-    const free = all - s.jobs.length;
-    const sub = `свободно ${free} из ${all} · ${q.note}`;
-    if (all >= q.max) return { buy: '', title: q.name, sub: `свободно ${free} из ${all}`, count: 'максимум', price: '', state: 'owned' };
-    return this.row(q.name, sub, `×${all}`, 'squad', squadPrice(s, this.cfg));
   }
 
   /** the lines of the factory: robots a second for money */
@@ -1450,7 +1446,8 @@ export class GameScene extends Phaser.Scene {
 
   private hubShelves(neck: Neck, taken: number, total: number): ShopShelf[] {
     const t = HUB_TEXT[this.stage];
-    const upgrades: ShopShelf = { title: 'УЛУЧШЕНИЯ · быстрее и дороже', hot: false, bonus: this.off('grades', 'повышения: скидка'), rows: [...this.planRows(false), ...this.gradeRows()] };
+    const cheaper = this.off('grades', 'повышения: скидка');
+    const upgrades: ShopShelf = { title: cheaper ? 'УЛУЧШЕНИЯ' : 'УЛУЧШЕНИЯ · быстрее и дороже', hot: false, bonus: cheaper, rows: [...this.planRows(false), ...this.gradeRows()] };
     const rest: ShopShelf[] = [{ title: t.farms, hot: neck === 'claude', bonus: this.off('farms'), rows: this.farmRows() }, upgrades, ...this.scaleShelf()];
     const employers = `${t.employers} · ${taken} из ${total}`;
     // the street: the trades are taken over by robots — the shop sells the lines that make them
@@ -1460,10 +1457,6 @@ export class GameScene extends Phaser.Scene {
         { title: 'ЗАВОД · больше роботов', hot: neck === 'tasks' && taken < total, bonus: this.off('farms'), rows: this.lineRows() },
         ...rest,
       ];
-    }
-    // the planet: units are taken by squads of robot dogs — the squads are sold with the units
-    if (this.cfg.squads.screen === this.stage) {
-      return [{ title: employers, hot: neck === 'tasks' && taken < total, bonus: this.off('sources'), rows: [this.squadRow(), ...this.employerRows(2)] }, ...rest];
     }
     return [{ title: employers, hot: neck === 'tasks' && taken < total, bonus: this.off('sources'), rows: this.employerRows(3) }, ...rest];
   }
@@ -1639,14 +1632,12 @@ export class GameScene extends Phaser.Scene {
 
     const employers = cfg.sources.filter((src) => src.screen === this.stage);
     const factory = cfg.lines.some((l) => l.screen === this.stage);
-    const squadsHere = cfg.squads.screen === this.stage;
-    const idle = s.jobs.length < squadsOf(s, cfg);
-    // the middle: on the street it is the factory and what it makes, on the planet — the squads that are free
+    // the middle: on the street it is the factory and what it makes; where robot dogs work — the packs on their way
     let home = t.home;
     if (factory) {
       const made = ROBOT_KINDS.map((k) => ({ k, n: outputOf(s, cfg, k) })).filter((x) => x.n > 0);
       if (made.length) home += `<br><b>${made.map((x) => `${short(x.n)} ${ROBOT_WORDS[x.k].of}/с`).join('<br>')}</b>`;
-    } else if (squadsHere) home += `<br><b>отрядов свободно: ${squadsOf(s, cfg) - s.jobs.length} из ${squadsOf(s, cfg)}</b>`;
+    } else if (s.jobs.length) home += `<br><b>стай в пути: ${s.jobs.length}</b>`;
     const tags: BlueprintTag[] = [{ x: layout.home.x, y: layout.home.y + 4, mid: true, small: true, html: home }];
     // the map sells itself: a caption and the building above it buy the next unit of that employer
     let taken = 0;
@@ -1682,12 +1673,19 @@ export class GameScene extends Phaser.Scene {
       const head = owned ? `${src.tag} · ${owned}/${src.max}` : src.tag;
       const job = jobOf(s, src.id);
       if (job) {
-        tags.push({ x: lot.x, y: lot.y + 4, mid: true, small: true, html: `${head}<br><b>отряд работает · ${Math.ceil(job.left)} с</b>${perk}` });
+        tags.push({ x: lot.x, y: lot.y + 4, mid: true, small: true, html: `${head}<br><b>собаки занимают места · ${Math.ceil(job.left)} с</b>${perk}` });
+        continue;
+      }
+      if (locked(s, src)) {
+        // robot dogs are not let in yet: the bribe comes first
+        const bribe = bribeCost(s, cfg, src);
+        tags.push({ x: lot.x, y: lot.y + 4, mid: true, small: true, buy: `bribe:${src.id}`, can: s.money >= bribe, html: `${head}<br><b>взятка · $${short(bribe)}</b>${perk}` });
         continue;
       }
       const price = sourceCost(s, cfg, src);
-      const can = s.money >= price && (!src.work || idle);
-      tags.push({ x: lot.x, y: lot.y + 4, mid: true, small: true, buy: `src:${src.id}`, can, html: `${head}<br><b>${owned ? 'ещё ' : ''}${t.floor[0]} · $${short(price)}</b>${perk}` });
+      // where robot dogs do the work, the unit on sale is a pack of them
+      const unit = src.work ? (owned ? 'стая' : 'стая робособак') : t.floor[0];
+      tags.push({ x: lot.x, y: lot.y + 4, mid: true, small: true, buy: `src:${src.id}`, can: s.money >= price, html: `${head}<br><b>${owned ? 'ещё ' : ''}${unit} · $${short(price)}</b>${perk}` });
     }
     const park = layout.park;
     if (park) tags.push({ x: park.label.x, y: park.label.y, mid: true, small: true, html: s.allowance ? 'парк · свободные люди отдыхают' : 'парк пуст · все на пикете' });

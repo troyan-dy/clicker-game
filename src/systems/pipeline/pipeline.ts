@@ -2,7 +2,7 @@
  * The core loop as a conveyor of tasks (M01 «Согласие», M02 sources, M03 plan, M05 «не спрашивай» and subagents,
  * M15 promotions, M16–M18 the scales — city, state, planet: employers taken unit by unit, farms as packs of sessions,
  * M23 perks of the employers taken whole, M24 the people left without work and the price of a task that
- * falls with unemployment, M25 the street: a factory makes robots that take the jobs, M26 squads of robot dogs):
+ * falls with unemployment, M25 the street: a factory makes robots that take the jobs, M26 packs of robot dogs let in by a bribe):
  *
  *   sources ──► backlog ──► Claude (plan rate) ──► waiting for «Да» ──► $ per task
  *                  └──────► subagents: their own sessions, no «Да» needed ──► $
@@ -66,8 +66,10 @@ export interface Source {
   staff?: number;
   /** what the employer gives once every unit is bought */
   perk?: Perk;
-  /** seconds a squad of robot dogs needs to take one unit: the unit is not bought at once (M26) */
+  /** seconds a pack of robot dogs needs to take the jobs of one unit: the pack is bought at once, the unit is taken later (M26) */
   work?: number;
+  /** the price of the one-off bribe that lets the robot dogs in: no pack can be sent before it is paid (M26) */
+  bribe?: number;
   /** the units are not bought at all: robots of this kind from the factory take the jobs one by one (M25) */
   made?: RobotKind;
 }
@@ -101,20 +103,7 @@ export interface Farm {
   share?: number;
 }
 
-/** Squads of robot dogs (M26): a unit of an employer with `work` is taken by a free squad, and that takes time. */
-export interface Squads {
-  /** the screen they are sold on */
-  screen: number;
-  name: string;
-  note: string;
-  price: number;
-  growth: number;
-  /** squads the player has without buying any */
-  start: number;
-  max: number;
-}
-
-/** A squad at work: the unit of the employer `id` is taken when `left` runs out. */
+/** A pack of robot dogs on its way to the jobs of the employer `id` (M26): the unit is taken when `left` runs out. */
 export interface Job {
   id: string;
   left: number;
@@ -199,7 +188,6 @@ export interface PipeConfig {
   /** in the order they are bought: the city, the state, the planet */
   scales: readonly Scale[];
   managers: readonly Manager[];
-  squads: Squads;
   lines: readonly Line[];
   auto: AutoConfig;
 }
@@ -232,9 +220,9 @@ export interface PipeState {
   allowance: boolean;
   /** 0..1: how much of their orders the people place now */
   orders: number;
-  /** squads of robot dogs bought on top of the ones given */
-  squads: number;
-  /** squads at work */
+  /** employers whose bribe is paid: robot dogs may work there instead of people */
+  bribed: Record<string, boolean>;
+  /** packs of robot dogs at work */
   jobs: Job[];
   /** production lines owned per line id */
   lines: Record<string, number>;
@@ -272,7 +260,7 @@ export function createPipe(cfg: PipeConfig): PipeState {
     limited: 0,
     allowance: false,
     orders: 0,
-    squads: 0,
+    bribed: {},
     jobs: [],
     lines: {},
     aim: {},
@@ -439,18 +427,19 @@ export function payOf(s: PipeState, cfg: PipeConfig): number {
   return base * (1 - slumpOf(s, cfg)) * (s.allowance ? 1 - cfg.tuning.allowance : 1);
 }
 
-/** squads of robot dogs the player has */
-export function squadsOf(s: PipeState, cfg: PipeConfig): number {
-  return cfg.squads.start + s.squads;
-}
-
-/** the squad at work at an employer, if there is one */
+/** the pack of robot dogs at work at an employer, if there is one */
 export function jobOf(s: PipeState, id: string): Job | undefined {
   return s.jobs.find((j) => j.id === id);
 }
 
-export function squadPrice(s: PipeState, cfg: PipeConfig): number {
-  return Math.round(cfg.squads.price * cfg.squads.growth ** s.squads);
+/** an employer that takes a bribe before robot dogs may work there, and has not been paid yet */
+export function locked(s: PipeState, src: Source): boolean {
+  return !!src.bribe && !s.bribed[src.id];
+}
+
+/** what the bribe of an employer costs now: the perks included */
+export function bribeCost(s: PipeState, cfg: PipeConfig, src: Source): number {
+  return Math.round((src.bribe ?? 0) * discount(s, cfg, 'sources'));
 }
 
 /** robots of a kind the factory makes every second */
@@ -500,7 +489,7 @@ export function stepPipe(
     if (l.surge && m > 1) s.surge[l.id] = 1 + (m - 1) * 0.5 ** ((dt * calm) / l.surge.halfLife);
   }
 
-  // squads at work: the unit is taken when the time is up
+  // packs of robot dogs at work: the unit is taken when the time is up
   for (let i = s.jobs.length - 1; i >= 0; i--) {
     const job = s.jobs[i];
     job.left -= dt;
@@ -622,17 +611,18 @@ export function buySource(s: PipeState, cfg: PipeConfig, id: string): boolean {
     s.owned[id] = owned + 1;
     return true;
   }
-  // a free squad goes there: the unit is paid for now and taken when the squad is done
-  if (jobOf(s, id) || s.jobs.length >= squadsOf(s, cfg) || !spend(s, sourceCost(s, cfg, src))) return false;
+  // a pack of robot dogs is bought and runs there: the unit is taken when the pack has taken the jobs; one pack at a time
+  if (locked(s, src) || jobOf(s, id) || !spend(s, sourceCost(s, cfg, src))) return false;
   const total = src.work / (1 + bonus(s, cfg, 'squads'));
   s.jobs.push({ id, left: total, total });
   return true;
 }
 
-/** One more squad of robot dogs: one more unit can be taken at the same time. */
-export function buySquad(s: PipeState, cfg: PipeConfig): boolean {
-  if (squadsOf(s, cfg) >= cfg.squads.max || !spend(s, squadPrice(s, cfg))) return false;
-  s.squads++;
+/** The bribe of an employer: from now on robot dogs may work there instead of people. */
+export function buyBribe(s: PipeState, cfg: PipeConfig, id: string): boolean {
+  const src = cfg.sources.find((x) => x.id === id);
+  if (!src || !locked(s, src) || !spend(s, bribeCost(s, cfg, src))) return false;
+  s.bribed[id] = true;
   return true;
 }
 

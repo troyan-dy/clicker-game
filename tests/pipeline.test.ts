@@ -8,7 +8,6 @@ import managerData from '../src/data/balance/managers.json';
 import planData from '../src/data/balance/plans.json';
 import scaleData from '../src/data/balance/scales.json';
 import sourceData from '../src/data/balance/sources.json';
-import squadData from '../src/data/balance/squads.json';
 import tuningData from '../src/data/tuning/pipeline.json';
 import { createEvents, stepEvents, takeEvent } from '../src/systems/events/events';
 import { managerPick } from '../src/systems/manager/manager';
@@ -17,6 +16,7 @@ import {
   backlogCap,
   buyFarm,
   aimAt,
+  buyBribe,
   buyGrade,
   buyLine,
   buyManager,
@@ -24,7 +24,6 @@ import {
   buyScale,
   buyPlan,
   buySource,
-  buySquad,
   buySubagent,
   claudeRate,
   createPipe,
@@ -54,7 +53,6 @@ const cfg: PipeConfig = {
   farms: farmData as Farm[],
   scales: scaleData,
   managers: managerData,
-  squads: squadData,
   lines: lineData as Line[],
   auto: autoData,
 };
@@ -324,18 +322,20 @@ describe('pipeline', () => {
     expect(payOf(s, cfg)).toBeCloseTo(full);
   });
 
-  it('test_squad_takes_a_unit_over_time_and_one_squad_does_one_job', () => {
+  it('test_bribe_lets_the_robot_dogs_in_and_a_pack_takes_a_unit_over_time', () => {
     const s = createPipe(cfg);
     s.noAsk = true;
     s.scale = 3; // the planet
     s.money = 1e15;
     const exchange = cfg.sources.find((x) => x.id === 'exchange')!;
+    expect(buySource(s, cfg, 'exchange')).toBe(false); // no bribe — no robot dogs
+    expect(buyBribe(s, cfg, 'exchange')).toBe(true);
+    expect(buyBribe(s, cfg, 'exchange')).toBe(false); // it is paid once
     expect(buySource(s, cfg, 'exchange')).toBe(true);
-    expect(s.owned.exchange).toBe(0); // paid for, not taken yet
-    expect(buySource(s, cfg, 'exchange')).toBe(false); // the squad is there already
-    expect(buySource(s, cfg, 'shipping')).toBe(false); // and there is no other squad
-    expect(buySquad(s, cfg)).toBe(true);
-    expect(buySource(s, cfg, 'shipping')).toBe(true);
+    expect(s.owned.exchange).toBe(0); // the pack is on its way: nothing is taken yet
+    expect(buySource(s, cfg, 'exchange')).toBe(false); // one pack at a time
+    expect(buyBribe(s, cfg, 'shipping')).toBe(true);
+    expect(buySource(s, cfg, 'shipping')).toBe(true); // another employer does not wait
     let done: string[] = [];
     for (let i = 0; i < (exchange.work! + 0.5) * 60; i++) done = done.concat(stepPipe(s, cfg, DT).done);
     expect(done).toContain('exchange');

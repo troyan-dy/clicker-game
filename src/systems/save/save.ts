@@ -113,11 +113,13 @@ export function restorePipe(cfg: PipeConfig, raw: unknown): PipeState {
     const n = num(owned[src.id], src.start, src.start, src.max);
     s.owned[src.id] = src.made ? n : Math.floor(n); // robots take the jobs of a `made` employer little by little
   }
-  s.squads = Math.floor(num(r.squads, 0, 0, cfg.squads.max - cfg.squads.start));
+  // a bribe is paid once; an employer with units taken was let in already
+  const bribed = counts(r.bribed);
+  for (const src of cfg.sources) if (src.bribe && (bribed[src.id] === true || s.owned[src.id] > 0)) s.bribed[src.id] = true;
   for (const raw of Array.isArray(r.jobs) ? r.jobs : []) {
     const job = counts(raw);
     const src = cfg.sources.find((x) => x.id === job.id);
-    if (!src?.work || s.owned[src.id] >= src.max || s.jobs.some((j) => j.id === src.id) || s.jobs.length >= cfg.squads.start + s.squads) continue;
+    if (!src?.work || s.owned[src.id] >= src.max || s.jobs.some((j) => j.id === src.id)) continue;
     const total = num(job.total, src.work, 0.1);
     s.jobs.push({ id: src.id, left: num(job.left, total, 0, total), total });
   }

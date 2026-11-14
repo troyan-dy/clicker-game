@@ -32,8 +32,8 @@ export interface HubTopology {
   rest: number;
   /** employers that are being taken right now, little by little: the colour follows without a jump */
   live: Record<string, boolean>;
-  /** employers where a squad of robot dogs is at work */
-  squads: Record<string, boolean>;
+  /** robot dogs that stand at an employer: the ones that took its jobs, and the pack that is taking the next ones */
+  dogs: Record<string, number>;
 }
 
 interface Route {
@@ -62,8 +62,8 @@ interface Lot {
   pickets: Phaser.GameObjects.Image[];
   /** Claude on the roof of a building taken whole */
   flag?: Phaser.GameObjects.Image;
-  /** a robot dog of the squad that works here */
-  dog?: Phaser.GameObjects.Image;
+  /** robot dogs that work here */
+  dogs: Phaser.GameObjects.Image[];
 }
 
 /**
@@ -135,7 +135,7 @@ export class HubView {
         const fill = scene.add.image(p.x, p.y, `node_${p.key}`).setOrigin(0.5, 1).setScale(scale);
         fill.setCrop(0, fill.height, fill.width, 0);
         this.root.add(fill);
-        this.lots.set(p.id, { ghost: img, fill, scale, shown: 0, target: 0, pickets: [] });
+        this.lots.set(p.id, { ghost: img, fill, scale, shown: 0, target: 0, pickets: [], dogs: [] });
       } else this.nodes.set(p.id, img);
     }
     this.walkers = new Walkers(scene, this.root, rng);
@@ -198,7 +198,7 @@ export class HubView {
       // those whose work was taken stand at the door: one, two when the whole building is gone
       this.picket(lot, place, t.picket && target > 0 ? (target >= 1 ? 2 : 1) : 0);
       if (target >= 1 && !lot.flag) this.raiseFlag(lot, place, lot.target > 0);
-      this.guard(lot, place, !!t.squads[id]);
+      this.guard(lot, place, t.dogs[id] ?? 0);
       if (target === lot.target) continue;
       const first = lot.target === 0;
       lot.target = target;
@@ -256,18 +256,18 @@ export class HubView {
     }
   }
 
-  /** A robot dog of the squad stands at the door while the squad works there. */
-  private guard(lot: Lot, place: { x: number; y: number }, on: boolean): void {
-    if (on === !!lot.dog) return;
-    if (on) {
-      const img = this.scene.add.image(place.x + 64, place.y + 8, 'node_robodog').setOrigin(0.5, 1).setFlipX(true);
-      const scale = 46 / img.height;
+  /** `want` robot dogs stand at the door of an employer: they work there instead of the people who left. */
+  private guard(lot: Lot, place: { x: number; y: number }, want: number): void {
+    while (lot.dogs.length < want) {
+      const n = lot.dogs.length;
+      const img = this.scene.add.image(place.x + 60 + n * 20, place.y + 8 + n * 5, 'node_robodog').setOrigin(0.5, 1).setFlipX(true);
+      const scale = 42 / img.height;
       this.root.add(img.setScale(scale).setAlpha(0));
       this.scene.tweens.add({ targets: img, alpha: 1, delay: 900, duration: 250 });
-      lot.dog = img;
-    } else {
-      const img = lot.dog!;
-      lot.dog = undefined;
+      lot.dogs.push(img);
+    }
+    while (lot.dogs.length > want) {
+      const img = lot.dogs.pop()!;
       this.scene.tweens.add({ targets: img, alpha: 0, duration: 250, onComplete: () => img.destroy() });
     }
   }
@@ -329,13 +329,7 @@ export class HubView {
     this.walkers.spawn(kind, [x + (place.x < x ? -50 : 50), y + 2], [place.x + (place.x < x ? 40 : -40), place.y + 4], count);
   }
 
-  /** The squad that worked at an employer runs back to the middle. */
-  back(id: string): void {
-    const place = this.layout.lots[id];
-    if (!place) return;
-    const { x, y } = this.layout.home;
-    this.walkers.spawn('robodog', [place.x + (place.x < x ? 40 : -40), place.y + 4], [x + (place.x < x ? -50 : 50), y + 2], 2);
-  }
+
 
   step(dt: number): void {
     for (const d of this.dots) {

@@ -7,7 +7,6 @@ import managerData from '../src/data/balance/managers.json';
 import planData from '../src/data/balance/plans.json';
 import scaleData from '../src/data/balance/scales.json';
 import sourceData from '../src/data/balance/sources.json';
-import squadData from '../src/data/balance/squads.json';
 import tuningData from '../src/data/tuning/pipeline.json';
 import saveTuning from '../src/data/tuning/save.json';
 import type { Plan } from '../src/systems/plan/plan';
@@ -38,7 +37,6 @@ const cfg: PipeConfig = {
   farms: farmData as Farm[],
   scales: scaleData,
   managers: managerData,
-  squads: squadData,
   lines: lineData as Line[],
   auto: autoData,
 };
@@ -64,7 +62,7 @@ describe('save', () => {
     const s = grown();
     s.allowance = true;
     s.orders = 0.5;
-    s.squads = 2;
+    s.bribed.exchange = true;
     s.lines.dogs = 3;
     s.aim.robodog = 'depot';
     s.owned.depot = 1.25; // robots are half-way through the second unit
