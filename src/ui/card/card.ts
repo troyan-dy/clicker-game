@@ -17,6 +17,8 @@ export interface CardSpec {
   options: CardOption[];
   /** the hint under the options */
   hint?: string;
+  /** the option highlighted at first; by default the first one that can be picked */
+  selected?: number;
 }
 
 /**
@@ -34,8 +36,8 @@ export interface CardUi {
 
 const esc = (s: string): string => s.replace(/&/g, '&amp;').replace(/</g, '&lt;');
 
-/** Adds the card to a 1920×1080 layer that sits above the canvas. */
-export function createCard(layer: HTMLElement): CardUi {
+/** Adds the card to a 1920×1080 layer that sits above the canvas. `blip` — a sound for moving the highlight. */
+export function createCard(layer: HTMLElement, blip: () => void = () => undefined): CardUi {
   layer.insertAdjacentHTML(
     'beforeend',
     `
@@ -75,6 +77,7 @@ export function createCard(layer: HTMLElement): CardUi {
         break;
       }
     }
+    blip();
     paint();
   };
   const choose = (i: number): void => {
@@ -98,7 +101,7 @@ export function createCard(layer: HTMLElement): CardUi {
     show(next, onPick) {
       spec = next;
       pick = onPick;
-      selected = Math.max(0, next.options.findIndex((o) => !o.off));
+      selected = next.selected ?? Math.max(0, next.options.findIndex((o) => !o.off));
       q('.card-head').textContent = next.head;
       q('h2 span').textContent = next.title;
       q('.card-lines').innerHTML = next.lines.map((l) => `<p>${l}</p>`).join('');

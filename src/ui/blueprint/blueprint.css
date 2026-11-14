@@ -136,6 +136,35 @@
   top: 36px;
   max-width: 318px;
 }
+/* a pile of questions: the same card asks for one «Да» */
+.bl-quip.ask {
+  outline: 1.5px solid var(--coral);
+}
+.bl-ask {
+  display: none;
+  margin-top: 8px;
+}
+.bl-quip.ask .bl-ask {
+  display: block;
+}
+.bl-ask b {
+  color: #7cc68d;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.bl-ask u {
+  display: block;
+  height: 3px;
+  margin-top: 8px;
+  background: #3d3a36;
+}
+.bl-ask s {
+  display: block;
+  height: 100%;
+  width: 0;
+  background: var(--coral);
+}
+
 /* his face: a coral square with two eyes */
 .bl-quip i {
   position: absolute;

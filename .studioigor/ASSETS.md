@@ -23,7 +23,7 @@
 | A015 EN_Scales | окружение | масштабы после стола: сеть работ, город, планета, орбита — как чертежи | PNG 1920×1080, 4 сцены | генерация (Codex) | plan |
 | A016 FNT | шрифты | JetBrains Mono 400/700, Source Serif 4 400/600, кириллица | woff2 ≤ 300 КБ | Fontsource (OFL) | wip |
 | A017 SFX | звук | нажатие, закрытие задачи, покупка, отъезд камеры, легендарный тикет | параметры в коде | ZzFX | plan |
-| A018 MUS | музыка | 1–2 спокойных зацикленных трека | ≤ 3 МБ | CC0/CC-BY, подбираю и показываю на выбор | plan |
+| A018 MUS | музыка | спокойный зацикленный лоу-фай «In the Lobby» (1,4 МБ); запасной кандидат — «Calm Track», pmiller, CC0, https://opengameart.org/content/calm-track | ≤ 3 МБ | CC0, OpenGameArt | wip |
 
 ## Strategy by category
 | category | source (pack / Blender / procedural / generation / user) | why | status |
@@ -59,4 +59,5 @@
 | JetBrains Mono | https://www.npmjs.com/package/@fontsource/jetbrains-mono | OFL-1.1 | JetBrains | node_modules/@fontsource/jetbrains-mono | в титрах |
 | Source Serif 4 | https://www.npmjs.com/package/@fontsource/source-serif-4 | OFL-1.1 | Adobe | node_modules/@fontsource/source-serif-4 | в титрах |
 | ZzFX | https://github.com/KilledByAPixel/ZzFX | MIT | Frank Force | node_modules/zzfx | в титрах |
+| музыка «In the Lobby» | https://opengameart.org/content/in-the-lobby | CC0 | Umplix | public/assets/audio/in_the_lobby.ogg | в титрах (не обязательно) |
 | lil-gui (только dev-панель настроек) | https://github.com/georgealways/lil-gui | MIT | George Michael Brower | node_modules/lil-gui | не входит в сборку игры |

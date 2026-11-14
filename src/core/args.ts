@@ -6,6 +6,8 @@ export interface Args {
   capture: boolean;
   /** keep the game between visits */
   save: boolean;
+  /** show the title card even in a gym or a capture */
+  menu: boolean;
 }
 
 /** Launch arguments from the URL: ?seed=7&gym=agree&state=rich&debug=1&save=1 */
@@ -19,5 +21,6 @@ export function readArgs(search: string): Args {
     debug: p.get('debug') === '1',
     capture: p.get('capture') === '1',
     save: p.get('save') === '1',
+    menu: p.get('menu') === '1',
   };
 }

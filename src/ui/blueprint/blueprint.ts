@@ -32,6 +32,8 @@ export interface BlueprintModel {
   quip: string;
   /** where the remark appears: above the laptop of the blueprint or in the corner of a map */
   quipAt: 'desk' | 'corner';
+  /** a pile of questions waiting for one «Да»: it takes the place of the remark */
+  ask?: { text: string; worth: string; fill: number };
 }
 
 export interface BlueprintUi {
@@ -55,7 +57,7 @@ export function createBlueprint(layer: HTMLElement): BlueprintUi {
     <div class="bl-money"><b>$0</b><span></span></div>
     <div class="bl-neck"></div>
     <div class="bl-tags"></div>
-    <div class="bl-quip"><i></i><span></span></div>
+    <div class="bl-quip"><i></i><span></span><div class="bl-ask"><b></b><u><s></s></u></div></div>
     <aside class="bl-shop"><div class="bl-shelves"></div><div class="bl-extra"></div></aside>
     <div class="bl-news"><i>НОВОСТИ</i><span></span><em></em></div>
   </div></div>`,
@@ -65,6 +67,8 @@ export function createBlueprint(layer: HTMLElement): BlueprintUi {
   const money = q('.bl-money b');
   const quip = q('.bl-quip');
   const quipText = q('.bl-quip span');
+  const askWorth = q('.bl-ask b');
+  const askBar = q('.bl-ask s');
   const parts: Record<string, HTMLElement> = {
     summary: q('.bl-money span'),
     neck: q('.bl-neck'),
@@ -105,8 +109,13 @@ export function createBlueprint(layer: HTMLElement): BlueprintUi {
       set('neck', m.neck);
       set('news', esc(m.news));
       // the last remark stays in place while it fades out
-      if (m.quip) set('quip', esc(m.quip), quipText);
-      quip.className = `bl-quip ${m.quipAt}${m.quip ? ' on' : ''}`;
+      const said = m.ask?.text ?? m.quip;
+      if (said) set('quip', esc(said), quipText);
+      if (m.ask) {
+        set('askWorth', `Enter — Да всем · +$${esc(m.ask.worth)}`, askWorth);
+        askBar.style.width = `${Math.round(m.ask.fill * 100)}%`;
+      }
+      quip.className = `bl-quip ${m.quipAt}${said ? ' on' : ''}${m.ask ? ' ask' : ''}`;
       set('hint', esc(m.hint));
       set(
         'tags',

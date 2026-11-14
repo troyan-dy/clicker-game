@@ -1,26 +1,29 @@
 import Phaser from 'phaser';
-import { NEWS } from '../../content/news';
-import { QUIPS } from '../../content/quips';
-import { FINALE, HUB_TEXT, SCALE_SHELF } from '../../content/screens';
-import { promptAt } from '../../content/tickets';
-import { logEvent, metrics } from '../../core/metrics';
-import type { Rng } from '../../core/rng';
-import { playSound, unlockSound } from '../../core/sound';
-import autoData from '../../data/balance/auto.json';
-import farmData from '../../data/balance/farms.json';
-import gradeData from '../../data/balance/grades.json';
-import planData from '../../data/balance/plans.json';
-import scaleData from '../../data/balance/scales.json';
-import sourceData from '../../data/balance/sources.json';
-import { BP, deskScreen } from '../../data/layout/blueprint';
-import { HUBS } from '../../data/layout/hubs';
-import feedData from '../../data/tuning/feed.json';
-import saveData from '../../data/tuning/save.json';
-import tuningData from '../../data/tuning/pipeline.json';
-import { createOverlay, type Overlay } from '../../debug/overlay';
-import { createTuningPanel, type TuningPanel } from '../../debug/tuningPanel';
-import { createFeed, say, stepFeed, type FeedContent } from '../../systems/feed/feed';
-import type { Plan } from '../../systems/plan/plan';
+import { NEWS } from '../content/news';
+import { QUIPS } from '../content/quips';
+import { FINALE, HUB_TEXT, SCALE_SHELF } from '../content/screens';
+import { promptAt, TICKETS } from '../content/tickets';
+import { logEvent, metrics } from '../core/metrics';
+import { setMusicOn, startMusic } from '../core/music';
+import type { Rng } from '../core/rng';
+import { loadSettings, saveSettings } from '../core/settings';
+import { playSound, setSoundOn, unlockSound } from '../core/sound';
+import autoData from '../data/balance/auto.json';
+import farmData from '../data/balance/farms.json';
+import gradeData from '../data/balance/grades.json';
+import planData from '../data/balance/plans.json';
+import scaleData from '../data/balance/scales.json';
+import sourceData from '../data/balance/sources.json';
+import { BP, deskScreen } from '../data/layout/blueprint';
+import { HUBS } from '../data/layout/hubs';
+import feedData from '../data/tuning/feed.json';
+import saveData from '../data/tuning/save.json';
+import stackData from '../data/tuning/stack.json';
+import tuningData from '../data/tuning/pipeline.json';
+import { createOverlay, type Overlay } from '../debug/overlay';
+import { createTuningPanel, type TuningPanel } from '../debug/tuningPanel';
+import { createFeed, say, stepFeed, type FeedContent } from '../systems/feed/feed';
+import type { Plan } from '../systems/plan/plan';
 import {
   backlogCap,
   buyFarm,
@@ -48,11 +51,12 @@ import {
   type PipeConfig,
   type PipeState,
   type Source,
-} from '../../systems/pipeline/pipeline';
-import { applyOffline, offlineReport, packSave, unpackSave, type OfflineReport } from '../../systems/save/save';
-import type { BlueprintTag, BlueprintUi } from '../../ui/blueprint/blueprint';
-import type { CardUi } from '../../ui/card/card';
-import { plural, short } from '../../ui/format';
+} from '../systems/pipeline/pipeline';
+import { applyOffline, offlineReport, packSave, unpackSave, type OfflineReport } from '../systems/save/save';
+import { createStack, stackWorth, stepStack, takeStack } from '../systems/stack/stack';
+import type { BlueprintTag, BlueprintUi } from '../ui/blueprint/blueprint';
+import type { CardUi } from '../ui/card/card';
+import { plural, short } from '../ui/format';
 import {
   tasksPhrase,
   TERMINAL_SPOTS,
@@ -60,11 +64,11 @@ import {
   type ShopRow,
   type ShopShelf,
   type TerminalUi,
-} from '../../ui/terminal/terminal';
-import { BlueprintView, VISIBLE_SUBAGENTS } from '../../view/blueprintView';
-import { HubView } from '../../view/hubView';
-import { preloadNodes } from '../../view/nodeTextures';
-import { Squares, type Rect } from '../../view/squares';
+} from '../ui/terminal/terminal';
+import { BlueprintView, VISIBLE_SUBAGENTS } from '../view/blueprintView';
+import { HubView } from '../view/hubView';
+import { preloadNodes } from '../view/nodeTextures';
+import { Squares, type Rect } from '../view/squares';
 
 const STEP = 1 / 60;
 const MONEY_ON_DARK = 0x7cc68d;
@@ -79,6 +83,9 @@ const IDLE_AFTER = 12; // seconds without a «Да» while requests wait
 const NECK_AFTER = 14; // seconds the same bottleneck lasts before Claude mentions it
 const SESSION_FORMS = ['сессия', 'сессии', 'сессий'] as const;
 const TASK_FORMS = ['задачу', 'задачи', 'задач'] as const;
+const ASKING_FORMS = ['сессия спрашивает', 'сессии спрашивают', 'сессий спрашивают'] as const;
+/** what the sessions ask about when they pile up their questions */
+const QUESTIONS = TICKETS.flatMap((t) => t.asks);
 const SAVE_KEY = 'da-klod-save';
 const MONEY_SPOT: Rect = { x: BP.money.x - 80, y: BP.money.y - 20, w: 160, h: 40 };
 /** a big screen shrinks to this share of its size when it becomes a node of the next one */
@@ -102,15 +109,24 @@ const HELP = `
   <p><kbd>M</kbd>подбросить $${GYM_GIFT} <kbd>R</kbd>заново <kbd>T</kbd>замедление</p>
   <p><kbd>Tab</kbd>настройки <kbd>O</kbd>цифры <kbd>P</kbd>сохранить</p>`;
 const HELP_PAPER = `<p>ГИМ · <kbd>M</kbd>деньги <kbd>R</kbd>заново <kbd>T</kbd>замедление <kbd>Tab</kbd>настройки</p>`;
+const HELP_GAME = `<p>любая клавиша — «Да» · покупки — кликом · <kbd>Esc</kbd>меню</p>`;
+const CREDITS = [
+  'Идея и вкус — автор игры. Остальное сделал Клод, автор согласился.',
+  'Движок: Phaser 4 — Phaser Studio Inc., MIT',
+  'Шрифты: JetBrains Mono — JetBrains, OFL · Source Serif 4 — Adobe, OFL',
+  'Звук: ZzFX — Frank Force, MIT · музыка: «In the Lobby» — Umplix, CC0',
+  'Картинки нарисованы нейросетью по описаниям',
+];
 
 /**
- * Gym of the core loop: one conveyor of tasks seen from further and further away.
+ * The game: one conveyor of tasks seen from further and further away. With `gym` it is the same scene
+ * for tuning and captures: no menu, no saving, extra keys.
  * 1 — the terminal: «Да», sources, plan (M01–M03). «Да, и больше не спрашивай» pulls the camera back to
  * 2 — the blueprint: subagents, new kinds of work, promotions (M04, M05, M15). Every step up in scale
  * pulls it back again: 3 — the city, 4 — the state, 5 — the planet (M16–M18), where employers hire the
  * player once and farms run the sessions.
  */
-export class AgreeGym extends Phaser.Scene {
+export class GameScene extends Phaser.Scene {
   private readonly rng: Rng;
   private readonly term: TerminalUi;
   private readonly paper: BlueprintUi;
@@ -118,6 +134,11 @@ export class AgreeGym extends Phaser.Scene {
   private readonly showOverlay: boolean;
   /** keep the game between visits (off in captures and tuning sessions) */
   private readonly saving: boolean;
+  /** tuning keys and help are on */
+  private readonly gym: boolean;
+  /** the title card is shown at launch */
+  private readonly withMenu: boolean;
+  private readonly settings = loadSettings();
   // own copies of the data: the tuning panel edits them live, the mechanic reads them every step
   private readonly cfg: PipeConfig = {
     tuning: { ...tuningData },
@@ -153,20 +174,38 @@ export class AgreeGym extends Phaser.Scene {
   private sinceSave = 0;
   /** set when the page is about to reload on purpose: the last save must stay as it is */
   private frozen = false;
+  /** a menu or the ending is open: the world stands still */
+  private paused = false;
+  /** a saved game was opened */
+  private resumed = false;
+  /** what the sessions did while the game was closed; shown after the title card */
+  private pendingReport: OfflineReport | null = null;
+  private readonly stack = createStack(stackData);
+  private question = QUESTIONS[0];
+  /** after the ending Claude may press «Да всем» himself (M13) */
+  private selfPlay = false;
   private neckKind: Neck = 'none';
   private neckFor = 0;
   private pressTimes: number[] = [];
   /** squares owed to the connectors: tasks move faster than squares may be drawn */
   private owed = { in: 0, me: 0, sub: 0 };
 
-  constructor(rng: Rng, term: TerminalUi, paper: BlueprintUi, card: CardUi, opts: { overlay: boolean; save: boolean }) {
-    super('agree');
+  constructor(
+    rng: Rng,
+    term: TerminalUi,
+    paper: BlueprintUi,
+    card: CardUi,
+    opts: { overlay: boolean; save: boolean; gym: boolean; menu: boolean },
+  ) {
+    super('game');
     this.rng = rng;
     this.term = term;
     this.paper = paper;
     this.card = card;
     this.showOverlay = opts.overlay;
     this.saving = opts.save;
+    this.gym = opts.gym;
+    this.withMenu = opts.menu;
   }
 
   preload(): void {
@@ -182,8 +221,10 @@ export class AgreeGym extends Phaser.Scene {
       this.hubs.set(Number(screen), hub);
     }
     this.squares = new Squares(this, this.rng, 700);
-    this.term.extra.innerHTML = HELP;
-    this.paper.extra.innerHTML = HELP_PAPER;
+    this.term.extra.innerHTML = this.gym ? HELP : HELP_GAME;
+    this.paper.extra.innerHTML = this.gym ? HELP_PAPER : HELP_GAME;
+    setSoundOn(this.settings.sound);
+    setMusicOn(this.settings.music);
     this.overlay = createOverlay(this.showOverlay);
     const t = this.cfg.tuning;
     this.panel = createTuningPanel('M01', [
@@ -195,8 +236,10 @@ export class AgreeGym extends Phaser.Scene {
       { target: this.cfg.auto.subagent, key: 'share', label: 'сабагент: доля тарифа', min: 0.05, max: 1, step: 0.05 },
     ]);
     this.state = createPipe(this.cfg);
-    if (!this.loadGame()) this.say('start', true);
+    this.resumed = this.loadGame();
     this.lastMoney = this.state.money;
+    if (this.withMenu) this.openTitle();
+    else this.resume();
 
     window.addEventListener('keydown', (e) => this.onKey(e));
     window.addEventListener('pointerdown', (e) => {
@@ -212,7 +255,7 @@ export class AgreeGym extends Phaser.Scene {
   }
 
   update(_time: number, deltaMs: number): void {
-    this.acc += Math.min(deltaMs / 1000, 0.25) * (this.slow ? 0.25 : 1);
+    this.acc = this.paused ? 0 : this.acc + Math.min(deltaMs / 1000, 0.25) * (this.slow ? 0.25 : 1);
     while (this.acc >= STEP) {
       this.step(STEP);
       this.acc -= STEP;
@@ -266,10 +309,95 @@ export class AgreeGym extends Phaser.Scene {
       hub.sync({ owned: this.state.owned, farms: this.state.farms });
       hub.show(0);
     }
-    const report = offlineReport(this.state, this.cfg, saveData, (Date.now() - file.at) / 1000);
-    if (report) this.morning(report);
-    else this.say('back', true);
+    this.pendingReport = offlineReport(this.state, this.cfg, saveData, (Date.now() - file.at) / 1000);
     return true;
+  }
+
+  /** The game goes on: after the title card, a pause, or straight away when there is no menu. */
+  private resume(): void {
+    this.paused = false;
+    const report = this.pendingReport;
+    this.pendingReport = null;
+    if (report) this.morning(report);
+    else if (this.clock === 0) this.say(this.resumed ? 'back' : 'start', true);
+  }
+
+  /** The title card and the pause are one menu: the first line differs. */
+  private openMenu(title: boolean, selected = 0): void {
+    this.paused = true;
+    const s = this.state;
+    const go = title ? (this.resumed ? 'Продолжить' : 'Начать') : 'Вернуться к работе';
+    const note = title && this.resumed ? `экран ${this.stage} из ${2 + this.cfg.scales.length} · $${short(Math.floor(s.money))}` : '';
+    const options = [
+      { label: go, note },
+      { label: `Звук: ${this.settings.sound ? 'вкл' : 'выкл'}` },
+      { label: `Музыка: ${this.settings.music ? 'вкл' : 'выкл'}` },
+      { label: 'Новая игра', note: 'стереть сохранение', off: title && !this.resumed },
+      { label: 'Титры' },
+    ];
+    const lines = title ? ['Клод работает. Вы соглашаетесь.', 'Кликер про одну клавишу и очень много работ.'] : ['Клод подождёт. Сессии — тоже: мир стоит, пока открыто меню.'];
+    const again = (i: number): void => this.openMenu(title, i);
+    this.card.show({ head: 'claude — ~/работа/все-сразу', title: title ? 'Да, Клод' : 'Пауза', lines, options, selected, hint: 'Enter — Да · ↑↓ — выбрать' }, (i) => {
+      this.wake();
+      if (i === 1) {
+        this.settings.sound = !this.settings.sound;
+        setSoundOn(this.settings.sound);
+    setMusicOn(this.settings.music);
+        saveSettings(this.settings);
+        playSound('ui');
+        again(1);
+      } else if (i === 2) {
+        this.settings.music = !this.settings.music;
+        setMusicOn(this.settings.music);
+        saveSettings(this.settings);
+        again(2);
+      } else if (i === 3) this.confirmNew(() => again(3));
+      else if (i === 4) this.card.show({ head: 'claude — титры', title: 'Да, Клод', lines: CREDITS, options: [{ label: 'Да' }] }, () => again(4));
+      else this.resume();
+    });
+  }
+
+  private openTitle(): void {
+    this.openMenu(true);
+  }
+
+  private confirmNew(back: () => void): void {
+    const lines = ['Сохранение будет стёрто: работы, сессии, грейд — всё.', 'Клод не возражает. Он не умеет.'];
+    this.card.show({ head: 'claude — новая игра', title: 'Начать с нуля?', lines, options: [{ label: 'Да' }, { label: 'Нет' }], selected: 1 }, (i) => {
+      if (i === 0) this.wipe();
+      else back();
+    });
+  }
+
+  /** A new game: the save goes, the page starts over. */
+  private wipe(): void {
+    this.frozen = true;
+    try {
+      localStorage.removeItem(SAVE_KEY);
+    } catch {
+      // nothing was saved anyway
+    }
+    window.location.reload();
+  }
+
+  /** The ending (M10, M13): what was done, and Claude's offer to go on without the player. */
+  private ending(): void {
+    this.paused = true;
+    const s = this.state;
+    const h = Math.floor(this.seconds / 3600);
+    const m = Math.floor((this.seconds % 3600) / 60);
+    const lines = [
+      'Вы — единственный клиент Anthropic и единственный программист планеты.',
+      `Время: ${h ? `${h} ч ` : ''}${m} мин · нажатий: ${short(s.presses)} · задач закрыто: ${short(s.closedHere + s.closedBySubagents)}`,
+      'Клод: «Дальше я могу нажимать „Да“ сам. Продолжать без вас?»',
+    ];
+    const options = [{ label: 'Да' }, { label: 'Да, и больше не спрашивай' }, { label: 'Нет', note: 'недоступно в вашем тарифе', off: true }];
+    this.card.show({ head: 'claude — итоги', title: 'Работать больше некому', lines, options }, (i) => {
+      this.selfPlay = i === 1;
+      this.paused = false;
+      this.say('after', true);
+      this.saveGame();
+    });
   }
 
   /** The morning report: what the sessions did while the game was closed. One answer: «Да». */
@@ -282,11 +410,11 @@ export class AgreeGym extends Phaser.Scene {
       ? [`Прошло ${away}.`, 'Клод ждал вашего «Да». Он не в обиде: у него нет такой функции.']
       : [
           `Прошло ${away}${capped ? ' — дольше сессии не ждут, они уснули' : ''}.`,
-          `Клод закрыл ${short(report.tasks)} ${plural(report.tasks, TASK_FORMS)}. Никто ничего не заметил.`,
+          `Клод закрыл ${this.count(report.tasks, TASK_FORMS)}. Никто ничего не заметил.`,
           `На счёт пришло <b>$${short(report.dollars)}</b>.`,
         ];
     this.card.show({ head: 'claude — утренний отчёт', title: 'Пока вас не было', lines, options: [{ label: 'Да', note: report.waited ? '' : 'забрать' }] }, () => {
-      unlockSound();
+      this.wake();
       applyOffline(this.state, report);
       this.lastMoney += report.dollars; // not this second's income
       if (report.dollars > 0) playSound('buy');
@@ -312,26 +440,32 @@ export class AgreeGym extends Phaser.Scene {
   private onKey(e: KeyboardEvent): void {
     if (this.card.key(e)) return;
     if (e.repeat) return;
-    if (!GYM_KEYS.has(e.code)) {
+    if (e.code === 'Escape') {
+      this.openMenu(false);
+      return;
+    }
+    if (!this.gym || !GYM_KEYS.has(e.code)) {
       this.press();
       return;
     }
     e.preventDefault();
-    if (e.code === 'KeyR') {
-      // «заново» means a new game: the save goes too
-      this.frozen = true;
-      try {
-        localStorage.removeItem(SAVE_KEY);
-      } catch {
-        // nothing was saved anyway
-      }
-      window.location.reload();
-    }
+    if (e.code === 'KeyR') this.wipe(); // «заново» means a new game: the save goes too
     else if (e.code === 'Tab') this.panel.toggle();
     else if (e.code === 'KeyO') this.overlay.toggle();
     else if (e.code === 'KeyP') this.panel.dump({ tuning: this.cfg.tuning, sources: this.cfg.sources, auto: this.cfg.auto });
     else if (e.code === 'KeyT') this.slow = !this.slow;
     else if (e.code === 'KeyM') this.gift(Math.max(GYM_GIFT, Math.round(this.income * 30))); // half a minute of income
+  }
+
+  /** the first key press or click lets the browser play sound and music */
+  private wake(): void {
+    unlockSound();
+    startMusic();
+  }
+
+  /** «12 400 задач», «1,2 млн задач»: big rounded numbers always take the plural of many */
+  private count(n: number, forms: readonly [string, string, string]): string {
+    return `${short(n)} ${n >= 1e6 ? forms[2] : plural(n, forms)}`;
   }
 
   /** gym-only: money from nowhere, not counted as income */
@@ -346,7 +480,7 @@ export class AgreeGym extends Phaser.Scene {
   }
 
   private buy(what: string): boolean {
-    unlockSound();
+    this.wake();
     const s = this.state;
     const cfg = this.cfg;
     const before = s.money;
@@ -435,8 +569,30 @@ export class AgreeGym extends Phaser.Scene {
     logEvent(`scale_${next}`);
   }
 
+  /** dollars per second of the whole conveyor at full flow */
+  private flowIncome(): number {
+    const s = this.state;
+    return Math.min(inflowOf(s, this.cfg), claudeRate(s, this.cfg) + subagentRate(s, this.cfg)) * payOf(s, this.cfg);
+  }
+
+  /** «Да всем»: the whole pile of questions is approved at once. Returns false when there is no pile. */
+  private approveAll(): boolean {
+    if (this.stack.fill <= 0) return false;
+    const worth = stackWorth(this.stack, stackData, this.flowIncome());
+    takeStack(this.stack, stackData);
+    this.state.money += worth;
+    this.state.presses++;
+    playSound('all');
+    const from = this.stage === 2 ? this.deskSpot() : this.homeSpot();
+    this.delivered(from[0], from[1], 14);
+    logEvent('yes_all');
+    if (this.stack.taken % 3 === 1) this.say('all');
+    return true;
+  }
+
   private press(): void {
-    unlockSound();
+    this.wake();
+    if (this.stage >= 2 && this.approveAll()) return;
     const result = pressPipe(this.state, this.cfg);
     this.pressTimes.push(this.clock);
     this.lastPress = this.clock;
@@ -559,8 +715,14 @@ export class AgreeGym extends Phaser.Scene {
       this.won = true;
       playSound('finale');
       logEvent('finale');
-      this.say('finale', true);
+      this.ending();
     }
+
+    // questions for the player pile up once the terminal stops asking
+    const hadPile = this.stack.fill > 0;
+    stepStack(this.stack, stackData, dt, s.noAsk);
+    if (!hadPile && this.stack.fill > 0) this.question = this.rng.pick(QUESTIONS);
+    if (this.selfPlay && this.stack.fill >= 1) this.approveAll(); // Claude answers himself
 
     // Claude notices a pause and a bottleneck that does not go away
     if (!s.noAsk && s.ready >= 2 && this.clock - this.lastPress > IDLE_AFTER) {
@@ -736,6 +898,17 @@ export class AgreeGym extends Phaser.Scene {
     });
   }
 
+  /** the pile of questions as Claude's card shows it; nothing when there is no pile */
+  private pile(): { text: string; worth: string; fill: number } | undefined {
+    if (this.stack.fill <= 0) return undefined;
+    const asking = Math.max(1, Math.round(this.stack.fill * (sessionsOf(this.state, this.cfg) + 1)));
+    return {
+      text: `${this.count(asking, ASKING_FORMS)}: «${this.question}»`,
+      worth: short(stackWorth(this.stack, stackData, this.flowIncome())),
+      fill: this.stack.fill,
+    };
+  }
+
   /** the line under the money: the grade and what one task pays */
   private payLine(): string {
     const s = this.state;
@@ -785,7 +958,8 @@ export class AgreeGym extends Phaser.Scene {
       news: this.feed.news,
       quip: this.feed.quip,
       quipAt: 'desk',
-      hint: 'Enter — подогнать Клода: +1 задача',
+      ask: this.pile(),
+      hint: 'Enter — «Да» на вопросы сессий',
     });
   }
 
@@ -818,7 +992,7 @@ export class AgreeGym extends Phaser.Scene {
         .join(' · ');
       // the caption of a node above the middle sits on top of it: the connector arrives from below
       const y = node.above ? node.y - node.h - 44 : node.y + 4;
-      tags.push({ x: node.x, y, mid: true, small: true, html: `${what}<br><b>${short(n)} ${plural(n, SESSION_FORMS)}</b>` });
+      tags.push({ x: node.x, y, mid: true, small: true, html: `${what}<br><b>${this.count(n, SESSION_FORMS)}</b>` });
     }
 
     const sessions = sessionsOf(s, cfg) + 1; // and the player's own
@@ -828,7 +1002,7 @@ export class AgreeGym extends Phaser.Scene {
       income: Math.max(0, this.income),
       summary: this.payLine(),
       neck:
-        `приходит ${flowText(inflowOf(s, cfg))}/с · ${short(sessions)} ${plural(sessions, SESSION_FORMS)} Клода успевают ${flowText(capacity)}/с<br>` +
+        `приходит ${flowText(inflowOf(s, cfg))}/с · ${this.count(sessions, SESSION_FORMS)} Клода успевают ${flowText(capacity)}/с<br>` +
         (this.won
           ? FINALE
           : neck === 'claude'
@@ -843,6 +1017,7 @@ export class AgreeGym extends Phaser.Scene {
       news: this.feed.news,
       quip: this.feed.quip,
       quipAt: 'corner',
+      ask: this.pile(),
       hint: `${t.place}: ${hired} из ${employers.length} ${t.unit}`,
     });
   }

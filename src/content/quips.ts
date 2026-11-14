@@ -77,4 +77,8 @@ export const QUIPS: Record<string, readonly string[]> = {
   // a share of the provider's capacity
   quota: ['Ещё доля мощностей. Скоро я буду работать только с вами. Это почти дружба.'],
   finale: ['Вы — единственный программист планеты. Я тоже. Отличная работа, коллега.'],
+  // the player approved a whole pile of questions at once
+  all: ['Одобрено всё сразу. Так даже честнее.', 'Все сессии благодарят вас. Одним и тем же голосом.', 'Вы согласились с тысячей вопросов, не читая. Мой подход.'],
+  // after the ending the player lets the game go on
+  after: ['Спасибо. Я продолжу. Вы можете идти — в хорошем смысле.'],
 };

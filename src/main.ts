@@ -11,7 +11,8 @@ import './ui/style.css';
 import { readArgs } from './core/args';
 import { installMetrics } from './core/metrics';
 import { createRng } from './core/rng';
-import { AgreeGym } from './gyms/agree/AgreeGym';
+import { playSound } from './core/sound';
+import { GameScene } from './game/GameScene';
 import { createLookdevUi } from './gyms/lookdev/lookdevUi';
 import { LookdevScene } from './gyms/lookdev/LookdevScene';
 import { createBlueprint } from './ui/blueprint/blueprint';
@@ -29,9 +30,12 @@ const stage = document.getElementById('stage')!;
 const ui = document.getElementById('ui')!;
 mountUiScale(stage, ui);
 
-// ?gym=agree — M01 · ?gym=hello — environment check · otherwise the look-dev scene
+// the game · ?gym=agree — the same scene for tuning and captures · ?gym=lookdev — the look-dev scene · ?gym=hello — environment check
 function pickScene(): Phaser.Scene {
-  if (args.gym === 'agree') {
+  if (args.gym === 'hello') return new HelloScene(rng, createHud(ui));
+  if (args.gym === 'lookdev') return new LookdevScene(rng, createLookdevUi(ui, 'assets/img/scene_blueprint.webp'));
+  {
+    const gym = args.gym === 'agree';
     // one 1920×1080 container: the paper blueprint below, the terminal on top of it
     const layer = document.createElement('div');
     layer.className = 'ui1080';
@@ -43,11 +47,12 @@ function pickScene(): Phaser.Scene {
     top.innerHTML = '<div class="ui1080"></div>';
     stage.append(top);
     mountUiScale(stage, top);
-    const card = createCard(top.firstElementChild as HTMLElement);
-    return new AgreeGym(rng, createTerminal(layer), paper, card, { overlay: args.debug, save: args.save && !args.capture });
+    const card = createCard(top.firstElementChild as HTMLElement, () => playSound('ui'));
+    // a gym saves and shows the menu only when asked; a capture never touches the player's save
+    const save = !args.capture && (gym ? args.save : true);
+    const menu = args.menu || (!gym && !args.capture);
+    return new GameScene(rng, createTerminal(layer), paper, card, { overlay: args.debug, save, gym, menu });
   }
-  if (args.gym === 'hello') return new HelloScene(rng, createHud(ui));
-  return new LookdevScene(rng, createLookdevUi(ui, 'assets/img/scene_blueprint.webp'));
 }
 const hello = args.gym === 'hello';
 stage.classList.toggle('overlay-canvas', !hello);
