@@ -1,0 +1,3 @@
+A flat world map in a simple rectangular projection that fills the whole picture: all continents drawn as pale sand shapes with thin charcoal coastlines, the oceans left as empty paper, a faint grid of thin parallels and meridians over everything. Nothing else on the map.
+
+STYLE: a deadpan-serious technical drawing. Plain warm ivory paper background (#F0EEE6). Thin precise charcoal lines (#262624) of one fine, even weight. Flat muted fills used sparingly: soft sage (#BCD1CA) and sand (#D4A27F). No gradients, no shadows, no text, no letters, no numbers, no labels, no icons, no frame, no border.
