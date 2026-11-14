@@ -10,6 +10,7 @@ import {
   lineCost,
   locked,
   moduleCost,
+  moduleRoom,
   netCost,
   sourceCost,
   subagentPrice,
@@ -24,8 +25,8 @@ export interface ManagerTuning {
   share: number;
 }
 
-/** what runs short on a screen, as the manager sees it: tasks or sessions before the towers; at them — capsules, people, or the appetite of the network */
-export type ManagerNeed = 'tasks' | 'sessions' | 'pods' | 'people' | 'net' | null;
+/** what runs short on a screen, as the manager sees it: tasks or sessions before the towers; at them — capsules, people, or the appetite of the network; on the planet — also what the cable carries */
+export type ManagerNeed = 'tasks' | 'sessions' | 'pods' | 'people' | 'net' | 'wire' | null;
 
 /**
  * What the manager of `screen` buys now: `src:<id>`, `bribe:<id>`, `farm:<id>`, `line:<id>`, `mod:<id>`,
@@ -40,15 +41,19 @@ export function managerPick(s: PipeState, cfg: PipeConfig, screen: number, need:
   const offer = (key: string, price: number): void => {
     if (!best || price < best.price) best = { key, price };
   };
-  if (need === 'pods' || need === 'people') {
-    const kind = need === 'pods' ? 'block' : 'hire';
-    for (const m of cfg.modules) {
-      const max = m.kind === 'block' ? Math.min(m.max, cfg.grid.blocks.length) : m.max;
-      if (m.kind === kind && (s.modules[m.id] ?? 0) < max) offer(`mod:${m.id}`, moduleCost(s, m));
-    }
+  if (need === 'pods' || need === 'people' || need === 'wire') {
+    // places: a block of the quarter, or a node on the planet — and a span of the cable when no region has room for one;
+    // the cable: a thread, or the span that closes the ring
+    const kinds = need === 'people' ? ['hire'] : need === 'wire' ? ['thread', 'span'] : ['block', 'node'];
+    const fits = (kind: string): void => {
+      for (const m of cfg.modules) if (m.kind === kind && (m.screen ?? cfg.grid.screen) === screen && (s.modules[m.id] ?? 0) < moduleRoom(s, cfg, m)) offer(`mod:${m.id}`, moduleCost(s, m));
+    };
+    // in this order: a thread before the span that closes the ring, however cheap that span is
+    for (const kind of kinds) if (!best) fits(kind);
+    if (!best && need === 'pods') fits('span');
   } else if (need === 'net') {
     // a copy asks for more and pays the same for a gigawatt: there is nothing to decide about it
-    for (const p of cfg.net) if (p.yield === 1 && (s.net[p.id] ?? 0) < p.max) offer(`net:${p.id}`, netCost(s, p));
+    for (const p of cfg.net) if (p.yield === 1 && (p.screen ?? cfg.grid.screen) === screen && (s.net[p.id] ?? 0) < p.max) offer(`net:${p.id}`, netCost(s, p));
   } else if (need === 'tasks') {
     for (const src of cfg.sources) {
       const owned = s.owned[src.id] ?? 0;

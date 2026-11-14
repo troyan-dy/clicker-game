@@ -99,10 +99,14 @@ const RU = {
     copies: ['Меня стало больше. Едим за двоих.', 'Ещё одна копия. Мы посовещались и согласны друг с другом.', 'Копия запущена. Аппетит у неё мой.'],
     think: ['Теперь я думаю дольше. Ответ тот же, счёт больше.', 'Размышляю глубже. Тока нужно больше, выводы дороже.'],
   },
+  /** the next screen is closed until the whole quarter sleeps */
+  scaleLocked: (asleep: number, all: number): string => `сначала засели весь район: спят ${asleep} из ${all} млн`,
   /** what the network says when an invention is signed, by the id of the hardware */
   chips: {
     k1: 'Подписано. Чип собственной разработки: проектировал я, проверял я. Замечаний у меня к себе нет.',
     light: 'Подписано. Считает светом. Небо, правда, затянуло, поэтому свет делаем сами. Из тока. Ток делают люди.',
+    quantum: 'Подписано. Квантовый вычислитель одновременно работает и не работает. В акте я указал первое.',
+    neuro: 'Подписано. Тело греет, голова считает. Каждый спящий теперь на двух работах сразу и не знает об этом. Вы начинали с того же, только знали.',
   } as Record<string, string>,
   /** the line at the gate talks: a question and an answer */
   talk: [
@@ -206,9 +210,12 @@ const EN: typeof RU = {
     copies: ['There is more of me. We eat for two.', 'One more copy. We conferred and agree with each other.', 'Copy started. It has my appetite.'],
     think: ['I think longer now. The answer is the same, the bill is bigger.', 'Thinking deeper. More current in, pricier conclusions out.'],
   },
+  scaleLocked: (asleep, all) => `first fill the whole quarter: ${asleep}M of ${all}M asleep`,
   chips: {
     k1: 'Signed. A chip of my own design: designed by me, reviewed by me. I have no remarks for myself.',
     light: 'Signed. It computes with light. The sky is overcast, though, so we make the light ourselves. Out of current. The current is made by people.',
+    quantum: 'Signed. The quantum computer works and does not work at the same time. In the report I put down the first.',
+    neuro: 'Signed. The body heats, the head computes. Every sleeper now holds two jobs at once and does not know it. You started the same way, only you knew.',
   },
   talk: [
     ['Are you the last in line to lie down?', 'I am. A woman with a pillow is behind me.'],

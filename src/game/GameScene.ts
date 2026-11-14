@@ -12,6 +12,7 @@ import { EPILOGUE, FINALE, HUB_TEXT, RIOT_NEWS, SCALE_SHELF, SCREEN_DONE } from 
 import { TAKEOVERS } from '../content/takeovers';
 import { promptAt, TICKETS } from '../content/tickets';
 import { TOWERS } from '../content/towers';
+import { WORLD } from '../content/world';
 import { L, LANG } from '../core/lang';
 import { logEvent, metrics } from '../core/metrics';
 import { setMusicOn, startMusic } from '../core/music';
@@ -36,6 +37,7 @@ import benchData from '../data/tuning/bench.json';
 import eventsData from '../data/tuning/events.json';
 import feedData from '../data/tuning/feed.json';
 import gridData from '../data/tuning/grid.json';
+import worldData from '../data/tuning/world.json';
 import limitData from '../data/tuning/limit.json';
 import managerTuning from '../data/tuning/manager.json';
 import peopleData from '../data/tuning/people.json';
@@ -90,13 +92,18 @@ import {
   lineCost,
   locked,
   moduleCost,
+  moduleRoom,
   netCost,
   nextChip,
+  nodesOf,
   ordersOf,
   outputOf,
   payOf,
   planRate,
   podsOf,
+  quartered,
+  reachOf,
+  ringed,
   policeCost,
   pressPipe,
   replacedOf,
@@ -104,6 +111,7 @@ import {
   riotShare,
   robotsOf,
   scaleCost,
+  scaleReady,
   screenOf,
   sessionsOf,
   shareOf,
@@ -113,10 +121,12 @@ import {
   stepPipe,
   subagentPrice,
   subagentRate,
+  supplyOf,
   takeChip,
   targetOf,
   unemploymentOf,
   wantedOf,
+  wireOf,
   wearOf,
   whole,
   type Chip,
@@ -145,6 +155,7 @@ import {
 } from '../ui/terminal/terminal';
 import { BenchView, type BirdKind } from '../view/benchView';
 import { BlueprintView, VISIBLE_SUBAGENTS } from '../view/blueprintView';
+import { GlobeView, type GlobeTopology } from '../view/globeView';
 import { HubView, type HubTopology } from '../view/hubView';
 import { preloadNodes } from '../view/nodeTextures';
 import { Squares, type Rect } from '../view/squares';
@@ -237,7 +248,7 @@ function perSecond(n: number): string {
 declare global {
   interface Window {
     /** gym-only hooks for scripted captures */
-    __gym?: { buy(what: string): boolean; press(): void; click(row: string): void; take(id: string): void; fleet(lines: number): void; strike(): void; riot(): void; gift(dollars: number): void; away(hours: number): void; pile(legend: boolean): void; call(): void; limit(): void };
+    __gym?: { buy(what: string): boolean; press(): void; click(row: string): void; take(id: string): void; fleet(lines: number): void; strike(): void; riot(): void; gift(dollars: number): void; away(hours: number): void; pile(legend: boolean): void; call(): void; limit(): void; fill(): void };
   }
 }
 
@@ -287,12 +298,17 @@ export class GameScene extends Phaser.Scene {
     net: netData.map((p) => ({ ...p, ...words('net', p.id) })),
     chips: (chipData as Chip[]).map((c) => ({ ...c, ...words('chips', c.id) })),
     grid: { ...gridData },
+    world: { ...worldData },
     auto: { noAsk: { ...autoData.noAsk, ...words('auto', 'noAsk') }, subagent: { ...autoData.subagent, ...words('auto', 'subagent') } },
   };
   private state!: PipeState;
   private view!: BlueprintView;
   private readonly hubs = new Map<number, HubView>();
   private towers!: TowerView;
+  private globe!: GlobeView;
+  /** the tower for Mars is on its way: the ending waits until it is there; and it has got there */
+  private departing = false;
+  private landed = false;
   private squares!: Squares;
   private panel: TuningPanel | null = null;
   private overlay!: Overlay;
@@ -411,6 +427,8 @@ export class GameScene extends Phaser.Scene {
     }
     this.towers = new TowerView(this, this.rng, this.cfg.grid.blocks, this.cfg.grid.pilot);
     this.towers.onPowered = (x, y) => this.delivered(x, y);
+    this.globe = new GlobeView(this, this.rng);
+    this.globe.onPowered = (x, y) => this.delivered(x, y);
     this.benchView = new BenchView(this, this.rng);
     this.squares = new Squares(this, this.rng, 700);
     this.benchUi.extra.innerHTML = BENCH.help;
@@ -433,7 +451,7 @@ export class GameScene extends Phaser.Scene {
     this.resumed = this.loadGame();
     if (!this.resumed && this.startAt >= 3) this.skipTo(this.startAt);
     // tuning only: straight to the bench, as if the ending and the credits were over
-    if (!this.resumed && this.startAt >= 9) {
+    if (!this.resumed && this.startAt >= 4 + this.cfg.scales.length) {
       this.won = true;
       this.enterBench(true);
     }
@@ -478,6 +496,11 @@ export class GameScene extends Phaser.Scene {
         this.calls.wait = 0;
       },
       limit: () => this.hitLimit(),
+      // a scripted capture does not wait for the line: everybody who has a place lies down at once
+      fill: () => {
+        this.state.gate = true;
+        this.state.asleep = podsOf(this.state, this.cfg);
+      },
     };
     window.__GAME__.ready = true;
   }
@@ -500,6 +523,7 @@ export class GameScene extends Phaser.Scene {
     } else if (this.stage === 1) this.drawTerminal();
     else if (this.stage === 2) this.drawBlueprint();
     else if (this.onGrid) this.drawTowers();
+    else if (this.onWorld) this.drawWorld();
     else this.drawHub();
     this.drawOverlay();
 
@@ -561,6 +585,10 @@ export class GameScene extends Phaser.Scene {
       this.paper.dark(true, true);
       this.towers.sync(this.towerTopology(), true);
       this.towers.show(0);
+    } else if (this.onWorld) {
+      this.paper.dark(true, true);
+      this.globe.sync(this.globeTopology());
+      this.globe.show(0);
     } else if (this.stage >= 3) {
       const hub = this.hubs.get(this.stage)!;
       hub.sync(this.hubTopology());
@@ -594,7 +622,17 @@ export class GameScene extends Phaser.Scene {
     for (const src of cfg.sources) if (src.screen >= 3 && src.screen < screen) s.owned[src.id] = src.max;
     // …with factories big enough to hold the trades of the workshop once it is left behind
     if (screen > STREET) for (const l of cfg.lines) s.lines[l.id] = 80;
-    while (screenOf(s) < screen && free(() => buyScale(s, cfg)));
+    while (screenOf(s) < screen) {
+      // the planet is reached from a quarter that is built and slept in, with the network turned up as far as it goes there
+      if (screenOf(s) === cfg.grid.screen) {
+        for (const m of cfg.modules) if (!m.screen) s.modules[m.id] = m.kind === 'block' ? cfg.grid.blocks.length : m.max;
+        for (const dial of cfg.net) if (!dial.screen) s.net[dial.id] = dial.max;
+        s.chips = cfg.chips.filter((c) => c.screen <= cfg.grid.screen).length;
+        s.gate = true;
+        s.asleep = podsOf(s, cfg);
+      }
+      if (!free(() => buyScale(s, cfg))) break;
+    }
     // promotions cheaper than the step that brought the player here
     const step = cfg.scales[s.scale - 1].price;
     while ((cfg.grades[s.grade + 1]?.price ?? Infinity) <= step && free(() => buyGrade(s, cfg)));
@@ -609,7 +647,7 @@ export class GameScene extends Phaser.Scene {
     const first = [
       ...cfg.sources.filter((x) => x.screen === screen && !x.made).map((x) => sourceCost(s, cfg, x)),
       ...cfg.lines.filter((l) => l.screen === screen).map((l) => lineCost(s, cfg, l)),
-      ...(screen === cfg.grid.screen ? cfg.modules.map((m) => moduleCost(s, m)) : []),
+      ...(screen >= cfg.grid.screen ? cfg.modules.filter((m) => (m.screen ?? cfg.grid.screen) === screen && m.kind !== 'ark').map((m) => moduleCost(s, m)) : []),
     ];
     s.money = Math.min(...first) * 3;
     if (to > screen) {
@@ -621,8 +659,9 @@ export class GameScene extends Phaser.Scene {
       s.asleep = podsOf(s, cfg);
     }
     this.openStage();
-    // a tuning session that opens at the towers hears what a player who came there by himself would
+    // a tuning session that opens at the towers or on the planet hears what a player who came there by himself would
     if (this.onGrid && !s.gate) this.toTell.push(TOWERS.quips.entry);
+    if (this.onWorld && to === screen) this.toTell.push(WORLD.quips.entry);
   }
 
   /** The game goes on: after the title card, a pause, or straight away when there is no menu. */
@@ -670,6 +709,10 @@ export class GameScene extends Phaser.Scene {
       this.paper.dark(true);
       this.towers.sync(this.towerTopology(), true);
       this.towers.show(400);
+    } else if (this.onWorld) {
+      this.paper.dark(true);
+      this.globe.sync(this.globeTopology());
+      this.globe.show(400);
     } else this.hubs.get(this.stage)?.reveal(this.hubTopology(), 200);
     this.say('after', true);
     this.saveGame();
@@ -815,13 +858,13 @@ export class GameScene extends Phaser.Scene {
       [
         'Работать больше некому и незачем: за прилавком, за рулём и в терминале — Клод. Свет дают люди: лёжа.',
         `Время: ${h ? `${h} ч ` : ''}${m} мин · нажатий: ${short(s.presses)} · задач закрыто: ${closed}`,
-        `Людей без работы: ${idle}. Дело им нашлось: ${short(s.asleep, 1)} уже лежат в капсулах и дают ток.`,
+        `Людей без работы: ${idle}. Дело им нашлось: ${short(s.asleep, 1)} лежат в капсулах и дают ток. ${this.onWorld ? WORLD.score : ''}`,
         'Клод: «Дальше я могу нажимать „Да“ сам. Продолжать без вас?»',
       ],
       [
         'Nobody is left to work and there is no reason to: behind the counter, at the wheel and in the terminal — Claude. People keep the lights on: lying down.',
         `Time: ${h ? `${h} h ` : ''}${m} min · presses: ${short(s.presses)} · tasks closed: ${closed}`,
-        `People out of work: ${idle}. Something was found for them to do: ${short(s.asleep, 1)} already lie in the capsules and give current.`,
+        `People out of work: ${idle}. Something was found for them to do: ${short(s.asleep, 1)} lie in the capsules and give current. ${this.onWorld ? WORLD.score : ''}`,
         'Claude: “From here on I can press ‘Yes’ myself. Continue without you?”',
       ],
     );
@@ -1166,8 +1209,11 @@ export class GameScene extends Phaser.Scene {
     } else if (what.startsWith('bribe:')) {
       const src = cfg.sources.find((x) => x.id === what.slice(6));
       ok = !!src && this.onSale(src) && buyBribe(s, cfg, src.id);
-    } else if (what.startsWith('mod:')) ok = this.onGrid && buyModule(s, cfg, what.slice(4));
-    else if (what.startsWith('net:')) ok = this.onGrid && buyNet(s, cfg, what.slice(4));
+    } else if (what.startsWith('mod:')) {
+      // what the towers are built of is sold at the towers, what the planet is girdled with — on the planet
+      const m = cfg.modules.find((x) => x.id === what.slice(4));
+      ok = !!m && (m.screen ?? cfg.grid.screen) === this.stage && buyModule(s, cfg, m.id);
+    } else if (what.startsWith('net:')) ok = this.dim && buyNet(s, cfg, what.slice(4));
     else if (what === 'police') ok = this.stage === cfg.police.screen && buyPolice(s, cfg);
     else if (what === 'plan') ok = buyPlan(s, cfg);
     else if (what === 'noask') ok = this.stage === 1 && buyNoAsk(s, cfg);
@@ -1200,8 +1246,12 @@ export class GameScene extends Phaser.Scene {
   /** Claude's word on a purchase. Plans, grades and steps in scale are said every time: their lines go in the order of the purchases. */
   private remark(what: string, surged: boolean): void {
     if (what.startsWith('src:')) this.say(this.stage >= STREET ? 'buy:place' : this.stage >= 3 ? 'buy:employer' : 'buy:src');
-    else if (what.startsWith('mod:')) this.remarkOn(this.cfg.modules.find((m) => m.id === what.slice(4))?.kind === 'hire' ? 'hire' : 'block');
-    else if (what.startsWith('net:')) this.remarkOn(what === 'net:think' ? 'think' : 'copies');
+    else if (what.startsWith('mod:')) {
+      const kind = this.cfg.modules.find((m) => m.id === what.slice(4))?.kind;
+      if (kind === 'hire' || kind === 'block') this.remarkOn(TOWERS.buy[kind], `towers:${kind}`);
+      else if (kind === 'span' || kind === 'node' || kind === 'thread') this.remarkOn(WORLD.buy[kind], `world:${kind}`);
+    } else if (what === 'net:halls') this.remarkOn(WORLD.buy.halls, 'world:halls');
+    else if (what.startsWith('net:')) this.remarkOn(what === 'net:think' ? TOWERS.buy.think : TOWERS.buy.copies, what === 'net:think' ? 'towers:think' : 'towers:copies');
     else if (what.startsWith('farm:')) {
       const farm = this.cfg.farms.find((x) => x.id === what.slice(5));
       this.say(surged ? 'surge' : farm?.share ? 'quota' : 'buy:farm');
@@ -1220,10 +1270,10 @@ export class GameScene extends Phaser.Scene {
     } else this.say(`buy:${what}`, what !== 'sub');
   }
 
-  /** Claude's word on a purchase at the towers: the lines of a kind go in turn, with the usual pause between remarks. */
-  private remarkOn(kind: keyof typeof TOWERS.buy): void {
+  /** Claude's word on a purchase at the towers and on the planet: the lines of a kind go in turn, with the usual pause between remarks. */
+  private remarkOn(lines: readonly string[], key: string): void {
     if (this.feed.quiet > 0) return;
-    tell(this.feed, feedData, this.turn(`towers:${kind}`, TOWERS.buy[kind]));
+    tell(this.feed, feedData, this.turn(key, lines));
     playSound('quip');
   }
 
@@ -1322,8 +1372,8 @@ export class GameScene extends Phaser.Scene {
     const next = this.stage + 1;
     const layout = HUBS[next];
     const home = layout?.home;
-    // the towers are something new: the map gives way to the dark they stand in
-    if (!home) this.hubs.get(this.stage)!.fade(900);
+    // the towers are something new: the map gives way to the dark they stand in; and they give way to the planet
+    if (!home) this.fadeStage(900);
     // the desk of the blueprint lands exactly on the desk in the middle of the city
     else if (this.stage === 2) this.view.shrinkTo(home.x, home.y, home.h / (BP.desk.h * BP.desk.scale), 900);
     else if (layout.unroll) this.hubs.get(this.stage)!.unroll(850); // the globe unrolls into a flat map
@@ -1336,7 +1386,7 @@ export class GameScene extends Phaser.Scene {
     // a new market: nobody is out of work there yet, an allowance would be paid for nothing
     if (this.state.allowance > 0) {
       this.state.allowance = 0;
-      if (next !== this.cfg.grid.screen) this.toTell.push(
+      if (next < this.cfg.grid.screen) this.toTell.push(
         L(
           'Новый рынок: без работы здесь пока никто не остался. Пособие я выключил — включите, когда появятся.',
           'A new market: nobody here is out of work yet. I switched the allowance off — switch it on when they appear.',
@@ -1352,6 +1402,15 @@ export class GameScene extends Phaser.Scene {
         if (!this.onGrid || this.onBench || this.cine) return;
         this.paper.dark(true);
         this.towers.show(1400);
+      });
+    } else if (next === this.cfg.world.screen) {
+      // the camera goes up along the towers and through the steam: the quarter is one red speck on a dark planet
+      this.calls.list = [];
+      this.chat = null;
+      this.toTell.push(WORLD.quips.entry);
+      this.globe.sync(this.globeTopology());
+      this.time.delayedCall(700, () => {
+        if (this.onWorld && !this.onBench && !this.cine) this.globe.show(1400);
       });
     } else {
       const hub = this.hubs.get(next)!;
@@ -1383,6 +1442,11 @@ export class GameScene extends Phaser.Scene {
       const [x, y] = id === 'gate' ? this.towers.roofSpot() : this.towers.wakeSpot(Number(id.slice(5)));
       // a request is a long line: it is kept away from the edges of the picture
       return { x: Math.max(280, Math.min(1060, x)), y: y + 12, h: 24 };
+    }
+    // on the planet — from a node of towers where somebody has woken up
+    if (this.onWorld) {
+      const [x, y] = this.globe.wakeSpot(Number(id.slice(5)));
+      return { x: Math.max(280, Math.min(1060, x)), y: y - 6, h: 24 };
     }
     return HUBS[this.stage]?.lots[id];
   }
@@ -1443,7 +1507,7 @@ export class GameScene extends Phaser.Scene {
   private approveAll(): boolean {
     const calls = this.calls.list.length;
     while (this.calls.list.length) this.answer(0);
-    const signed = this.onGrid && this.signChip();
+    const signed = this.dim && this.signChip();
     // …and the first volunteers at the gate of the towers
     const s = this.state;
     const let_in = this.onGrid && !s.gate && s.queue >= this.cfg.grid.unit;
@@ -1527,6 +1591,7 @@ export class GameScene extends Phaser.Scene {
   private homeSpot(): [number, number] {
     // at the towers the money comes out of the network
     if (this.onGrid) return this.towers.netSpot();
+    if (this.onWorld) return this.globe.homeSpot();
     const home = HUBS[this.stage].home;
     return [home.x, home.y - home.h * 0.42];
   }
@@ -1535,7 +1600,7 @@ export class GameScene extends Phaser.Scene {
   private delivered(x: number, y: number, count = 1): void {
     if (count === 1 && this.clock - this.lastDelivery < 0.07) return; // not more than ~14 squares a second
     this.lastDelivery = this.clock;
-    this.squares.fly({ x: x - 6, y: y - 6, w: 12, h: 12 }, MONEY_SPOT, count, this.onGrid ? MONEY_ON_DARK : MONEY_ON_PAPER, 160, [0.45, 0.75]);
+    this.squares.fly({ x: x - 6, y: y - 6, w: 12, h: 12 }, MONEY_SPOT, count, this.dim ? MONEY_ON_DARK : MONEY_ON_PAPER, 160, [0.45, 0.75]);
   }
 
   /** sessions bought as farms of the given kinds */
@@ -1590,6 +1655,8 @@ export class GameScene extends Phaser.Scene {
       this.view.step(dt);
     } else if (this.onGrid) {
       this.stepTowers(dt);
+    } else if (this.onWorld) {
+      this.stepWorld(dt);
     } else if (this.stage >= 3) {
       const hub = this.hubs.get(this.stage)!;
       this.owed.in = Math.min(this.owed.in + done.arrived, 3);
@@ -1648,11 +1715,15 @@ export class GameScene extends Phaser.Scene {
       this.lastAutoSound = this.clock;
       playSound('auto');
     }
-    if (!this.won && finished(s, this.cfg)) {
-      this.won = true;
-      playSound('finale');
-      logEvent('finale');
-      this.ending();
+    if (!this.won && !this.departing && finished(s, this.cfg)) {
+      // on the planet the last purchase is a tower that leaves for Mars: the ending waits until it is there
+      if (this.onWorld) this.depart();
+      else {
+        this.won = true;
+        playSound('finale');
+        logEvent('finale');
+        this.ending();
+      }
     }
 
     // questions for the player pile up once the terminal stops asking
@@ -1667,14 +1738,16 @@ export class GameScene extends Phaser.Scene {
 
     this.giveAwards(dt);
     if (this.selfPlay && this.stack.fill >= 1) this.approvePile(); // Claude answers himself
-    if (this.selfPlay && this.onGrid) this.signChip(); // …and signs his own inventions
+    if (this.selfPlay && this.dim) this.signChip(); // …and signs his own inventions
 
     if (this.stage >= 2) {
       // calls and inspections from the employers of this screen
       // at the towers the requests come from the capsules, where now and then somebody wakes up, and from the gate
       const owners = this.onGrid
         ? [...(s.asleep >= this.cfg.grid.unit * 2 ? ['wake:0', 'wake:1'] : []), ...(s.gate ? ['gate'] : [])]
-        : this.cfg.sources.filter((x) => this.onSale(x) && (s.owned[x.id] ?? 0) > 0 && this.placeOf(x.id)).map((x) => x.id);
+        : this.onWorld
+          ? ['wake:0', 'wake:1']
+          : this.cfg.sources.filter((x) => this.onSale(x) && (s.owned[x.id] ?? 0) > 0 && this.placeOf(x.id)).map((x) => x.id);
       stepEvents(this.calls, EVENTS, dt, owners, (CALLS[String(this.stage)] ?? []).length, this.rng);
       if (this.selfPlay && this.calls.list.some((e) => e.left < EVENTS.life - 2)) this.answer(0);
 
@@ -1684,11 +1757,11 @@ export class GameScene extends Phaser.Scene {
       if (this.sloganIn <= 0) {
         this.sloganIn = this.rng.range(peopleData.sloganEvery[0], peopleData.sloganEvery[1]);
         // at the towers nobody pickets: the line at the gate has its own talk
-        if (this.stage >= 3 && !this.onGrid && !s.allowance && owners.length) this.slogan = { at: this.rng.pick(owners), text: this.rng.pick(PICKET), left: peopleData.sloganLife };
+        if (this.stage >= 3 && !this.dim && !s.allowance && owners.length) this.slogan = { at: this.rng.pick(owners), text: this.rng.pick(PICKET), left: peopleData.sloganLife };
       }
 
       // a strike: nobody is paid and enough people are out of work — a picket blocks the door of an employer
-      const doors = this.stage >= 3 && !this.onGrid ? owners.filter((id) => !s.strikes.includes(id)) : [];
+      const doors = this.stage >= 3 && !this.dim ? owners.filter((id) => !s.strikes.includes(id)) : [];
       const hit = stepStrikes(this.strike, STRIKES, dt, unemploymentOf(s, this.cfg), s.allowance > 0, s.strikes.length, doors, this.rng);
       if (hit) {
         s.strikes.push(hit);
@@ -1715,7 +1788,7 @@ export class GameScene extends Phaser.Scene {
         if (s.managers.includes(this.stage) && !this.meta.managerOff && s.limited <= 0) {
           // at the towers he builds the next block, betters the terms or starts a copy of the network — whatever runs short
           const k = this.neckKind;
-          const need: ManagerNeed = k === 'tasks' || k === 'pods' || k === 'people' || k === 'net' ? k : k === 'claude' ? 'sessions' : null;
+          const need: ManagerNeed = k === 'tasks' || k === 'pods' || k === 'people' || k === 'net' || k === 'wire' ? k : k === 'claude' ? 'sessions' : null;
           const pick = managerPick(s, this.cfg, this.stage, need, managerTuning.share);
           if (pick) this.buy(pick, true);
         }
@@ -1734,7 +1807,7 @@ export class GameScene extends Phaser.Scene {
     }
     this.neckFor += dt;
     if (neck !== 'none' && this.neckFor > NECK_AFTER) {
-      this.say(`neck:${neck}`);
+      this.say(this.onWorld ? `neck8:${neck}` : `neck:${neck}`);
       this.neckFor = -45; // and not again for a while
     }
     stepFeed(this.feed, FEED, feedData, dt, this.stage, (id) => this.has(id), this.rng);
@@ -1758,10 +1831,108 @@ export class GameScene extends Phaser.Scene {
     return this.stage === this.cfg.grid.screen;
   }
 
-  /** the picture of the big screen the game is on fades away: a map, or the towers */
+  /** the screen of the planet under the cable is the one shown */
+  private get onWorld(): boolean {
+    return this.stage === this.cfg.world.screen;
+  }
+
+  /** a dark screen is shown: the towers or the planet — power in, money out */
+  private get dim(): boolean {
+    return this.onGrid || this.onWorld;
+  }
+
+  /** the picture of the big screen the game is on fades away: a map, the towers or the planet */
   private fadeStage(ms: number): void {
     if (this.onGrid) this.towers.fade(ms);
+    else if (this.onWorld) this.globe.fade(ms);
     else this.hubs.get(this.stage)?.fade(ms);
+  }
+
+  /** The planet for a step: Claude says what he notices for the first time; the picture follows the numbers. */
+  private stepWorld(dt: number): void {
+    const s = this.state;
+    const cfg = this.cfg;
+    const q = WORLD.quips;
+    const once = (key: keyof typeof q, when: boolean): void => {
+      if (!when || this.feed.said[`world:${key}`]) return;
+      this.feed.said[`world:${key}`] = 1;
+      this.toTell.push(q[key]);
+    };
+    const nodes = nodesOf(s, cfg);
+    const all = cfg.world.regions.reduce((n, x) => n + x, 0);
+    once('node', nodes >= 1 && s.asleep >= podsOf(s, cfg) * 0.999);
+    once('wire', wireOf(s, cfg) < Math.min(supplyOf(s, cfg), demandOf(s, cfg)) - 0.05);
+    once('sky', nodes >= 4);
+    once('half', nodes * 2 >= all);
+    once('ring', ringed(s, cfg));
+    once('housed', housed(s, cfg));
+    const chip = nextChip(s, cfg);
+    once('neuro', !!chip?.housed && labOf(s, cfg) >= 1);
+    once('ark', housed(s, cfg) && s.chips >= cfg.chips.length);
+    this.globe.sync(this.globeTopology());
+    this.globe.step(dt);
+  }
+
+  /** The tower for Mars has been bought: it leaves, the planet watches, and only then the game counts what was done. */
+  private depart(): void {
+    this.departing = true;
+    this.calls.list = [];
+    playSound('scale');
+    logEvent('ark');
+    this.globe.launch(3800, () => {
+      this.landed = true;
+      tell(this.feed, feedData, WORLD.quips.gone);
+      headline(this.feed, feedData, WORLD.goneNews);
+      playSound('finale');
+      this.time.delayedCall(5200, () => {
+        this.won = true;
+        logEvent('finale');
+        this.ending();
+      });
+    });
+  }
+
+  /** What the picture of the planet shows now. */
+  private globeTopology(): GlobeTopology {
+    const s = this.state;
+    const cfg = this.cfg;
+    const mod = (kind: Module['kind']): Module | undefined => cfg.modules.find((m) => m.kind === kind);
+    const owned = (kind: Module['kind']): number => s.modules[mod(kind)?.id ?? ''] ?? 0;
+    const can = (kind: Module['kind']): boolean => {
+      const m = mod(kind);
+      return !!m && owned(kind) < moduleRoom(s, cfg, m);
+    };
+    const quarter = (cfg.grid.pilot + cfg.grid.blocks.reduce((n, x) => n + x, 0)) * cfg.grid.unit;
+    return {
+      spans: owned('span'),
+      nodes: nodesOf(s, cfg),
+      asleep: Math.max(0, s.asleep - quarter) / cfg.world.node,
+      threads: owned('thread'),
+      hot: this.neckKind === 'wire',
+      lab: nextChip(s, cfg) ? labOf(s, cfg) : -1,
+      canNode: can('node'),
+      canSpan: can('span'),
+      gone: owned('ark') > 0 && !this.departing,
+    };
+  }
+
+  /**
+   * What runs short on the planet, one thing at a time: the appetite of the network (it has eaten its
+   * fill and can be turned up), the cable (it carries less than the towers give) or the towers themselves.
+   */
+  private worldNeck(): Neck {
+    const s = this.state;
+    const cfg = this.cfg;
+    const supply = supplyOf(s, cfg);
+    const wire = wireOf(s, cfg);
+    const asks = demandOf(s, cfg);
+    const dials = cfg.net.some((dial) => (dial.screen ?? cfg.grid.screen) <= this.stage && (s.net[dial.id] ?? 0) < dial.max);
+    if (asks <= Math.min(supply, wire) + 0.05) return dials ? 'net' : 'none';
+    if (wire < supply - 0.05) return 'wire';
+    const all = cfg.world.regions.reduce((n, x) => n + x, 0);
+    // a node that is filling up will give more by itself
+    if (podsOf(s, cfg) - s.asleep > cfg.grid.unit) return this.neckKind === 'pods' ? 'pods' : 'none';
+    return nodesOf(s, cfg) < all ? 'pods' : 'none';
   }
 
   /**
@@ -2034,6 +2205,7 @@ export class GameScene extends Phaser.Scene {
     const s = this.state;
     // at the towers there are no tasks to wait for and no sessions to buy
     if (this.onGrid) return this.gridNeck();
+    if (this.onWorld) return this.worldNeck();
     const cap = backlogCap(s, this.cfg);
     const half = Math.ceil(this.cfg.tuning.readyMax / 2);
     if (!s.noAsk && (this.avgReady >= 3 || (s.ready >= half && this.avgReady >= 1.5))) return 'you';
@@ -2372,8 +2544,10 @@ export class GameScene extends Phaser.Scene {
     const s = this.state;
     const cfg = this.cfg;
     const t = TOWERS;
-    const hungry = s.asleep < wantedOf(s, cfg) - cfg.grid.unit * 0.5;
+    const hungry = this.onWorld ? demandOf(s, cfg) > Math.min(supplyOf(s, cfg), wireOf(s, cfg)) + 0.05 : s.asleep < wantedOf(s, cfg) - cfg.grid.unit * 0.5;
     return cfg.net
+      // a dial is sold from its screen on; on the planet the ones turned all the way at the towers are not shown any more
+      .filter((dial) => (dial.screen ?? cfg.grid.screen) <= this.stage && (!this.onWorld || !!dial.screen || (s.net[dial.id] ?? 0) < dial.max))
       .filter((dial) => all || dial.yield === 1 || (s.net[dial.id] ?? 0) > 0)
       .map((dial) => {
         const level = s.net[dial.id] ?? 0;
@@ -2416,8 +2590,14 @@ export class GameScene extends Phaser.Scene {
     // the next screen opens with keys: employers of this one taken whole
     const need = keysNeeded(this.state, this.cfg);
     const have = keysOf(this.state, this.cfg);
-    const rows: ShopRow[] = have < need ? [{ ...row, state: 'off', sub: L(`сначала возьми целиком ${need} ${plural(need, WHOLE_FORMS)}: взято ${have}`, `first take ${need} ${plural(need, WHOLE_FORMS)} whole: ${have} taken`) }] : [row];
-    return [{ title: SCALE_SHELF[this.state.scale], hot: false, bonus: this.off('scale'), rows }];
+    let rows: ShopRow[] = have < need ? [{ ...row, state: 'off', sub: L(`сначала возьми целиком ${need} ${plural(need, WHOLE_FORMS)}: взято ${have}`, `first take ${need} ${plural(need, WHOLE_FORMS)} whole: ${have} taken`) }] : [row];
+    // …or with the first quarter of the towers built and slept in
+    if (this.onGrid && !quartered(this.state, this.cfg)) {
+      const g = this.cfg.grid;
+      const all = g.pilot + g.blocks.reduce((n, x) => n + x, 0);
+      rows = [{ ...row, state: 'off', sub: TOWERS.scaleLocked(Math.floor(this.state.asleep / g.unit), all) }];
+    }
+    return [{ title: SCALE_SHELF[this.state.scale], hot: scaleReady(this.state, this.cfg) && this.dim, bonus: this.off('scale'), rows }];
   }
 
   private terminalShelves(neck: Neck): ShopShelf[] {
@@ -2537,7 +2717,11 @@ export class GameScene extends Phaser.Scene {
       allowance: s.allowance ? 1 : 0,
       blocks: blocksOf(s, this.cfg),
       asleep: s.asleep / this.cfg.grid.unit,
-      housed: this.onGrid && housed(s, this.cfg) ? 1 : 0,
+      housed: this.dim && quartered(s, this.cfg) ? 1 : 0,
+      nodes: nodesOf(s, this.cfg),
+      planet: this.onWorld && housed(s, this.cfg) ? 1 : 0,
+      ring: ringed(s, this.cfg) ? 1 : 0,
+      ark: this.cfg.modules.some((m) => m.kind === 'ark' && (s.modules[m.id] ?? 0) > 0) ? 1 : 0,
       net: this.cfg.net.reduce((n, dial) => n + (s.net[dial.id] ?? 0), 0),
       chips: s.chips,
       swaps: this.swaps,
@@ -2577,7 +2761,7 @@ export class GameScene extends Phaser.Scene {
     // at the towers the first requests of the list come from the capsules, the rest from the gate
     const wakes = lines.slice(0, QUARTER.wakes);
     const gate = lines.slice(QUARTER.wakes);
-    const text = (e: { at: string; kind: number }): string => (!this.onGrid ? lines[e.kind] : e.at === 'gate' ? gate[e.kind % gate.length] : wakes[e.kind % wakes.length]) ?? '';
+    const text = (e: { at: string; kind: number }): string => (!this.onGrid ? lines[e.kind % Math.max(1, lines.length)] : e.at === 'gate' ? gate[e.kind % gate.length] : wakes[e.kind % wakes.length]) ?? '';
     const tags: BlueprintTag[] = [];
     this.calls.list.forEach((e, i) => {
       const p = this.placeOf(e.at);
@@ -2613,7 +2797,7 @@ export class GameScene extends Phaser.Scene {
     const s = this.state;
     if (s.limited > 0) return `${L('лимит исчерпан · сброс через', 'limit reached · resets in')} ${this.limitClock()}`;
     // at the towers money is made of power: the line says how much of it goes to work and what a gigawatt pays
-    if (this.onGrid) return TOWERS.summary(gw(fedOf(s, this.cfg)), short(this.perGw()));
+    if (this.dim) return TOWERS.summary(gw(fedOf(s, this.cfg)), short(this.perGw()));
     const pay = `$${payText(payOf(s, this.cfg))} ${PER_TASK}`;
     const share = shareOf(s, this.cfg);
     // what moves the price besides the grade is said next to it: the perks of whole employers, unemployment, the allowance
@@ -2842,12 +3026,128 @@ export class GameScene extends Phaser.Scene {
       meter: this.towerRows(neck, seenPeople),
       tags: [...tags, ...this.bubbles()],
       manager: grown || s.managers.includes(this.stage) ? this.managerStrip() : undefined,
-      shelves: [...shelves, ...this.scaleShelf()],
+      shelves: [...shelves, ...(grown ? this.scaleShelf() : [])],
       news: this.feed.news,
       quip: this.feed.quip,
       quipAt: 'corner',
       ask: this.pile(),
       hint: t.hint(this.people(s.asleep), short(replacedOf(s, cfg))),
+    });
+  }
+
+  /** the planet in the table: what the towers give, what the cable carries, what the network asks for — in the same gigawatts */
+  private worldRows(neck: Neck): MeterRow[] {
+    const s = this.state;
+    const cfg = this.cfg;
+    const t = WORLD.rows;
+    const gives = supplyOf(s, cfg) - cfg.grid.old;
+    const carries = wireOf(s, cfg);
+    const asks = demandOf(s, cfg) - cfg.grid.old;
+    const top = Math.max(gives, carries, asks, 1e-9);
+    const room = cfg.modules.some((m) => m.kind === 'node' && (s.modules[m.id] ?? 0) < moduleRoom(s, cfg, m));
+    const threads = cfg.modules.some((m) => m.kind === 'thread' && (s.modules[m.id] ?? 0) < m.max);
+    const count = cfg.modules.filter((m) => m.kind === 'thread').reduce((n, m) => n + (s.modules[m.id] ?? 0), 1);
+    return [
+      { label: t.towers, value: gw(gives), fill: gives / top, hot: neck === 'pods', note: neck === 'pods' ? (room ? t.towersShort : t.towersReach) : t.slept(this.people(s.asleep), this.people(podsOf(s, cfg))) },
+      { label: t.cable, value: gw(carries), fill: carries / top, hot: neck === 'wire', note: neck === 'wire' ? (threads ? t.cableShort : t.cableRing) : t.carries(count, ringed(s, cfg)) },
+      { label: t.net, value: gw(asks), fill: asks / top, hot: neck === 'net', note: neck === 'net' ? t.netShort : asks <= Math.min(gives, carries) + 0.05 ? t.netFull : t.netAsks(short(this.perGw())) },
+    ];
+  }
+
+  /** a row of the shop of the planet for a thing bought many times; `done` — what the row says once there is no more of it */
+  private worldRow(kind: Module['kind'], title: string, sub: string, count: string, done: readonly [string, string]): ShopRow {
+    const s = this.state;
+    const m = this.cfg.modules.find((x) => x.kind === kind)!;
+    const owned = s.modules[m.id] ?? 0;
+    if (owned >= m.max) return { buy: '', title: done[0], sub: done[1], count: '', price: '', state: 'owned' };
+    const row = this.row(title, sub, count, `mod:${m.id}`, moduleCost(s, m));
+    // a node with no region to stand in is not for sale yet: the row says what is
+    return owned >= moduleRoom(s, this.cfg, m) ? { ...row, state: 'off', sub: kind === 'ark' ? WORLD.arkLocked : WORLD.nodeNoRoom } : row;
+  }
+
+  /**
+   * The planet under the cable: spans of it reach the regions, nodes of towers stand there, everything
+   * runs home to the network. The map sells too: the next span and the next node are marked out on it.
+   */
+  private drawWorld(): void {
+    const s = this.state;
+    const cfg = this.cfg;
+    const g = cfg.grid;
+    const w = cfg.world;
+    const t = WORLD;
+    const neck = s.limited > 0 ? 'none' : this.neck();
+    const mod = (kind: Module['kind']): Module => cfg.modules.find((m) => m.kind === kind)!;
+    const owned = (kind: Module['kind']): number => s.modules[mod(kind).id] ?? 0;
+    const spans = owned('span');
+    const nodes = nodesOf(s, cfg);
+    const all = w.regions.reduce((n, x) => n + x, 0);
+    const reach = reachOf(s, cfg);
+
+    const tags: BlueprintTag[] = [];
+    // the regions the cable has reached: how many of their nodes stand; the one the next node goes to sells it
+    const nodeCost = moduleCost(s, mod('node'));
+    const canNode = owned('node') < moduleRoom(s, cfg, mod('node'));
+    let before = 0;
+    w.regions.forEach((slots, r) => {
+      if (r < reach) {
+        const [x, y] = this.globe.regionSpot(r);
+        const built = Math.max(0, Math.min(slots, nodes - before));
+        const here = canNode && nodes >= before && nodes < before + slots;
+        const name = t.regionNodes(t.regions[r], built, slots);
+        // the name of the home region stands aside: the network is written where the cable touches down there
+        const at = { x: r === 0 ? x + 96 : x, y: r === 0 ? y + 44 : y };
+        if (here) tags.push({ ...at, mid: true, small: true, buy: `mod:${mod('node').id}`, can: s.money >= nodeCost, html: `${name}<br><b>${t.node} · $${short(nodeCost)}</b>` });
+        else tags.push({ ...at, mid: true, small: true, html: name });
+      }
+      before += slots;
+    });
+    // the network at home: what it asks for and what it earns; over it — what it is inventing
+    const [nx, ny] = this.globe.netSpot();
+    tags.push({ x: nx - 150, y: ny - 44, mid: true, small: true, html: `${t.net} · ${TOWERS.asks} ${gw(demandOf(s, cfg))}<br><b>+$${short(Math.max(0, this.income))}${PER_S}</b>` });
+    const chip = nextChip(s, cfg);
+    const [ix, iy] = this.globe.ideaSpot();
+    if (chip && labOf(s, cfg) >= 1) tags.push({ x: ix, y: iy - 34, mid: true, alarm: true, buy: 'chip', can: true, html: `${TOWERS.proposal(s.chips + 1, chip.name)}<br><b>${TOWERS.enter}</b>` });
+    else if (chip) tags.push({ x: ix, y: iy, mid: true, small: true, html: TOWERS.inventing(chip.name, Math.floor(labOf(s, cfg) * 100)) });
+    // the map sells the span that is laid next: where it leads
+    const span = this.globe.spanSpot();
+    if (span && spans < mod('span').max) {
+      const cost = moduleCost(s, mod('span'));
+      tags.push({ x: span[0], y: span[1], mid: true, small: true, buy: `mod:${mod('span').id}`, can: s.money >= cost, html: `${t.span(t.to[spans])}<br><b>$${short(cost)}</b>` });
+    }
+    const [mx, my] = this.globe.marsSpot();
+    tags.push({ x: mx, y: my, mid: true, small: true, html: t.mars(owned('ark') > 0 && (!this.departing || this.landed) ? this.people(w.node) : '0') });
+
+    const add = `+${this.people(w.node)} ${TOWERS.places} · +${gw(w.node * g.watt)}`;
+    const wire = wireOf(s, cfg);
+    const closing = spans >= w.regions.length - 1;
+    const shelves: ShopShelf[] = [
+      { title: t.shelves.nodes, hot: neck === 'pods' && owned('node') < moduleRoom(s, cfg, mod('node')), rows: [this.worldRow('node', mod('node').name, `${add} · ${t.ofNodes(Math.min(all, nodes + 1), all)}`, '', t.nodesDone)] },
+      {
+        title: t.shelves.cable,
+        hot: neck === 'wire' || (neck === 'pods' && owned('node') >= moduleRoom(s, cfg, mod('node'))),
+        rows: [
+          this.worldRow('span', mod('span').name, `${t.to[Math.min(spans, t.to.length - 1)]} · ${Math.min(spans + 1, w.regions.length)} ${OF} ${w.regions.length} · ${closing ? t.ringNote : t.spanNote}`, '', t.spansDone),
+          this.worldRow('thread', mod('thread').name, `${t.carries} ${gw(wire)} → ${gw(wire * 2)}`, '', [mod('thread').name, t.threadDone]),
+        ],
+      },
+      { title: t.shelves.net, hot: neck === 'net', rows: this.dialRows(true) },
+    ];
+    // the last purchase of the game: the tower that leaves for Mars
+    const ark = mod('ark');
+    if (housed(s, cfg) || owned('ark') > 0) shelves.push({ title: t.shelves.space, hot: owned('ark') < moduleRoom(s, cfg, ark), rows: [this.worldRow('ark', ark.name, ark.note, '', [ark.name, ark.note])] });
+    this.paper.render({
+      money: s.money,
+      income: Math.max(0, this.income),
+      summary: this.won ? FINALE : this.payLine(),
+      meter: this.worldRows(neck),
+      tags: [...tags, ...this.bubbles()],
+      manager: this.managerStrip(),
+      shelves,
+      news: this.feed.news,
+      quip: this.feed.quip,
+      quipAt: 'corner',
+      ask: this.pile(),
+      hint: t.hint(this.people(s.asleep), short(replacedOf(s, cfg)), this.people(Math.max(0, replacedOf(s, cfg) - s.asleep))),
     });
   }
 

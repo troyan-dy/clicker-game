@@ -4,7 +4,9 @@
  * M23 perks of the employers taken whole, M24 the people left without work and the price of a task that
  * falls with unemployment, M25 the street: a factory makes robots that take the jobs, M26 packs of robot dogs let in by a bribe, M27 robots wear out and are broken in riots, robot police guards them,
  * M28 the towers: power in, money out — people come and stand in line at the gate, blocks of capsules take
- * them in, whoever sleeps there gives a hundred watts, and the neural network turns the power into money):
+ * them in, whoever sleeps there gives a hundred watts, and the neural network turns the power into money,
+ * M32 the planet under the cable: spans of it reach the regions, nodes of the same towers stand there, the
+ * cable carries only so much, and the last tower leaves for Mars):
  *
  *   sources ──► backlog ──► Claude (plan rate) ──► waiting for «Да» ──► $ per task
  *                  └──────► subagents: their own sessions, no «Да» needed ──► $
@@ -107,8 +109,11 @@ export interface Farm {
 }
 
 /**
- * What the towers are built of and filled by (M28). «block» — the next block of capsules: how many it
- * holds is in the tuning, block by block; «hire» — one more reason to come: `amount` more people a second.
+ * What the towers are built of and filled by (M28) and what the planet is girdled with (M32).
+ * «block» — the next block of capsules: how many it holds is in the tuning, block by block; «hire» — one
+ * more reason to come: `amount` more people a second; «span» — the cable reaches the next region (the
+ * last one closes the ring); «node» — one more node of towers in a region the cable has reached;
+ * «thread» — the cable carries twice as much; «ark» — the tower that leaves for Mars: the last purchase.
  */
 export interface Module {
   id: string;
@@ -116,11 +121,13 @@ export interface Module {
   /** short plural name for a caption */
   tag: string;
   note: string;
-  kind: 'block' | 'hire';
+  kind: 'block' | 'hire' | 'span' | 'node' | 'thread' | 'ark';
   amount: number;
   price: number;
   growth: number;
   max: number;
+  /** the screen it is sold on; absent — the screen of the towers */
+  screen?: number;
 }
 
 /**
@@ -136,6 +143,8 @@ export interface NetParam {
   price: number;
   growth: number;
   max: number;
+  /** the screen it is sold on; absent — the screen of the towers */
+  screen?: number;
 }
 
 /**
@@ -152,6 +161,8 @@ export interface Chip {
   /** every gigawatt pays this many times more; the network asks for `draw` times as much */
   yield: number;
   draw: number;
+  /** it is not the power that brings this one: it comes when the whole planet sleeps */
+  housed?: boolean;
 }
 
 /** The towers (M28). */
@@ -174,6 +185,20 @@ export interface GridTuning {
   /** the line at the gate holds this many people: the rest wait in the park */
   line: number;
   /** people the gate lets in every second */
+  admit: number;
+}
+
+/** The planet under the cable (M32). */
+export interface WorldTuning {
+  /** the screen it is seen on */
+  screen: number;
+  /** people a node of towers holds: as many as the whole quarter of the screen before */
+  node: number;
+  /** nodes every region has room for, in the order the cable reaches them; the first one is reached from the start */
+  regions: number[];
+  /** gigawatts the cable carries on one thread; every thread more and the closed ring double it */
+  wire: number;
+  /** people the nodes take in every second: by now the line stands everywhere */
   admit: number;
 }
 
@@ -288,6 +313,7 @@ export interface PipeConfig {
   /** generations of hardware the network invents, in order */
   chips: readonly Chip[];
   grid: GridTuning;
+  world: WorldTuning;
   auto: AutoConfig;
 }
 
@@ -497,10 +523,15 @@ export function shareOf(s: PipeState, cfg: PipeConfig): number {
   return Math.min(100, share);
 }
 
-/** the end of the game: the last screen is reached and everything on it is taken — every employer whole, every capsule of the towers built and slept in */
+/**
+ * The end of the game: the last screen is reached and everything on it is taken — every employer whole;
+ * where the towers are the last thing, every capsule built and slept in; where the planet is — the tower
+ * for Mars has left.
+ */
 export function finished(s: PipeState, cfg: PipeConfig): boolean {
   const last = 2 + cfg.scales.length;
   if (s.scale < cfg.scales.length || !cfg.sources.every((x) => x.screen !== last || whole(s, x))) return false;
+  if (last >= cfg.world.screen) return ownedOf(s, cfg, 'ark') > 0;
   return last < cfg.grid.screen || housed(s, cfg);
 }
 
@@ -666,9 +697,47 @@ export function capsulesOf(s: PipeState, cfg: PipeConfig): number {
   return n;
 }
 
-/** places to sleep in, in people */
+/** the planet is girdled now: the cable goes from region to region */
+export function worldOn(s: PipeState, cfg: PipeConfig): boolean {
+  return screenOf(s) >= cfg.world.screen;
+}
+
+/** regions the cable has reached: the first one is home */
+export function reachOf(s: PipeState, cfg: PipeConfig): number {
+  return Math.min(cfg.world.regions.length, 1 + ownedOf(s, cfg, 'span'));
+}
+
+/** the last span is laid: the cable goes all the way round the planet */
+export function ringed(s: PipeState, cfg: PipeConfig): boolean {
+  return ownedOf(s, cfg, 'span') >= cfg.world.regions.length;
+}
+
+/** nodes of towers the regions reached so far have room for */
+export function roomOf(s: PipeState, cfg: PipeConfig): number {
+  let n = 0;
+  for (let i = reachOf(s, cfg) - 1; i >= 0; i--) n += cfg.world.regions[i];
+  return n;
+}
+
+/** nodes of towers that stand on the planet, besides the first quarter */
+export function nodesOf(s: PipeState, cfg: PipeConfig): number {
+  return Math.min(roomOf(s, cfg), ownedOf(s, cfg, 'node'));
+}
+
+/** places to sleep in, in people: the capsules of the first quarter and every node on the planet */
 export function podsOf(s: PipeState, cfg: PipeConfig): number {
-  return capsulesOf(s, cfg) * cfg.grid.unit;
+  return capsulesOf(s, cfg) * cfg.grid.unit + nodesOf(s, cfg) * cfg.world.node;
+}
+
+/** the first quarter is built and somebody sleeps in every capsule of it: the key to the planet */
+export function quartered(s: PipeState, cfg: PipeConfig): boolean {
+  return blocksOf(s, cfg) >= cfg.grid.blocks.length && s.asleep >= capsulesOf(s, cfg) * cfg.grid.unit * 0.999;
+}
+
+/** gigawatts the cable can carry to the network; before the planet nothing stands between the towers and it */
+export function wireOf(s: PipeState, cfg: PipeConfig): number {
+  if (!worldOn(s, cfg)) return Infinity;
+  return cfg.world.wire * 2 ** ownedOf(s, cfg, 'thread') * (ringed(s, cfg) ? 2 : 1);
 }
 
 /** people who come to the gate every second: by themselves, and for every reason they were given */
@@ -678,9 +747,12 @@ export function hireOf(s: PipeState, cfg: PipeConfig): number {
   return n;
 }
 
-/** every block is built and somebody sleeps in every capsule */
+/** everything is built and somebody sleeps everywhere: the quarter, and — once the planet is reached — every node of every region */
 export function housed(s: PipeState, cfg: PipeConfig): boolean {
-  return blocksOf(s, cfg) >= cfg.grid.blocks.length && s.asleep >= podsOf(s, cfg) - cfg.grid.unit * 0.01;
+  if (!quartered(s, cfg)) return false;
+  if (2 + cfg.scales.length < cfg.world.screen) return true;
+  const all = cfg.world.regions.reduce((n, x) => n + x, 0);
+  return worldOn(s, cfg) && ownedOf(s, cfg, 'node') >= all && s.asleep >= podsOf(s, cfg) * 0.999;
 }
 
 /** gigawatts the network gets: what the old grid still gives and what the sleepers add */
@@ -710,9 +782,9 @@ export function demandOf(s: PipeState, cfg: PipeConfig): number {
   return k;
 }
 
-/** gigawatts that go to work: the network eats no more than it asks for */
+/** gigawatts that go to work: the network eats no more than it asks for, and no more than the cable brings it */
 export function fedOf(s: PipeState, cfg: PipeConfig): number {
-  return Math.min(supplyOf(s, cfg), demandOf(s, cfg));
+  return Math.min(supplyOf(s, cfg), demandOf(s, cfg), wireOf(s, cfg));
 }
 
 /** people the network still has power to ask for: asleep, they would feed it full */
@@ -726,17 +798,22 @@ export function nextChip(s: PipeState, cfg: PipeConfig): Chip | undefined {
   return c && c.screen <= screenOf(s) ? c : undefined;
 }
 
-/** 0..1: how far the network is with its next invention; 1 — it waits for a «Да» */
+/** 0..1: how far the network is with its next invention; 1 — it waits for a «Да». The last one comes with the last sleeper. */
 export function labOf(s: PipeState, cfg: PipeConfig): number {
   const c = nextChip(s, cfg);
-  return c ? Math.min(1, s.lab / c.need) : 0;
+  if (!c) return 0;
+  if (!c.housed) return Math.min(1, s.lab / c.need);
+  if (housed(s, cfg)) return 1;
+  const all = cfg.grid.pilot + cfg.grid.blocks.reduce((n, x) => n + x, 0);
+  const people = all * cfg.grid.unit + cfg.world.regions.reduce((n, x) => n + x, 0) * cfg.world.node;
+  return Math.min(0.99, s.asleep / people);
 }
 
 /** The «Да» under an invention: the network runs on the next generation of hardware from now on. */
 export function takeChip(s: PipeState, cfg: PipeConfig): Chip | undefined {
   const c = nextChip(s, cfg);
-  if (!c || s.lab < c.need) return undefined;
-  s.lab -= c.need;
+  if (!c || labOf(s, cfg) < 1) return undefined;
+  if (!c.housed) s.lab -= c.need;
   s.chips++;
   return c;
 }
@@ -756,13 +833,22 @@ export function netCost(s: PipeState, p: NetParam): number {
   return Math.round(p.price * p.growth ** (s.net[p.id] ?? 0));
 }
 
-/** One more block of capsules, or one more reason for people to come. */
+/** how many of a thing the towers and the planet are built of can be owned right now: a node needs a region the cable has reached, the tower for Mars — a planet that sleeps and a network that has invented everything */
+export function moduleRoom(s: PipeState, cfg: PipeConfig, m: Module): number {
+  if ((m.screen ?? cfg.grid.screen) > screenOf(s)) return 0;
+  if (m.kind === 'block') return Math.min(m.max, cfg.grid.blocks.length);
+  if (m.kind === 'span') return Math.min(m.max, cfg.world.regions.length);
+  if (m.kind === 'node') return Math.min(m.max, roomOf(s, cfg));
+  if (m.kind === 'ark') return housed(s, cfg) && s.chips >= cfg.chips.length ? m.max : 0;
+  return m.max;
+}
+
+/** One more block of capsules or reason for people to come; on the planet — a span of the cable, a node of towers, a thread, the tower for Mars. */
 export function buyModule(s: PipeState, cfg: PipeConfig, id: string): boolean {
   const m = cfg.modules.find((x) => x.id === id);
   if (!m || !gridOn(s, cfg)) return false;
   const owned = s.modules[id] ?? 0;
-  const max = m.kind === 'block' ? Math.min(m.max, cfg.grid.blocks.length) : m.max;
-  if (owned >= max || !spend(s, moduleCost(s, m))) return false;
+  if (owned >= moduleRoom(s, cfg, m) || !spend(s, moduleCost(s, m))) return false;
   s.modules[id] = owned + 1;
   return true;
 }
@@ -770,7 +856,7 @@ export function buyModule(s: PipeState, cfg: PipeConfig, id: string): boolean {
 /** One more step of a dial of the network: it asks for more and pays more. */
 export function buyNet(s: PipeState, cfg: PipeConfig, id: string): boolean {
   const p = cfg.net.find((x) => x.id === id);
-  if (!p || !gridOn(s, cfg)) return false;
+  if (!p || (p.screen ?? cfg.grid.screen) > screenOf(s)) return false;
   const level = s.net[id] ?? 0;
   if (level >= p.max || !spend(s, netCost(s, p))) return false;
   s.net[id] = level + 1;
@@ -786,10 +872,18 @@ function stepGrid(s: PipeState, cfg: PipeConfig, dt: number): { came: number; in
   const g = cfg.grid;
   const came = Math.max(0, Math.min(hireOf(s, cfg) * dt, g.line - s.queue));
   s.queue += came;
-  const into = s.gate ? Math.max(0, Math.min(s.queue, podsOf(s, cfg) - s.asleep, g.admit * dt)) : 0;
+  const free = podsOf(s, cfg) - s.asleep;
+  let into: number;
+  if (worldOn(s, cfg)) {
+    // on the planet the line stands at every node: each one that has room fills by itself, all of them at once
+    into = Math.max(0, Math.min(free, cfg.world.admit * dt * Math.ceil(free / cfg.world.node)));
+  } else {
+    into = s.gate ? Math.max(0, Math.min(s.queue, free, g.admit * dt)) : 0;
+    s.queue -= into;
+  }
   s.asleep += into;
-  s.queue -= into;
-  if (nextChip(s, cfg)) s.lab += s.asleep * g.watt * dt;
+  const chip = nextChip(s, cfg);
+  if (chip && !chip.housed) s.lab += s.asleep * g.watt * dt;
   return { came, into };
 }
 
@@ -1049,9 +1143,14 @@ export function buyFarm(s: PipeState, cfg: PipeConfig, id: string): boolean {
   return true;
 }
 
+/** the next screen may be opened: its keys are there — employers taken whole, or the first quarter of the towers built and slept in */
+export function scaleReady(s: PipeState, cfg: PipeConfig): boolean {
+  return keysOf(s, cfg) >= keysNeeded(s, cfg) && (screenOf(s) !== cfg.grid.screen || quartered(s, cfg));
+}
+
 /** The next step up in scale; the first one needs a terminal that agrees by itself. */
 export function buyScale(s: PipeState, cfg: PipeConfig): boolean {
-  if (!cfg.scales[s.scale] || !s.noAsk || keysOf(s, cfg) < keysNeeded(s, cfg) || !spend(s, scaleCost(s, cfg))) return false;
+  if (!cfg.scales[s.scale] || !s.noAsk || !scaleReady(s, cfg) || !spend(s, scaleCost(s, cfg))) return false;
   s.scale++;
   return true;
 }

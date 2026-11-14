@@ -156,7 +156,7 @@ export function restorePipe(cfg: PipeConfig, raw: unknown): PipeState {
   // the towers: what they are built of, the dials and the hardware of the network, who stands in line and who sleeps
   const modules = counts(r.modules);
   for (const m of cfg.modules) {
-    const n = Math.floor(num(modules[m.id], 0, 0, m.kind === 'block' ? Math.min(m.max, cfg.grid.blocks.length) : m.max));
+    const n = Math.floor(num(modules[m.id], 0, 0, m.max));
     if (n > 0) s.modules[m.id] = n;
   }
   const net = counts(r.net);

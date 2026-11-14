@@ -12,6 +12,7 @@ import policeData from '../src/data/balance/police.json';
 import scaleData from '../src/data/balance/scales.json';
 import sourceData from '../src/data/balance/sources.json';
 import gridData from '../src/data/tuning/grid.json';
+import worldData from '../src/data/tuning/world.json';
 import tuningData from '../src/data/tuning/pipeline.json';
 import saveTuning from '../src/data/tuning/save.json';
 import type { Plan } from '../src/systems/plan/plan';
@@ -49,6 +50,7 @@ const cfg: PipeConfig = {
   net: netData,
   chips: chipData,
   grid: gridData,
+  world: worldData,
   auto: autoData,
 };
 
@@ -81,6 +83,10 @@ describe('save', () => {
     // the towers: five blocks, terms bettered twice, a dial of the network turned twice, people in line and asleep, an invention on its way
     s.modules.block = 5;
     s.modules.hire = 2;
+    // …and the planet: two spans of the cable, three nodes, a thread
+    s.modules.span = 2;
+    s.modules.node = 3;
+    s.modules.thread = 1;
     s.net.copies = 2;
     s.queue = 3.5e6;
     s.asleep = 21e6;

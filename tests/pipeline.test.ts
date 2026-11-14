@@ -3,6 +3,7 @@ import { createRng } from '../src/core/rng';
 import autoData from '../src/data/balance/auto.json';
 import chipData from '../src/data/balance/chips.json';
 import farmData from '../src/data/balance/farms.json';
+import globe from '../src/data/layout/globe.json';
 import gradeData from '../src/data/balance/grades.json';
 import lineData from '../src/data/balance/lines.json';
 import managerData from '../src/data/balance/managers.json';
@@ -13,6 +14,7 @@ import policeData from '../src/data/balance/police.json';
 import scaleData from '../src/data/balance/scales.json';
 import sourceData from '../src/data/balance/sources.json';
 import gridData from '../src/data/tuning/grid.json';
+import worldData from '../src/data/tuning/world.json';
 import tuningData from '../src/data/tuning/pipeline.json';
 import { createEvents, stepEvents, takeEvent } from '../src/systems/events/events';
 import { managerPick } from '../src/systems/manager/manager';
@@ -47,13 +49,17 @@ import {
   keysNeeded,
   keysOf,
   labOf,
+  moduleRoom,
   netCost,
+  nodesOf,
   payOf,
   podsOf,
   pressPipe,
+  quartered,
   riot,
   riotShare,
   robotsOf,
+  scaleReady,
   sessionsOf,
   sourceInflow,
   sourcePrice,
@@ -62,6 +68,7 @@ import {
   takeChip,
   unemploymentOf,
   wantedOf,
+  wireOf,
   type Farm,
   type Line,
   type Module,
@@ -84,6 +91,7 @@ const cfg: PipeConfig = {
   net: netData,
   chips: chipData,
   grid: gridData,
+  world: worldData,
   auto: autoData,
 };
 const DT = 1 / 60;
@@ -500,12 +508,19 @@ describe('pipeline', () => {
     s.noAsk = true;
     s.scale = cfg.scales.length;
     const last = 2 + cfg.scales.length;
+    s.money = 1e40;
     expect(finished(s, cfg)).toBe(false);
     for (const src of cfg.sources) if (src.screen === last) s.owned[src.id] = src.max;
-    // the last screen is the towers: every block built and somebody asleep in every capsule
-    for (const m of cfg.modules) if (m.kind === 'block') s.modules[m.id] = cfg.grid.blocks.length;
-    expect(finished(s, cfg)).toBe(false);
+    // the last screen is the planet: the tower for Mars is not for sale until everything stands, everybody sleeps and the network has invented all it can
+    for (const m of cfg.modules) if (m.kind !== 'ark') s.modules[m.id] = m.max;
     s.asleep = podsOf(s, cfg);
+    expect(buyModule(s, cfg, 'ark')).toBe(false);
+    s.chips = cfg.chips.length;
+    s.asleep -= cfg.world.node;
+    expect(buyModule(s, cfg, 'ark')).toBe(false);
+    s.asleep = podsOf(s, cfg);
+    expect(finished(s, cfg)).toBe(false);
+    expect(buyModule(s, cfg, 'ark')).toBe(true);
     expect(finished(s, cfg)).toBe(true);
     s.scale--;
     expect(finished(s, cfg)).toBe(false);
@@ -629,6 +644,66 @@ describe('pipeline', () => {
     // nothing is left to build: he does not buy a block that is not there
     s.modules.block = cfg.grid.blocks.length;
     expect(managerPick(s, cfg, screen, 'pods', 1)).toBeNull();
+  });
+
+  it('test_planet_nodes_stand_where_the_cable_has_reached_and_the_cable_carries_only_so_much', () => {
+    const s = atTowers();
+    const g = cfg.grid;
+    const w = cfg.world;
+    s.money = 1e40;
+    s.gate = true;
+    // the planet opens from a quarter that is built and slept in
+    expect(buyScale(s, cfg)).toBe(false);
+    s.modules.block = g.blocks.length;
+    expect(scaleReady(s, cfg)).toBe(false);
+    s.asleep = podsOf(s, cfg);
+    expect(quartered(s, cfg)).toBe(true);
+    expect(buyScale(s, cfg)).toBe(true);
+    const quarter = podsOf(s, cfg);
+    // home has room for one node; the next one needs a region the cable has reached
+    expect(buyModule(s, cfg, 'node')).toBe(true);
+    expect(buyModule(s, cfg, 'node')).toBe(false);
+    expect(buyModule(s, cfg, 'span')).toBe(true);
+    expect(buyModule(s, cfg, 'node')).toBe(true);
+    expect(nodesOf(s, cfg)).toBe(2);
+    expect(podsOf(s, cfg)).toBe(quarter + 2 * w.node);
+    // a node fills by itself: the line stands everywhere by now
+    for (let i = 0; i < 60 * 60; i++) stepPipe(s, cfg, DT);
+    expect(s.asleep).toBeCloseTo(podsOf(s, cfg));
+    // the network may ask for anything: the cable brings it no more than it carries
+    for (const dial of cfg.net) s.net[dial.id] = dial.max;
+    expect(supplyOf(s, cfg)).toBeGreaterThan(w.wire);
+    expect(fedOf(s, cfg)).toBe(w.wire);
+    expect(buyModule(s, cfg, 'thread')).toBe(true);
+    expect(wireOf(s, cfg)).toBe(w.wire * 2);
+    expect(fedOf(s, cfg)).toBeCloseTo(supplyOf(s, cfg));
+    // the last span closes the ring: twice as much again
+    s.modules.span = w.regions.length - 1;
+    expect(buyModule(s, cfg, 'span')).toBe(true);
+    expect(wireOf(s, cfg)).toBe(w.wire * 4);
+    expect(buyModule(s, cfg, 'span')).toBe(false);
+    // the manager lays the cable when there is nowhere to put a node, and thickens it when it runs hot
+    const fresh = atTowers();
+    fresh.money = 1e40;
+    fresh.scale++;
+    fresh.modules.node = moduleRoom(fresh, cfg, cfg.modules.find((m) => m.kind === 'node')!);
+    expect(managerPick(fresh, cfg, w.screen, 'pods', 1)).toBe('mod:span');
+    expect(managerPick(fresh, cfg, w.screen, 'wire', 1)).toBe('mod:thread');
+    expect(managerPick(fresh, cfg, w.screen, 'net', 1)).toBe('net:halls');
+  });
+
+  it('test_planet_the_picture_has_a_place_for_every_node_the_data_sells', () => {
+    // the first region of the picture holds home as well: the quarter of the screen before
+    expect(globe.regions.map((r, i) => r.nodes.length - (i === 0 ? 1 : 0))).toEqual(cfg.world.regions);
+    expect(cfg.modules.find((m) => m.kind === 'node')!.max).toBe(cfg.world.regions.reduce((n, x) => n + x, 0));
+    expect(cfg.modules.find((m) => m.kind === 'span')!.max).toBe(cfg.world.regions.length);
+    expect(cfg.modules.find((m) => m.kind === 'block')!.max).toBe(cfg.grid.blocks.length);
+    // every sleeper of the planet is one of the people the game has put out of work
+    const idle = cfg.sources.reduce((n, src) => n + (src.max - src.start) * (src.staff ?? 0), 0);
+    const places = (cfg.grid.pilot + cfg.grid.blocks.reduce((n, x) => n + x, 0)) * cfg.grid.unit + cfg.world.regions.reduce((n, x) => n + x, 0) * cfg.world.node;
+    // …and there is a place for every one of them: nobody is left idle at the end
+    expect(places).toBeGreaterThanOrEqual(idle);
+    expect(places).toBeLessThan(idle + 100);
   });
 
   it('test_pipe_prices_grow_and_money_is_required', () => {

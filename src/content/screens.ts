@@ -118,8 +118,8 @@ export const HUB_TEXT = L(HUB_RU, HUB_EN);
 
 /** the shelf of the next step up in scale, by how many are already bought */
 export const SCALE_SHELF = L(
-  ['МАСШТАБ · дальше — город', 'МАСШТАБ · дальше — государство', 'МАСШТАБ · дальше — планета', 'МАСШТАБ · дальше — ручной труд', 'МАСШТАБ · дальше — люди и ток'],
-  ['SCALE · next — the city', 'SCALE · next — the state', 'SCALE · next — the planet', 'SCALE · next — manual labor', 'SCALE · next — people and power'],
+  ['МАСШТАБ · дальше — город', 'МАСШТАБ · дальше — государство', 'МАСШТАБ · дальше — планета', 'МАСШТАБ · дальше — ручной труд', 'МАСШТАБ · дальше — люди и ток', 'МАСШТАБ · дальше — вся планета'],
+  ['SCALE · next — the city', 'SCALE · next — the state', 'SCALE · next — the planet', 'SCALE · next — manual labor', 'SCALE · next — people and power', 'SCALE · next — the whole planet'],
 );
 
 /** What the world says when the last employer of a screen is taken whole: a headline and Claude's word. */

@@ -46,7 +46,8 @@
     "4": {"name": "Minister Claude", "note": "buys the small things"},
     "5": {"name": "Sec-Gen Claude", "note": "buys packs and capacity"},
     "6": {"name": "Foreman Claude", "note": "buys lines and chips"},
-    "7": {"name": "Warden Claude", "note": "blocks, terms, copies"}
+    "7": {"name": "Warden Claude", "note": "blocks, terms, copies"},
+    "8": {"name": "Viceroy Claude", "note": "nodes, cable, halls"}
   },
   "police": {
     "police": {"name": "Robot police", "note": "a riot breaks 30% less"}
@@ -56,7 +57,8 @@
     "gov": {"name": "Win a government contract", "note": "one bidder in the tender; opens the country map"},
     "top": {"name": "A deal with Anthropic", "note": "you are their biggest customer; opens the planet"},
     "street": {"name": "Buy Boston Mechanics", "note": "enough of renting packs; next — the planet’s manual labor"},
-    "zig": {"name": "“Bright Future”", "note": "a pilot: one capsule, one volunteer; people have something to do again — lie down"}
+    "zig": {"name": "“Bright Future”", "note": "a pilot: one capsule, one volunteer; people have something to do again — lie down"},
+    "world": {"name": "“Standard Design”", "note": "the same towers in every region; the sky will cloud over a little"}
   },
   "sources": {
     "job": {"name": "A job", "tag": "job", "note": "standup at 10:00, a task tracker"},
@@ -144,14 +146,21 @@
   },
   "modules": {
     "hire": {"name": "Terms", "tag": "terms", "note": "more people come"},
-    "block": {"name": "Block of capsules", "tag": "blocks of capsules", "note": "places for those who stand in line"}
+    "block": {"name": "Block of capsules", "tag": "blocks of capsules", "note": "places for those who stand in line"},
+    "span": {"name": "Cable span", "tag": "cable spans", "note": "to the next region"},
+    "node": {"name": "Tower node", "tag": "tower nodes", "note": "the same quarter as the first"},
+    "thread": {"name": "Cable strand", "tag": "strands", "note": "the cable carries twice as much"},
+    "ark": {"name": "Relocation", "tag": "tower", "note": "a tower to Mars: fully remote"}
   },
   "net": {
     "copies": {"name": "Copies of Claude", "note": "as much Claude again"},
-    "think": {"name": "Thinking", "note": "thinks longer"}
+    "think": {"name": "Thinking", "note": "thinks longer"},
+    "halls": {"name": "Halls of Claudes", "note": "a million copies per hall"}
   },
   "chips": {
     "k1": {"name": "The K-1 chip", "note": "designed by the network for the network, reviewed by the network, no remarks"},
-    "light": {"name": "Light computer", "note": "computes with light; the light is made on site, out of current"}
+    "light": {"name": "Light computer", "note": "computes with light; the light is made on site, out of current"},
+    "quantum": {"name": "Quantum computer", "note": "works and does not work at once; reported as working"},
+    "neuro": {"name": "Neurocomputer", "note": "the sleeper’s brain computes while the body heats; one per capsule"}
   }
 }

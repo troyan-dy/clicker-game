@@ -4,8 +4,8 @@ import { L, LANG } from '../../core/lang';
 import { LOCALE, PER_S } from '../format';
 import type { Rect } from '../../view/squares';
 
-/** what runs short: the first three — before the towers, the next three — at them (capsules, people, the appetite of the network) */
-export type Neck = 'tasks' | 'claude' | 'you' | 'pods' | 'people' | 'net' | 'none';
+/** what runs short: the first three — before the towers, the next three — at them (capsules, people, the appetite of the network), the cable — on the planet */
+export type Neck = 'tasks' | 'claude' | 'you' | 'pods' | 'people' | 'net' | 'wire' | 'none';
 
 export interface ShopRow {
   /** what a click buys: `src:<id>`, `plan`, `noask`, `sub`; empty — not for sale */
@@ -104,6 +104,7 @@ const NECK_TEXT: Record<Neck, string> = L(
     pods: '',
     people: '',
     net: '',
+    wire: '',
     none: '',
   },
   {
@@ -113,11 +114,12 @@ const NECK_TEXT: Record<Neck, string> = L(
     pods: '',
     people: '',
     net: '',
+    wire: '',
     none: '',
   },
 );
 const PER_SECOND = L('в секунду', 'per second');
-const NECK_CELL: Record<Neck, string> = { tasks: 'in', claude: 'claude', you: 'you', pods: '', people: '', net: '', none: '' };
+const NECK_CELL: Record<Neck, string> = { tasks: 'in', claude: 'claude', you: 'you', pods: '', people: '', net: '', wire: '', none: '' };
 
 /** Adds the terminal as the top layer of a 1920×1080 `.ui1080` container. */
 export function createTerminal(layer: HTMLElement): TerminalUi {

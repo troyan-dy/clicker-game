@@ -11,6 +11,7 @@ const NODES = [
   'back_world', 'earth_night', // the flat world of the last screen, the planet of the ending
   'rest_hammock', 'rest_chess', 'rest_bench', 'rest_fishing', 'rest_picnic', 'rest_easel', // the park
   'netcore', 'drone', 'drone_work', 'drone_towel', 'sleeper1', 'sleeper2', 'sleeper3', // the towers: the network they feed, service drones, people in bathrobes
+  'earth_dark', ...Array.from({ length: 18 }, (_, i) => `lit_${String(i).padStart(2, '0')}`), // the planet under the cable: its lights are out, they come on node by node
   'bench', 'pigeon', 'pigeon_peck', 'pigeon_fly', 'sparrow', 'duck', 'seagull', // the bench after the credits
 ];
 

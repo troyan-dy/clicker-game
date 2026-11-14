@@ -1,0 +1,6 @@
+[
+  {"t": 2.0, "eval": "(() => { const g = window.__gym; g.press(); g.gift(1e19); for (let i = 0; i < 19; i++) g.buy('mod:block'); for (let i = 0; i < 8; i++) g.buy('mod:hire'); })()"},
+  {"t": 3.0, "eval": "window.__gym.fill()"},
+  {"t": 6.0, "eval": "window.__gym.gift(3e18); window.__gym.buy('scale')"},
+  {"t": 14.0, "eval": "window.__gym.buy('mod:span'); window.__gym.buy('mod:node')"}
+]
