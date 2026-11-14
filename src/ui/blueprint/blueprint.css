@@ -234,6 +234,38 @@
   background: var(--coral);
 }
 
+/* the ending: the interface gives way to the picture */
+.bl.cut .bl-hud,
+.bl-over.cut .bl-tags,
+.bl-over.cut .bl-toast {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.4s linear;
+}
+/* …and one line is said under it */
+.bl-cine {
+  position: absolute;
+  left: 50%;
+  bottom: 86px;
+  max-width: 1400px;
+  padding: 16px 34px 18px;
+  border-radius: 14px;
+  background: #262624;
+  color: #f0eee6;
+  font: 400 30px/1.35 'Source Serif 4', serif;
+  text-align: center;
+  opacity: 0;
+  transform: translate(-50%, 10px);
+  transition:
+    opacity 0.4s linear,
+    transform 0.4s ease-out;
+  pointer-events: none;
+}
+.bl-cine.on {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+
 /* a banner over the map: an employer is taken whole and gives its perk */
 .bl-toast {
   position: absolute;

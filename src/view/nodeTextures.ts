@@ -1,7 +1,7 @@
 import type Phaser from 'phaser';
 
 const NODES = [
-  'desk', 'laptop', 'office', 'tray', 'board', 'handshake', 'studio', 'box', // the blueprint
+  'desk', 'desk_empty', 'laptop', 'office', 'tray', 'board', 'handshake', 'studio', 'box', // the blueprint
   'tower', 'datacenter', 'bank', 'garage', 'mall', 'factory', 'admin', 'warehouse', 'rack', 'racks', // the city
   'cityblock', 'parliament', 'military', 'launchpad', 'gpus', 'back_state', // the state
   'island', 'dish', 'hq', 'satellite', 'globe', // the planet

@@ -79,6 +79,10 @@ export interface BlueprintUi {
   flash(row: string, kind: 'bought' | 'denied'): void;
   /** a banner over the map for a few seconds: something big has just happened */
   toast(title: string, text: string): void;
+  /** the ending: the interface gives way to the picture, and comes back */
+  cut(on: boolean): void;
+  /** the ending: one line under the picture; empty — none */
+  caption(text: string): void;
   /** below the shop: a gym puts its help here */
   extra: HTMLElement;
 }
@@ -104,9 +108,10 @@ export function createBlueprint(layer: HTMLElement, over: HTMLElement): Blueprin
   </div></div>`,
   );
   const root = layer.lastElementChild as HTMLElement;
-  over.insertAdjacentHTML('afterbegin', '<div class="bl-over"><div class="bl-tags"></div><div class="bl-toast"><i></i><b></b><span></span></div></div>');
+  over.insertAdjacentHTML('afterbegin', '<div class="bl-over"><div class="bl-tags"></div><div class="bl-toast"><i></i><b></b><span></span></div><div class="bl-cine"></div></div>');
   const overRoot = over.firstElementChild as HTMLElement;
   const toast = overRoot.querySelector<HTMLElement>('.bl-toast')!;
+  const cine = overRoot.querySelector<HTMLElement>('.bl-cine')!;
   const q = <T extends HTMLElement>(sel: string): T => root.querySelector<T>(sel)!;
   const money = q('.bl-money b');
   const quip = q('.bl-quip');
@@ -212,6 +217,14 @@ export function createBlueprint(layer: HTMLElement, over: HTMLElement): Blueprin
     flash(row, kind) {
       mark = { row, cls: kind, until: performance.now() + 260 };
       showMark();
+    },
+    cut(on) {
+      root.classList.toggle('cut', on);
+      overRoot.classList.toggle('cut', on);
+    },
+    caption(text) {
+      if (text) cine.textContent = text;
+      cine.classList.toggle('on', text !== '');
     },
     toast(title, text) {
       toast.querySelector('b')!.textContent = title;

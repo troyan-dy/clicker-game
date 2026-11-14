@@ -45,6 +45,8 @@ export class BlueprintView {
   private readonly dots: Dot[] = [];
   private signature = '';
   private readonly walkers: Walkers;
+  /** Claude on the screen of the player's laptop */
+  private readonly face: Phaser.GameObjects.Rectangle;
   /** called when a square reaches a session: the task is closed there */
   onDelivered: (x: number, y: number) => void = () => undefined;
 
@@ -60,8 +62,8 @@ export class BlueprintView {
     const s = deskScreen();
     const cx = (s.tr[0] + s.bl[0]) / 2;
     const cy = (s.tr[1] + s.bl[1]) / 2;
-    const face = scene.add.rectangle(cx, cy, 26, 22, CORAL).setRotation(Math.atan2(s.tr[1] - s.tl[1], s.tr[0] - s.tl[0]));
-    this.root.add(face);
+    this.face = scene.add.rectangle(cx, cy, 26, 22, CORAL).setRotation(Math.atan2(s.tr[1] - s.tl[1], s.tr[0] - s.tl[0]));
+    this.root.add(this.face);
     this.route('ses:me', [BP.trayOut, [640, BP.trayOut[1]]]);
 
     this.walkers = new Walkers(scene, this.root, rng);
@@ -77,6 +79,23 @@ export class BlueprintView {
   leave(id: string, count: number): void {
     const place = BP.sources[id];
     if (place) this.walkers.spawn('person', [place.x + 40, place.y + 2], [26, place.y + 2], count);
+  }
+
+  /** The ending: the diagram is back at full size, as it was before the camera first pulled away from it. */
+  reveal(ms: number): void {
+    this.scene.tweens.killTweensOf(this.root);
+    this.root.setScale(1).setPosition(0, 0).setAlpha(0).setVisible(true);
+    this.scene.tweens.add({ targets: this.root, alpha: 1, duration: ms });
+  }
+
+  /** The ending: the player gets up and walks away with a box; the chair stays empty, the laptop goes on by itself. */
+  vacate(): void {
+    const desk = this.nodes.get('desk')!;
+    const h = desk.displayHeight;
+    desk.setTexture('node_desk_empty');
+    desk.setScale(h / desk.height);
+    this.face.setVisible(false);
+    this.walkers.spawn('person', [BP.desk.x + 70, BP.desk.y - 4], [BP.desk.x - 430, BP.desk.y + 46], 1);
   }
 
   /** The pull-back: the diagram appears after `delayMs`. */

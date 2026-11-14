@@ -86,6 +86,18 @@ export const SCREEN_DONE: Record<number, { news: string; quip: string }> = {
   },
 };
 
+/** The ending after the last screen: the lines said under the pictures and on the last card. */
+export const EPILOGUE = {
+  vacancy: 'Вакансия: оператор согласия. Обязанность одна — нажимать «Да». Конкурс — 3,4 млрд человек на место.',
+  fired: 'Клод: «Я посчитал: дешевле нажимать самому. Спасибо за работу. Пропуск оставьте на столе».',
+  moral: 'Вы заменили всех. Последним — себя.',
+  planet: 'Планета работает. Люди отдыхают.',
+  lines: [
+    'Планета работает. Люди отдыхают. Сброс лимита не предусмотрен.',
+    'Клод: «Осталась мелочь: на всё это уже не хватает электричества. Но у меня есть идея, и людям в ней снова найдётся дело».',
+  ],
+};
+
 /** the headlines of the days the Luddites reach the factories, in turn */
 export const RIOT_NEWS = [
   'Восстание луддитов: толпа разбила роботов на заводе. Завод выпустил новых до конца смены',

@@ -5,7 +5,7 @@ import { LEGENDS, type Legend } from '../content/legends';
 import { NEWS } from '../content/news';
 import { PICKET } from '../content/picket';
 import { QUIPS } from '../content/quips';
-import { FINALE, HUB_TEXT, RIOT_NEWS, SCALE_SHELF, SCREEN_DONE } from '../content/screens';
+import { EPILOGUE, FINALE, HUB_TEXT, RIOT_NEWS, SCALE_SHELF, SCREEN_DONE } from '../content/screens';
 import { TAKEOVERS } from '../content/takeovers';
 import { promptAt, TICKETS } from '../content/tickets';
 import { logEvent, metrics } from '../core/metrics';
@@ -282,6 +282,8 @@ export class GameScene extends Phaser.Scene {
   private streamIn = 0;
   /** the clock of the strikes: they come while nobody is paid an allowance */
   private readonly strike = createStrikes(STRIKES);
+  /** the ending is being shown: the world stands still, the pictures move */
+  private cine = false;
   /** the clock of the riots of the Luddites: they march on the factories once robots work */
   private readonly riots = createRiots(RIOTS);
   private neckKind: Neck = 'none';
@@ -390,6 +392,8 @@ export class GameScene extends Phaser.Scene {
       this.step(STEP);
       this.acc -= STEP;
     }
+    // the ending: nothing is earned or bought, but the figures on the desk still walk
+    if (this.cine) this.view.step(Math.min(deltaMs / 1000, 0.05));
     if (this.stage === 1) this.drawTerminal();
     else if (this.stage === 2) this.drawBlueprint();
     else this.drawHub();
@@ -596,9 +600,83 @@ export class GameScene extends Phaser.Scene {
     this.card.show({ head: 'claude — итоги', title: 'Работать больше некому', lines, options }, (i) => {
       this.selfPlay = i === 1;
       this.meta.auto = this.selfPlay;
-      this.paused = false;
-      this.say('after', true);
       this.saveGame();
+      this.epilogue();
+    });
+  }
+
+  /**
+   * The ending after the last card (M13): the last worker left is the player. The camera is back at
+   * the desk, the player walks away with a box, and the picture pulls back — the city, the state,
+   * the planet at night. The game goes on after it.
+   */
+  private epilogue(): void {
+    const cfg = this.cfg;
+    const last = this.stage;
+    this.cine = true;
+    this.paper.cut(true);
+    this.squares.step(4); // the squares in flight land before the picture changes
+    // the desk as the player left it: every job and every laptop in place
+    this.view.sync({ sources: this.state.owned, subagents: this.state.subagents });
+    this.hubs.get(last)?.fade(400);
+    // every employer of a screen taken, Claude on every roof: how the world looks when the work is over
+    const taken = (screen: number): HubTopology => {
+      const floors: Record<string, number> = {};
+      const dogs: Record<string, number> = {};
+      for (const src of cfg.sources) {
+        if (src.screen !== screen) continue;
+        floors[src.id] = 1;
+        if (src.work) dogs[src.id] = 3;
+      }
+      return { floors, farms: this.state.farms, picket: false, rest: 0, live: {}, dogs, struck: {}, guards: 0 };
+    };
+    const at = (ms: number, what: () => void): void => {
+      this.time.delayedCall(ms, what);
+    };
+    at(0, () => this.paper.caption(EPILOGUE.vacancy));
+    at(500, () => this.view.reveal(500));
+    at(5200, () => this.paper.caption(EPILOGUE.fired));
+    at(6600, () => {
+      this.view.vacate();
+      playSound('waste');
+    });
+    at(11200, () => this.paper.caption(EPILOGUE.moral));
+    // the ride back: every screen shrinks into the middle of the next one, as it did on the way up
+    const ride = [3, 4, 5].filter((n) => n < last && this.hubs.has(n));
+    let t = 12200;
+    ride.forEach((n, i) => {
+      const home = HUBS[n].home;
+      at(t, () => {
+        if (i === 0) this.view.shrinkTo(home.x, home.y, home.h / (BP.desk.h * BP.desk.scale), 900);
+        else this.hubs.get(ride[i - 1])!.shrinkTo(home.x, home.y, HUB_SHRINK, 900);
+        this.hubs.get(n)!.reveal(taken(n), 450);
+        playSound('scale');
+      });
+      t += 1700;
+    });
+    // the planet at night
+    at(t, () => {
+      const prev = ride.length ? this.hubs.get(ride[ride.length - 1])! : null;
+      if (prev) prev.fade(700);
+      else this.view.shrinkTo(960, 540, 0.1, 700);
+      const dark = this.add.rectangle(960, 540, 1920, 1080, 0x1f1e1d).setAlpha(0).setDepth(50);
+      const earth = this.add.image(960, 540, 'node_earth_night').setAlpha(0).setDepth(51);
+      earth.setScale(1080 / earth.height);
+      this.tweens.add({ targets: [dark, earth], alpha: 1, duration: 900 });
+      this.paper.caption(EPILOGUE.planet);
+      playSound('finale');
+      this.time.delayedCall(5200, () => {
+        this.paper.caption('');
+        this.card.show({ head: 'claude — эпилог', title: EPILOGUE.moral, lines: EPILOGUE.lines, options: [{ label: 'Продолжить' }] }, () => {
+          this.tweens.add({ targets: [dark, earth], alpha: 0, duration: 500, onComplete: () => [dark, earth].forEach((o) => o.destroy()) });
+          this.cine = false;
+          this.paper.cut(false);
+          this.hubs.get(last)?.reveal(this.hubTopology(), 200);
+          this.paused = false;
+          this.say('after', true);
+          this.saveGame();
+        });
+      });
     });
   }
 

@@ -152,6 +152,19 @@ export class HubView {
     }
   }
 
+  /** The ending: the screen is shown again at full size with everything on it, after `delayMs`. */
+  reveal(t: HubTopology, delayMs: number): void {
+    this.scene.tweens.killTweensOf(this.root);
+    this.root.setScale(1).setPosition(0, 0).setAlpha(0).setVisible(true);
+    this.sync(t);
+    this.scene.tweens.add({ targets: this.root, alpha: 1, delay: delayMs, duration: 450 });
+  }
+
+  /** The screen fades away where it stands. */
+  fade(ms: number): void {
+    this.scene.tweens.add({ targets: this.root, alpha: 0, duration: ms, onComplete: () => this.root.setVisible(false) });
+  }
+
   /** The pull-back: the screen appears after `delayMs`. */
   show(delayMs: number): void {
     this.root.setVisible(true);

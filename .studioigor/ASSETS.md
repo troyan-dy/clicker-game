@@ -28,6 +28,9 @@
 | A020 CH_Robots | персонажи | андроид и робособака: светлый корпус, голова — коралловый квадрат с двумя глазами (свой знак Клода) | android.webp, robodog.webp | генерация (Codex), лист street_d | final |
 | A021 CH_People | персонажи | люди без работы: три пикетчика с пустыми плакатами, шесть групп отдыхающих в парке (скамейка, шахматы, гамак, пикник, мольберт, рыбалка) | picket1–3.webp, rest_*.webp | генерация (Codex), листы street_e…g | final |
 | A022 CH_Bold | персонажи | фигурки людей и роботов для экрана: копии в 3 высоты показа, линии утолщены, тёмный контур по силуэту (PT-19: «не разглядеть»); исходники — art/gen/nodes/thin/ | person*, picket*, android, robodog, rest_* | обработка Pillow (scratchpad/bold_figures.py) | final |
+| A023 EN_World | окружение | плоская карта мира для «Планеты-цеха»: песочные материки, тонкая сетка | back_world.webp | генерация (Codex), ключ по яркости | final |
+| A024 EN_EarthNight | окружение | ночная Земля для эпилога: сетка коралловых огней, зелёные парки | earth_night.webp | генерация (Codex) | final |
+| A025 ND_DeskEmpty | узел | стол с ноутбуком и пустым креслом для эпилога | desk_empty.webp | генерация (Codex), вырезка заливкой | final |
 
 ## Strategy by category
 | category | source (pack / Blender / procedural / generation / user) | why | status |
