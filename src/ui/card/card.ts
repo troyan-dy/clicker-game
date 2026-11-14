@@ -19,6 +19,8 @@ export interface CardSpec {
   hint?: string;
   /** the option highlighted at first; by default the first one that can be picked */
   selected?: number;
+  /** many short lines: a list, set smaller */
+  dense?: boolean;
 }
 
 /**
@@ -105,6 +107,7 @@ export function createCard(layer: HTMLElement, blip: () => void = () => undefine
       q('.card-head').textContent = next.head;
       q('h2 span').textContent = next.title;
       q('.card-lines').innerHTML = next.lines.map((l) => `<p>${l}</p>`).join('');
+      q('.card-lines').classList.toggle('dense', !!next.dense);
       q('.card-hint').textContent = next.hint ?? 'Enter — Да';
       paint();
       veil.classList.add('on');

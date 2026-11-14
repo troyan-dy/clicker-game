@@ -33,7 +33,7 @@ export interface BlueprintModel {
   /** where the remark appears: above the laptop of the blueprint or in the corner of a map */
   quipAt: 'desk' | 'corner';
   /** a pile of questions waiting for one «Да»: it takes the place of the remark */
-  ask?: { text: string; worth: string; fill: number };
+  ask?: { text: string; worth: string; fill: number; legend: boolean };
 }
 
 export interface BlueprintUi {
@@ -115,7 +115,7 @@ export function createBlueprint(layer: HTMLElement): BlueprintUi {
         set('askWorth', `Enter — Да всем · +$${esc(m.ask.worth)}`, askWorth);
         askBar.style.width = `${Math.round(m.ask.fill * 100)}%`;
       }
-      quip.className = `bl-quip ${m.quipAt}${said ? ' on' : ''}${m.ask ? ' ask' : ''}`;
+      quip.className = `bl-quip ${m.quipAt}${said ? ' on' : ''}${m.ask ? ' ask' : ''}${m.ask?.legend ? ' legend' : ''}`;
       set('hint', esc(m.hint));
       set(
         'tags',

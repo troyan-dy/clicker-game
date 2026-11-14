@@ -88,6 +88,13 @@ export function stepFeed(
   }
 }
 
+/** Claude says exactly this: an award, a one-off line. Always heard. */
+export function tell(f: FeedState, tuning: FeedTuning, text: string): void {
+  f.quip = text;
+  f.quipLeft = tuning.quipHold + text.length * tuning.quipPerChar;
+  f.quiet = f.quipLeft + tuning.quipGap;
+}
+
 /**
  * Claude says the next line of the kind `on`. Ordinary remarks keep a pause between each other;
  * `force` — an event too big to stay silent about. Returns whether something was said.

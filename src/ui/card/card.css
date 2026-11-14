@@ -85,6 +85,16 @@
 .card-lines p {
   margin: 10px 0 0;
 }
+.card-lines.dense {
+  font-size: 20px;
+  color: #87867f;
+}
+.card-lines.dense p {
+  margin: 5px 0 0;
+}
+.card-lines.dense b {
+  color: #f0eee6;
+}
 .card-lines b {
   color: #7cc68d;
   font-weight: 700;

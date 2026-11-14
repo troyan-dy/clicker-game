@@ -1,1 +1,1 @@
-{ "cooldown": 28, "fillSeconds": 14, "worthSeconds": 8 }
+{ "cooldown": 28, "fillSeconds": 14, "worthSeconds": 8, "legendChance": 0.2, "legendMult": 10 }

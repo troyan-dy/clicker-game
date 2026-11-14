@@ -12,11 +12,11 @@ Line syntax:
 Cookie Clicker: 20 зданий, 700+ улучшений, 600+ ачивок, престиж, золотые печеньки, лента новостей — годы контента. Берём форму, а не объём: небольшая игра ≈ половина зданий и ~5% улучшений.
 
 ## Contract
-- [ ] источники задач: 10 шт — count: manual: after phase 4
-- [ ] тарифы подписки: 5 шт — count: manual: after phase 4
-- [ ] улучшения: 40 шт — count: manual: after phase 4
-- [ ] масштабы сцены: 6 шт — count: manual: after phase 4
-- [ ] легендарные тикеты: 15 шт — count: manual: after phase 4
-- [ ] реплики Клода: 60 шт — count: manual: after phase 4
-- [ ] новости: 60 шт — count: manual: after phase 4
-- [ ] ачивки: 30 шт — count: manual: after phase 4
+- [x] источники задач: 10 шт — count: node -e "console.log(require('./src/data/balance/sources.json').length)"
+- [x] тарифы подписки: 5 шт — count: node -e "console.log(require('./src/data/balance/plans.json').length)"
+- [ ] улучшения: 40 шт — BLOCKED: 27 сделано (грейды 11, мощности 7, тарифы 4, масштабы 3, автомат 2); отдельного слоя улучшений нет — магазин на пределе внимания; решение proxy 2026-11-14, ждёт пользователя — count: node -e "console.log(require('./src/data/balance/grades.json').length-1+require('./src/data/balance/farms.json').length+require('./src/data/balance/plans.json').length-1+require('./src/data/balance/scales.json').length+2)"
+- [ ] масштабы сцены: 6 шт — BLOCKED: 5 сделано (терминал, чертёж, город, государство, планета): пользователь просил к трём экранам «еще несколько экравов, 1 или 2», 2026-11-14 — count: node -e "console.log(2+require('./src/data/balance/scales.json').length)"
+- [x] легендарные тикеты: 15 шт — count: node -e "console.log(require('./src/content/legends.json').length)"
+- [x] реплики Клода: 60 шт — count: node -e "console.log(Object.values(require('./src/content/quips.json')).flat().length)"
+- [x] новости: 60 шт — count: node -e "console.log(require('./src/content/news.json').length)"
+- [x] ачивки: 30 шт — count: node -e "console.log(require('./src/content/awards.json').length)"

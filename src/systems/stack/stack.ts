@@ -10,6 +10,9 @@ export interface StackTuning {
   fillSeconds: number;
   /** a full pile pays this many seconds of income */
   worthSeconds: number;
+  /** the chance that a new pile is a legendary ticket, and how many times more it pays */
+  legendChance: number;
+  legendMult: number;
 }
 
 export interface StackState {

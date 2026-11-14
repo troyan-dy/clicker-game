@@ -31,12 +31,29 @@ export interface SavedFeed {
   said: Record<string, number>;
 }
 
+/** What the player has collected besides money. */
+export interface SavedMeta {
+  /** ids of the legendary tickets closed */
+  legends: string[];
+  /** ids of the awards earned */
+  awards: string[];
+  /** piles of questions approved */
+  piles: number;
+  /** morning reports taken */
+  reports: number;
+}
+
+export function freshMeta(): SavedMeta {
+  return { legends: [], awards: [], piles: 0, reports: 0 };
+}
+
 export interface SaveFile {
   v: number;
   /** when it was written, ms since the epoch */
   at: number;
   state: PipeState;
   feed: SavedFeed;
+  meta: SavedMeta;
   /** the finale has been seen */
   won: boolean;
   /** seconds played in total */
@@ -104,6 +121,8 @@ export function unpackSave(json: string | null, cfg: PipeConfig): SaveFile | nul
   }
   if (data.v !== SAVE_VERSION) return null;
   const feed = counts(data.feed);
+  const meta = counts(data.meta);
+  const ids = (v: unknown): string[] => (Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : []);
   const said: Record<string, number> = {};
   for (const [k, v] of Object.entries(counts(feed.said))) said[k] = Math.floor(num(v, 0));
   return {
@@ -111,6 +130,7 @@ export function unpackSave(json: string | null, cfg: PipeConfig): SaveFile | nul
     at: num(data.at, 0),
     state: restorePipe(cfg, data.state),
     feed: { shown: Array.isArray(feed.shown) ? feed.shown.filter((i): i is number => Number.isInteger(i)) : [], said },
+    meta: { legends: ids(meta.legends), awards: ids(meta.awards), piles: Math.floor(num(meta.piles, 0)), reports: Math.floor(num(meta.reports, 0)) },
     won: data.won === true,
     seconds: num(data.seconds, 0),
   };

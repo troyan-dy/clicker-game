@@ -1,4 +1,6 @@
 import Phaser from 'phaser';
+import { AWARDS } from '../content/awards';
+import { LEGENDS, type Legend } from '../content/legends';
 import { NEWS } from '../content/news';
 import { QUIPS } from '../content/quips';
 import { FINALE, HUB_TEXT, SCALE_SHELF } from '../content/screens';
@@ -22,7 +24,7 @@ import stackData from '../data/tuning/stack.json';
 import tuningData from '../data/tuning/pipeline.json';
 import { createOverlay, type Overlay } from '../debug/overlay';
 import { createTuningPanel, type TuningPanel } from '../debug/tuningPanel';
-import { createFeed, say, stepFeed, type FeedContent } from '../systems/feed/feed';
+import { createFeed, say, stepFeed, tell, type FeedContent } from '../systems/feed/feed';
 import type { Plan } from '../systems/plan/plan';
 import {
   backlogCap,
@@ -52,7 +54,7 @@ import {
   type PipeState,
   type Source,
 } from '../systems/pipeline/pipeline';
-import { applyOffline, offlineReport, packSave, unpackSave, type OfflineReport } from '../systems/save/save';
+import { applyOffline, freshMeta, offlineReport, packSave, unpackSave, type OfflineReport } from '../systems/save/save';
 import { createStack, stackWorth, stepStack, takeStack } from '../systems/stack/stack';
 import type { BlueprintTag, BlueprintUi } from '../ui/blueprint/blueprint';
 import type { CardUi } from '../ui/card/card';
@@ -100,7 +102,7 @@ function flowText(perSec: number): string {
 declare global {
   interface Window {
     /** gym-only hooks for scripted captures */
-    __gym?: { buy(what: string): boolean; gift(dollars: number): void; away(hours: number): void };
+    __gym?: { buy(what: string): boolean; gift(dollars: number): void; away(hours: number): void; pile(legend: boolean): void };
   }
 }
 
@@ -182,6 +184,13 @@ export class GameScene extends Phaser.Scene {
   private pendingReport: OfflineReport | null = null;
   private readonly stack = createStack(stackData);
   private question = QUESTIONS[0];
+  /** the current pile is a legendary ticket */
+  private legend: Legend | null = null;
+  /** the collection and the awards */
+  private meta = freshMeta();
+  /** awards earned but not announced yet */
+  private toTell: string[] = [];
+  private sinceAwards = 0;
   /** after the ending Claude may press «Да всем» himself (M13) */
   private selfPlay = false;
   private neckKind: Neck = 'none';
@@ -250,7 +259,12 @@ export class GameScene extends Phaser.Scene {
       else if (!el.closest('.tm-side') && !el.closest('.bl-shop')) this.press();
     });
     window.addEventListener('pagehide', () => this.saveGame());
-    window.__gym = { buy: (what) => this.buy(what), gift: (dollars) => this.gift(dollars), away: (hours) => this.away(hours) };
+    window.__gym = {
+      buy: (what) => this.buy(what),
+      gift: (dollars) => this.gift(dollars),
+      away: (hours) => this.away(hours),
+      pile: (legend) => this.forcePile(legend),
+    };
     window.__GAME__.ready = true;
   }
 
@@ -274,7 +288,7 @@ export class GameScene extends Phaser.Scene {
     if (!this.saving || this.frozen) return;
     try {
       const feed = { shown: this.feed.shown, said: this.feed.said };
-      localStorage.setItem(SAVE_KEY, packSave({ at: Date.now(), state: this.state, feed, won: this.won, seconds: this.seconds }));
+      localStorage.setItem(SAVE_KEY, packSave({ at: Date.now(), state: this.state, feed, meta: this.meta, won: this.won, seconds: this.seconds }));
     } catch {
       // private mode or a full disk: the game goes on without saving
     }
@@ -294,6 +308,7 @@ export class GameScene extends Phaser.Scene {
     this.state = file.state;
     this.feed.shown = file.feed.shown;
     this.feed.said = file.feed.said;
+    this.meta = file.meta;
     this.won = file.won;
     this.seconds = file.seconds;
     this.stage = screenOf(this.state);
@@ -332,6 +347,8 @@ export class GameScene extends Phaser.Scene {
       { label: go, note },
       { label: `Звук: ${this.settings.sound ? 'вкл' : 'выкл'}` },
       { label: `Музыка: ${this.settings.music ? 'вкл' : 'выкл'}` },
+      { label: `Грамоты: ${this.meta.awards.length} из ${AWARDS.length}` },
+      { label: `Легендарные тикеты: ${this.meta.legends.length} из ${LEGENDS.length}` },
       { label: 'Новая игра', note: 'стереть сохранение', off: title && !this.resumed },
       { label: 'Титры' },
     ];
@@ -351,9 +368,27 @@ export class GameScene extends Phaser.Scene {
         setMusicOn(this.settings.music);
         saveSettings(this.settings);
         again(2);
-      } else if (i === 3) this.confirmNew(() => again(3));
-      else if (i === 4) this.card.show({ head: 'claude — титры', title: 'Да, Клод', lines: CREDITS, options: [{ label: 'Да' }] }, () => again(4));
+      } else if (i === 3) {
+        const lines = AWARDS.map((a) => (this.meta.awards.includes(a.id) ? `<b>${a.name}</b> — ${a.text}` : `${a.name}`));
+        this.openList('claude — грамоты', `Грамоты: ${this.meta.awards.length} из ${AWARDS.length}`, lines, 0, () => again(3));
+      } else if (i === 4) {
+        const lines = LEGENDS.map((l) => (this.meta.legends.includes(l.id) ? `<b>${l.title}</b>` : '· ещё не попадался'));
+        this.openList('claude — коллекция', `Легендарные тикеты: ${this.meta.legends.length} из ${LEGENDS.length}`, lines, 0, () => again(4));
+      } else if (i === 5) this.confirmNew(() => again(5));
+      else if (i === 6) this.card.show({ head: 'claude — титры', title: 'Да, Клод', lines: CREDITS, options: [{ label: 'Да' }] }, () => again(6));
       else this.resume();
+    });
+  }
+
+  /** A long list on a card, a page at a time. */
+  private openList(head: string, title: string, lines: string[], page: number, back: () => void): void {
+    const per = 10;
+    const pages = Math.ceil(lines.length / per);
+    const more = page + 1 < pages;
+    const options = more ? [{ label: 'Дальше', note: `страница ${page + 1} из ${pages}` }, { label: 'Назад' }] : [{ label: 'Назад' }];
+    this.card.show({ head, title, lines: lines.slice(page * per, (page + 1) * per), options, dense: true }, (i) => {
+      if (more && i === 0) this.openList(head, title, lines, page + 1, back);
+      else back();
     });
   }
 
@@ -416,11 +451,19 @@ export class GameScene extends Phaser.Scene {
     this.card.show({ head: 'claude — утренний отчёт', title: 'Пока вас не было', lines, options: [{ label: 'Да', note: report.waited ? '' : 'забрать' }] }, () => {
       this.wake();
       applyOffline(this.state, report);
+      this.meta.reports++;
       this.lastMoney += report.dollars; // not this second's income
       if (report.dollars > 0) playSound('buy');
       this.say('back', true);
       this.saveGame();
     });
+  }
+
+  /** gym-only: a full pile of questions right now, legendary or not */
+  private forcePile(legend: boolean): void {
+    this.stack.fill = 1;
+    this.legend = legend ? (LEGENDS.find((l) => !this.meta.legends.includes(l.id)) ?? LEGENDS[0]) : null;
+    this.question = this.legend ? this.legend.ask : QUESTIONS[0];
   }
 
   /** gym-only: pretend the game was closed for `hours` and open it again */
@@ -578,15 +621,21 @@ export class GameScene extends Phaser.Scene {
   /** «Да всем»: the whole pile of questions is approved at once. Returns false when there is no pile. */
   private approveAll(): boolean {
     if (this.stack.fill <= 0) return false;
-    const worth = stackWorth(this.stack, stackData, this.flowIncome());
+    const legend = this.legend;
+    const worth = stackWorth(this.stack, stackData, this.flowIncome()) * (legend ? stackData.legendMult : 1);
     takeStack(this.stack, stackData);
+    this.legend = null;
     this.state.money += worth;
     this.state.presses++;
-    playSound('all');
+    this.meta.piles++;
+    playSound(legend ? 'finale' : 'all');
     const from = this.stage === 2 ? this.deskSpot() : this.homeSpot();
     this.delivered(from[0], from[1], 14);
-    logEvent('yes_all');
-    if (this.stack.taken % 3 === 1) this.say('all');
+    logEvent(legend ? 'yes_legend' : 'yes_all');
+    if (legend) {
+      if (!this.meta.legends.includes(legend.id)) this.meta.legends.push(legend.id);
+      this.say('legend', true);
+    } else if (this.stack.taken % 3 === 1) this.say('all');
     return true;
   }
 
@@ -721,7 +770,28 @@ export class GameScene extends Phaser.Scene {
     // questions for the player pile up once the terminal stops asking
     const hadPile = this.stack.fill > 0;
     stepStack(this.stack, stackData, dt, s.noAsk);
-    if (!hadPile && this.stack.fill > 0) this.question = this.rng.pick(QUESTIONS);
+    if (!hadPile && this.stack.fill > 0) {
+      // now and then the pile is a legendary ticket; those not collected yet come first
+      const fresh = LEGENDS.filter((l) => !this.meta.legends.includes(l.id));
+      this.legend = this.rng.next() < stackData.legendChance ? this.rng.pick(fresh.length ? fresh : LEGENDS) : null;
+      this.question = this.legend ? this.legend.ask : this.rng.pick(QUESTIONS);
+    }
+
+    // awards: checked once a second, announced one at a time when Claude is silent
+    this.sinceAwards += dt;
+    if (this.sinceAwards >= 1) {
+      this.sinceAwards = 0;
+      for (const a of AWARDS) {
+        if (this.meta.awards.includes(a.id) || this.stat(a.stat) < a.min) continue;
+        this.meta.awards.push(a.id);
+        this.toTell.push(`Грамота «${a.name}». ${a.text}.`);
+        logEvent(`award_${a.id}`);
+      }
+    }
+    if (this.toTell.length && !this.feed.quip) {
+      tell(this.feed, feedData, this.toTell.shift()!);
+      playSound('buy');
+    }
     if (this.selfPlay && this.stack.fill >= 1) this.approveAll(); // Claude answers himself
 
     // Claude notices a pause and a bottleneck that does not go away
@@ -898,14 +968,42 @@ export class GameScene extends Phaser.Scene {
     });
   }
 
+  /** what an award counts: the numbers of the game by name */
+  private stat(name: string): number {
+    const s = this.state;
+    if (name.startsWith('own:')) return s.owned[name.slice(4)] ?? 0;
+    if (name.startsWith('farm:')) return s.farms[name.slice(5)] ?? 0;
+    if (name.startsWith('hired:')) {
+      const screen = Number(name.slice(6));
+      return this.cfg.sources.filter((x) => x.screen === screen && s.owned[x.id]).length;
+    }
+    const stats: Record<string, number> = {
+      closed: s.closedHere + s.closedBySubagents,
+      presses: s.presses,
+      wasted: s.wasted,
+      money: s.money,
+      plan: s.plan.index,
+      noask: s.noAsk ? 1 : 0,
+      subs: s.subagents,
+      grade: s.grade,
+      scale: s.scale,
+      share: shareOf(s, this.cfg),
+      piles: this.meta.piles,
+      legends: this.meta.legends.length,
+      reports: this.meta.reports,
+    };
+    return stats[name] ?? 0;
+  }
+
   /** the pile of questions as Claude's card shows it; nothing when there is no pile */
-  private pile(): { text: string; worth: string; fill: number } | undefined {
+  private pile(): { text: string; worth: string; fill: number; legend: boolean } | undefined {
     if (this.stack.fill <= 0) return undefined;
     const asking = Math.max(1, Math.round(this.stack.fill * (sessionsOf(this.state, this.cfg) + 1)));
     return {
-      text: `${this.count(asking, ASKING_FORMS)}: «${this.question}»`,
-      worth: short(stackWorth(this.stack, stackData, this.flowIncome())),
+      text: this.legend ? `Легендарный тикет: «${this.question}»` : `${this.count(asking, ASKING_FORMS)}: «${this.question}»`,
+      worth: short(stackWorth(this.stack, stackData, this.flowIncome()) * (this.legend ? stackData.legendMult : 1)),
       fill: this.stack.fill,
+      legend: this.legend !== null,
     };
   }
 

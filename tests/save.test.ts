@@ -23,7 +23,7 @@ import {
   type PipeConfig,
   type Source,
 } from '../src/systems/pipeline/pipeline';
-import { applyOffline, offlineReport, packSave, restorePipe, unpackSave } from '../src/systems/save/save';
+import { applyOffline, freshMeta, offlineReport, packSave, restorePipe, unpackSave } from '../src/systems/save/save';
 
 const cfg: PipeConfig = {
   tuning: tuningData,
@@ -53,11 +53,17 @@ function grown() {
 describe('save', () => {
   it('test_save_round_trip_keeps_the_whole_game', () => {
     const s = grown();
-    const json = packSave({ at: 123, state: s, feed: { shown: [1, 4], said: { yes: 2 } }, won: false, seconds: 600 });
+    const meta = { legends: ['rust'], awards: ['first_yes', 'no_ask'], piles: 4, reports: 1 };
+    const json = packSave({ at: 123, state: s, feed: { shown: [1, 4], said: { yes: 2 } }, meta, won: false, seconds: 600 });
     const file = unpackSave(json, cfg)!;
     expect(file.state).toEqual(s);
     expect(screenOf(file.state)).toBe(3);
     expect(file.feed).toEqual({ shown: [1, 4], said: { yes: 2 } });
+    expect(file.meta).toEqual(meta);
+    // a save written before the collection existed opens with an empty one
+    const old = JSON.parse(json) as Record<string, unknown>;
+    delete old.meta;
+    expect(unpackSave(JSON.stringify(old), cfg)!.meta).toEqual(freshMeta());
     expect(file.at).toBe(123);
     expect(file.seconds).toBe(600);
   });
