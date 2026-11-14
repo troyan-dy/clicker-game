@@ -1,5 +1,5 @@
 /**
- * The big screens — the city (3), the state (4), the planet (5), the street (6), the ziggurat (7) — share one layout:
+ * The big screens — the city (3), the state (4), the planet (5), the street (6) — share one layout:
  * a node in the middle (the previous screen shrunk, or the factory of the street), employers around
  * it, the farms that run the sessions next to it. Scene coordinates (1920×1080), nodes anchored at
  * their bottom centre, `h` — the height a node is drawn at, px.
@@ -27,23 +27,6 @@ export interface HubLayout {
   park?: { slots: readonly (readonly [number, number])[]; h: number; label: { x: number; y: number } };
   /** the previous screen does not shrink into the middle of this one: its globe unrolls into this flat map */
   unroll?: boolean;
-  /** the previous screen simply fades and this one appears in its place: the middle is something new */
-  fresh?: boolean;
-  /**
-   * The middle is a ziggurat (M28): a dark tower coloured in tier by tier, with capsules on its walls;
-   * the paper darkens at night, a dial shows the hour, power runs out to the lots. `steps` — how much of
-   * the picture's height stands with one tier, two, … `faces` — the front wall of every tier in the
-   * picture's own pixels (`size`): its top left corner, where it ends, the middle of the cables that
-   * cross it and its height; the walls lean by `slope` px down for every px to the right.
-   */
-  grid?: {
-    steps: readonly number[];
-    size: readonly [number, number];
-    slope: number;
-    faces: readonly (readonly [y: number, x0: number, x1: number, cables: number, h: number])[];
-  };
-  /** the node in the middle may be wider than the others */
-  homeWidth?: number;
 }
 
 const MID = { x: 670, y: 700 };
@@ -153,40 +136,5 @@ export const HUBS: Record<number, HubLayout> = {
       label: { x: 270, y: 776 },
     },
     unroll: true,
-  },
-  // the ziggurat: the tallest thing on the map stands in the middle; the neural network it feeds — in the far
-  // row, the old power plants that people in baths replace — around
-  7: {
-    home: { key: 'ziggurat', x: 670, y: 884, h: 372 },
-    homeRadius: 200,
-    homeWidth: 400,
-    lots: {
-      diesel: { key: 'diesel', x: 384, y: 700, h: 112 },
-      coal: { key: 'coalplant', x: 956, y: 700, h: 150 },
-      gas: { key: 'gasplant', x: 384, y: 930, h: 126 },
-      wind: { key: 'wind', x: 956, y: 930, h: 158 },
-      solar: { key: 'solar', x: 132, y: 700, h: 118 },
-      hydro: { key: 'hydro', x: 1208, y: 700, h: 146 },
-      nuclear: { key: 'nuclear', x: 132, y: 930, h: 150 },
-      fusion: { key: 'fusion', x: 1208, y: 930, h: 150 },
-    },
-    farms: {
-      net: { key: 'netcore', x: 384, y: 478, h: 150, ids: ['net'] },
-    },
-    maxWidth: 185,
-    fresh: true,
-    grid: {
-      steps: [0.24, 0.374, 0.464, 0.606, 0.689, 0.794, 1],
-      size: [725, 862],
-      slope: 0.099,
-      faces: [
-        [683, 8, 513, 281, 142],
-        [572, 61, 480, 290, 89],
-        [469, 108, 456, 298, 86],
-        [370, 153, 452, 309, 95],
-        [275, 197, 434, 318, 80],
-        [186, 242, 416, 329, 85],
-      ],
-    },
   },
 };

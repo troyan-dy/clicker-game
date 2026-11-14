@@ -1,7 +1,0 @@
-[
-  {"t": 1.0, "eval": "window.__gym.gift(6e16); window.__gym.buy('src:diesel'); window.__gym.buy('mod:tier'); window.__gym.buy('net:copies')"},
-  {"t": 4.0, "eval": "window.__gym.gift(4e17); window.__gym.buy('mod:tier'); window.__gym.buy('mod:care'); window.__gym.buy('src:coal'); window.__gym.buy('src:coal'); window.__gym.buy('net:speed')"},
-  {"t": 8.0, "eval": "window.__gym.gift(6e17); window.__gym.buy('mod:plug'); window.__gym.take('diesel'); window.__gym.buy('src:gas'); window.__gym.buy('mod:tier'); window.__gym.buy('manager')"},
-  {"t": 14.0, "eval": "window.__gym.call()"},
-  {"t": 20.0, "eval": "window.__gym.buy('net:copies'); window.__gym.buy('net:copies')"}
-]

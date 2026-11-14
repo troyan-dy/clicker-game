@@ -70,8 +70,6 @@ export interface BlueprintModel {
   manager?: ManagerStrip;
   /** a pile of questions waiting for one «Да»: it takes the place of the remark */
   ask?: { text: string; worth: string; fill: number; legend: boolean };
-  /** how deep the night over the map is, 0..1: the paper darkens with it (the ziggurat has days and nights) */
-  night?: number;
 }
 
 export interface BlueprintUi {
@@ -86,6 +84,8 @@ export interface BlueprintUi {
   cut(on: boolean): void;
   /** the bench after the credits takes the whole screen: the captions and banners of the map step aside */
   away(on: boolean): void;
+  /** the last screen is dark: the same layout in the colours of the terminal; `now` — at once, a saved game opens there */
+  dark(on: boolean, now?: boolean): void;
   /**
    * The ending: a line under the picture, typed letter by letter; empty — none. `kind`: «claude» —
    * Claude says it, «title» — big words in the middle of the screen, «dark» — the same over a dark picture.
@@ -207,17 +207,6 @@ export function createBlueprint(layer: HTMLElement, over: HTMLElement): Blueprin
       }
       quip.className = `bl-quip ${m.quipAt}${said ? ' on' : ''}${m.ask ? ' ask' : ''}${m.ask?.legend ? ' legend' : ''}`;
       set('hint', esc(m.hint));
-      // the night: the paper itself gets darker, in a dozen steps, and everything drawn on it stays as it is
-      const dusk = Math.round((m.night ?? 0) * 12) / 12;
-      if (last.night !== String(dusk)) {
-        last.night = String(dusk);
-        const tone = (day: number, night: number): number => Math.round(day + (night - day) * dusk);
-        const paper = dusk > 0 ? `rgb(${tone(240, 204)}, ${tone(238, 202)}, ${tone(230, 197)})` : '';
-        for (const el of [root, overRoot]) {
-          if (paper) el.style.setProperty('--paper', paper);
-          else el.style.removeProperty('--paper');
-        }
-      }
       set(
         'tags',
         m.tags
@@ -266,6 +255,19 @@ export function createBlueprint(layer: HTMLElement, over: HTMLElement): Blueprin
     },
     away(on) {
       overRoot.classList.toggle('away', on);
+    },
+    dark(on, now = false) {
+      // the page and its cards change colour slowly — unless the game opens on that screen
+      const slow = [root, ...root.querySelectorAll<HTMLElement>('.bl-meter, .bl-shop, .bl-news')];
+      if (now) for (const el of slow) el.style.transition = 'none';
+      root.classList.toggle('dark', on);
+      overRoot.classList.toggle('dark', on);
+      // the picture of the dark screen lies under the page
+      document.getElementById('stage')?.classList.toggle('under', on);
+      if (now) {
+        void root.offsetWidth;
+        for (const el of slow) el.style.transition = '';
+      }
     },
     caption(text, kind = 'plain') {
       window.clearInterval(typing);

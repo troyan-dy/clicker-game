@@ -46,7 +46,7 @@
     "4": {"name": "Minister Claude", "note": "buys the small things"},
     "5": {"name": "Sec-Gen Claude", "note": "buys packs and capacity"},
     "6": {"name": "Foreman Claude", "note": "buys lines and chips"},
-    "7": {"name": "Engineer Claude", "note": "buys tiers, blocks and dials"}
+    "7": {"name": "Warden Claude", "note": "blocks, terms, copies"}
   },
   "police": {
     "police": {"name": "Robot police", "note": "a riot breaks 30% less"}
@@ -56,7 +56,7 @@
     "gov": {"name": "Win a government contract", "note": "one bidder in the tender; opens the country map"},
     "top": {"name": "A deal with Anthropic", "note": "you are their biggest customer; opens the planet"},
     "street": {"name": "Buy Boston Mechanics", "note": "enough of renting packs; next — the planet’s manual labor"},
-    "zig": {"name": "“Bright Future”", "note": "a project: people have something to do again — lie down; opens the ziggurat"}
+    "zig": {"name": "“Bright Future”", "note": "a pilot: one capsule, one volunteer; people have something to do again — lie down"}
   },
   "sources": {
     "job": {"name": "A job", "tag": "job", "note": "standup at 10:00, a task tracker"},
@@ -100,15 +100,7 @@
     "build": {"name": "“Done Yesterday” construction", "tag": "Construction", "note": "handover date: already"},
     "clinic": {"name": "Clinics", "tag": "Healthcare", "note": "the front desk smiles: firmware"},
     "school": {"name": "Schools", "tag": "Education", "note": "teacher not found, lesson in progress"},
-    "farm": {"name": "“Harvest.json” farms", "tag": "Farming", "note": "the tractor commits furrows"},
-    "diesel": {"name": "Diesel generators", "tag": "Diesel", "note": "rattling behind every shed"},
-    "coal": {"name": "Coal plants", "tag": "Coal", "note": "the smoke goes up, so do the reports"},
-    "gas": {"name": "Gas stations", "tag": "Gas", "note": "the pipe is there, the point is gone"},
-    "wind": {"name": "Wind farms", "tag": "Wind", "note": "blows for free, but not on schedule"},
-    "solar": {"name": "Solar fields", "tag": "Solar", "note": "off at night, like the day shift"},
-    "hydro": {"name": "Hydro dams", "tag": "Hydro", "note": "the dam holds the water, the water holds the people"},
-    "nuclear": {"name": "Nuclear plants", "tag": "Nuclear", "note": "people are cheaper than uranium and do not glow"},
-    "fusion": {"name": "Fusion", "tag": "Fusion", "note": "it was twenty years from launch"}
+    "farm": {"name": "“Harvest.json” farms", "tag": "Farming", "note": "the tractor commits furrows"}
   },
   "perks": {
     "vector": {"text": "10% more tasks"},
@@ -148,24 +140,18 @@
     "build": {"text": "+50% sessions in chips"},
     "clinic": {"text": "shortages melt 3× faster"},
     "school": {"text": "promotions 20% cheaper"},
-    "farm": {"text": "25% more tasks"},
-    "diesel": {"text": "construction 20% cheaper"},
-    "coal": {"text": "the baths give +20%"},
-    "gas": {"text": "network dials −25%"},
-    "wind": {"text": "requests pay double"},
-    "solar": {"text": "“Yes to all” pays 1.5×"},
-    "hydro": {"text": "the baths give +25%"},
-    "nuclear": {"text": "income doubled"},
-    "fusion": {"text": "network dials −30%"}
+    "farm": {"text": "25% more tasks"}
   },
   "modules": {
-    "tier": {"name": "Tier of baths", "tag": "tiers", "note": "500M places: warm, quiet, paid"},
-    "plug": {"name": "Plug", "tag": "plug generations", "note": "a new generation, the same neck"},
-    "care": {"name": "Service bots", "tag": "service bots", "note": "warm water, plugs in place"}
+    "hire": {"name": "Terms", "tag": "terms", "note": "more people come"},
+    "block": {"name": "Block of capsules", "tag": "blocks of capsules", "note": "places for those who stand in line"}
   },
   "net": {
-    "copies": {"name": "Model copies", "note": "as much Claude again"},
-    "size": {"name": "Parameters", "note": "smarter and hungrier"},
-    "speed": {"name": "Overclock", "note": "faster tokens, faster meter"}
+    "copies": {"name": "Copies of Claude", "note": "as much Claude again"},
+    "think": {"name": "Thinking", "note": "thinks longer"}
+  },
+  "chips": {
+    "k1": {"name": "The K-1 chip", "note": "designed by the network for the network, reviewed by the network, no remarks"},
+    "light": {"name": "Light computer", "note": "computes with light; the light is made on site, out of current"}
   }
 }

@@ -1,0 +1,8 @@
+[
+  {"t": 7.0, "eval": "window.__gym.press()"},
+  {"t": 18.0, "eval": "window.__gym.gift(1e16); window.__gym.buy('mod:block')"},
+  {"t": 26.0, "eval": "window.__gym.gift(2e16); window.__gym.buy('mod:hire')"},
+  {"t": 40.0, "eval": "window.__gym.gift(4e16); window.__gym.buy('net:copies'); window.__gym.buy('mod:block')"},
+  {"t": 48.0, "eval": "window.__gym.gift(2e17); window.__gym.buy('mod:block'); window.__gym.buy('mod:hire'); window.__gym.buy('mod:block')"},
+  {"t": 58.0, "eval": "window.__gym.gift(9e17); for (let i = 0; i < 6; i++) window.__gym.buy('mod:block'); window.__gym.buy('mod:hire'); window.__gym.buy('mod:hire'); window.__gym.buy('net:copies')"}
+]

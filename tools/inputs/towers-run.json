@@ -1,0 +1,4 @@
+[
+  {"t": 8.0, "eval": "window.__gym.press()"},
+  {"t": 14.0, "eval": "(() => { const g = window.__gym; const plan = ['mod:block','mod:hire','net:copies','mod:block','mod:block','mod:hire','mod:block','net:copies','mod:block','mod:block','mod:block','mod:hire','net:think','mod:block','mod:block','net:copies','mod:block','mod:hire','mod:block','mod:block','mod:block','net:copies','mod:block','mod:hire','mod:block','mod:block','mod:block','net:think','mod:block','mod:block','mod:hire','mod:block','mod:block']; let i = 0; window.__run = setInterval(() => { g.gift(4e17); g.press(); if (i < plan.length) g.buy(plan[i++]); }, 2600); })()"}
+]

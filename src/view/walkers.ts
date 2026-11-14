@@ -3,7 +3,7 @@ import type { Rng } from '../core/rng';
 
 type Pt = readonly [number, number];
 
-/** who walks: a laid-off worker with a box, Claude in a body from the factory, a marcher with a placard, or someone in a bathrobe on the way to a shift in the baths */
+/** who walks: a laid-off worker with a box, Claude in a body from the factory, a marcher with a placard, or someone in a bathrobe on the way home from a shift in a capsule */
 export type WalkerKind = 'person' | 'android' | 'robodog' | 'mob' | 'sleeper';
 
 /** the pictures a kind is drawn with, its height on the screen and its speed, px per second */

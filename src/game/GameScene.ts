@@ -7,12 +7,11 @@ import { LEGENDS, type Legend } from '../content/legends';
 import { words } from '../content/names';
 import { NEWS } from '../content/news';
 import { PICKET } from '../content/picket';
-import { BATHS } from '../content/baths';
-import { SHIFT_TALK } from '../content/shifts';
 import { QUIPS } from '../content/quips';
 import { EPILOGUE, FINALE, HUB_TEXT, RIOT_NEWS, SCALE_SHELF, SCREEN_DONE } from '../content/screens';
 import { TAKEOVERS } from '../content/takeovers';
 import { promptAt, TICKETS } from '../content/tickets';
+import { TOWERS } from '../content/towers';
 import { L, LANG } from '../core/lang';
 import { logEvent, metrics } from '../core/metrics';
 import { setMusicOn, startMusic } from '../core/music';
@@ -20,6 +19,7 @@ import type { Rng } from '../core/rng';
 import { loadSettings, saveSettings } from '../core/settings';
 import { playSound, setSoundOn, unlockSound } from '../core/sound';
 import autoData from '../data/balance/auto.json';
+import chipData from '../data/balance/chips.json';
 import farmData from '../data/balance/farms.json';
 import gradeData from '../data/balance/grades.json';
 import lineData from '../data/balance/lines.json';
@@ -49,14 +49,14 @@ import { createTuningPanel, type TuningPanel } from '../debug/tuningPanel';
 import { birdRate, createBench, refuseBird, stepBench, throwBread } from '../systems/bench/bench';
 import { createEvents, stepEvents, takeEvent, type EventsTuning } from '../systems/events/events';
 import { createFeed, headline, say, stepFeed, tell, type FeedContent } from '../systems/feed/feed';
-import { managerPick } from '../systems/manager/manager';
+import { managerPick, type ManagerNeed } from '../systems/manager/manager';
 import { createRiots, stepRiots, type RiotTuning } from '../systems/riots/riots';
 import { createStrikes, stepStrikes, type StrikeTuning } from '../systems/strikes/strikes';
 import type { Plan } from '../systems/plan/plan';
 import {
   aimAt,
   backlogCap,
-  bathsOf,
+  blocksOf,
   bonus,
   bribeCost,
   buyBribe,
@@ -77,24 +77,26 @@ import {
   demandOf,
   discount,
   farmCost,
+  fedOf,
   finished,
   flowOf,
   gradeCost,
+  housed,
   inflowOf,
-  isNight,
   jobOf,
   keysNeeded,
   keysOf,
+  labOf,
   lineCost,
   locked,
   moduleCost,
   netCost,
-  netDraw,
-  netYield,
+  nextChip,
   ordersOf,
   outputOf,
   payOf,
   planRate,
+  podsOf,
   policeCost,
   pressPipe,
   replacedOf,
@@ -111,11 +113,13 @@ import {
   stepPipe,
   subagentPrice,
   subagentRate,
-  supplyOf,
+  takeChip,
   targetOf,
   unemploymentOf,
+  wantedOf,
   wearOf,
   whole,
+  type Chip,
   type Farm,
   type Line,
   type Module,
@@ -144,6 +148,7 @@ import { BlueprintView, VISIBLE_SUBAGENTS } from '../view/blueprintView';
 import { HubView, type HubTopology } from '../view/hubView';
 import { preloadNodes } from '../view/nodeTextures';
 import { Squares, type Rect } from '../view/squares';
+import { TowerView, type TowerTopology } from '../view/towerView';
 
 const STEP = 1 / 60;
 const MONEY_ON_DARK = 0x7cc68d;
@@ -186,18 +191,13 @@ const NOT_ON_PLAN = L('недоступно в вашем тарифе', 'not av
 const OF = L('из', 'of');
 /** seconds, after a number */
 const SEC = L('с', 's');
-/** gigawatts, after a number: «240 ГВт» */
-const gw = (n: number): string => `${short(Math.round(n))}${L(' ГВт', ' GW')}`;
-/** the quip of a part of the ziggurat, by its kind */
-const MODULE_QUIP: Record<Module['kind'], string> = { baths: 'buy:tier', plug: 'buy:plug', care: 'buy:care' };
-/** the change of shifts at the ziggurat: seconds the two columns need to pass each other, and to get dark or light */
-const SWAP = { length: 9, dusk: 3, walkers: 3 };
-/** where a sleeper may wake up: three places on the tower, as offsets from its foot */
-const WAKE_SPOTS: readonly (readonly [number, number])[] = [
-  [-176, -206],
-  [182, -158],
-  [14, -306],
-];
+/**
+ * The towers: how often those who have slept their shift walk home past the line, how long a word said
+ * there stays and how often the line talks, how long the first volunteers wait at the gate before it
+ * opens without a «Да», how many of the screen's requests come from the capsules (the rest — from the gate),
+ * how many blocks make the first tower (with it the manager and the second dial are shown).
+ */
+const QUARTER = { shiftEvery: 70, talk: 6, talkEvery: [9, 16] as const, gateWait: 9, wakes: 5, firstTower: 7 };
 /** the title of the terminal window and of the menu card */
 const HOME_DIR = L('claude — ~/работа/все-сразу', 'claude — ~/work/all-at-once');
 const PER_TASK = L('за задачу', 'per task');
@@ -218,6 +218,9 @@ const MONEY_SPOT: Rect = { x: BP.money.x - 80, y: BP.money.y - 20, w: 160, h: 40
 /** a big screen shrinks to this share of its size when it becomes a node of the next one */
 const HUB_SHRINK = 0.14;
 const fmt1 = new Intl.NumberFormat(LOCALE, { maximumFractionDigits: 1 });
+const fmt2 = new Intl.NumberFormat(LOCALE, { maximumFractionDigits: 2 });
+/** gigawatts, after a number: «0,8 ГВт», «240 ГВт» */
+const gw = (n: number): string => `${n < 100 ? fmt1.format(n) : short(Math.round(n))}${L(' ГВт', ' GW')}`;
 /** the pay for a task: whole dollars from a hundred up — it drifts with unemployment, and «879,9 → 880» would change the width of the line */
 const payText = (n: number): string => (n >= 100 ? short(Math.round(n)) : fmt1.format(n));
 
@@ -234,7 +237,7 @@ function perSecond(n: number): string {
 declare global {
   interface Window {
     /** gym-only hooks for scripted captures */
-    __gym?: { buy(what: string): boolean; click(row: string): void; take(id: string): void; fleet(lines: number): void; strike(): void; riot(): void; gift(dollars: number): void; away(hours: number): void; pile(legend: boolean): void; call(): void; limit(): void };
+    __gym?: { buy(what: string): boolean; press(): void; click(row: string): void; take(id: string): void; fleet(lines: number): void; strike(): void; riot(): void; gift(dollars: number): void; away(hours: number): void; pile(legend: boolean): void; call(): void; limit(): void };
   }
 }
 
@@ -282,12 +285,14 @@ export class GameScene extends Phaser.Scene {
     police: { ...policeData, ...words('police', 'police') },
     modules: (moduleData as Module[]).map((m) => ({ ...m, ...words('modules', m.id) })),
     net: netData.map((p) => ({ ...p, ...words('net', p.id) })),
+    chips: (chipData as Chip[]).map((c) => ({ ...c, ...words('chips', c.id) })),
     grid: { ...gridData },
     auto: { noAsk: { ...autoData.noAsk, ...words('auto', 'noAsk') }, subagent: { ...autoData.subagent, ...words('auto', 'subagent') } },
   };
   private state!: PipeState;
   private view!: BlueprintView;
   private readonly hubs = new Map<number, HubView>();
+  private towers!: TowerView;
   private squares!: Squares;
   private panel: TuningPanel | null = null;
   private overlay!: Overlay;
@@ -355,15 +360,14 @@ export class GameScene extends Phaser.Scene {
   /** the headlines of the park go in turn */
   private benchNews = 0;
   private benchNewsIn = 0;
-  /** the ziggurat: it was night at the last step — a change means the shifts swap */
-  private wasNight = false;
-  /** seconds until the next square of power leaves the ziggurat, and until money comes back from what it feeds */
-  private feedIn = 0;
-  private earnIn = 0;
-  /** the shifts are changing: seconds since it began, -1 — they are not; what the two columns say to each other; how many changes were seen */
-  private swap = -1;
-  private talk: (readonly [string, string])[] = [];
+  /** the towers: seconds until those who have slept their shift walk home past the line again; how many times they have */
+  private shiftIn = QUARTER.shiftEvery * 0.5;
   private swaps = 0;
+  /** a word said at the gate: a question and an answer, seconds since it began; `home` — one who goes home answers. Nothing — silence */
+  private chat: { home: boolean; lines: readonly [string, string]; t: number } | null = null;
+  private chatIn: number = QUARTER.talkEvery[0];
+  /** seconds the first volunteers have waited at the gate */
+  private gateFor = 0;
   private neckKind: Neck = 'none';
   private neckFor = 0;
   private pressTimes: number[] = [];
@@ -405,6 +409,8 @@ export class GameScene extends Phaser.Scene {
       hub.onDelivered = (x, y) => this.delivered(x, y);
       this.hubs.set(Number(screen), hub);
     }
+    this.towers = new TowerView(this, this.rng, this.cfg.grid.blocks, this.cfg.grid.pilot);
+    this.towers.onPowered = (x, y) => this.delivered(x, y);
     this.benchView = new BenchView(this, this.rng);
     this.squares = new Squares(this, this.rng, 700);
     this.benchUi.extra.innerHTML = BENCH.help;
@@ -452,6 +458,7 @@ export class GameScene extends Phaser.Scene {
     window.addEventListener('pagehide', () => this.saveGame());
     if (__TOOLS__) window.__gym = {
       buy: (what) => this.buy(what),
+      press: () => this.press(),
       click: (row) => this.click(row),
       take: (id) => this.takeWhole(id),
       // a scripted capture needs factories big enough to keep what it takes
@@ -492,6 +499,7 @@ export class GameScene extends Phaser.Scene {
       this.drawBench();
     } else if (this.stage === 1) this.drawTerminal();
     else if (this.stage === 2) this.drawBlueprint();
+    else if (this.onGrid) this.drawTowers();
     else this.drawHub();
     this.drawOverlay();
 
@@ -549,6 +557,10 @@ export class GameScene extends Phaser.Scene {
     if (this.stage === 2) {
       this.view.sync({ sources: this.state.owned, subagents: this.state.subagents });
       this.view.show(0);
+    } else if (this.onGrid) {
+      this.paper.dark(true, true);
+      this.towers.sync(this.towerTopology(), true);
+      this.towers.show(0);
     } else if (this.stage >= 3) {
       const hub = this.hubs.get(this.stage)!;
       hub.sync(this.hubTopology());
@@ -594,15 +606,23 @@ export class GameScene extends Phaser.Scene {
     }
     s.surge = {};
     // money for the first purchases of this screen: units of its employers, or lines of its factory
-    const first = [...cfg.sources.filter((x) => x.screen === screen && !x.made).map((x) => sourceCost(s, cfg, x)), ...cfg.lines.filter((l) => l.screen === screen).map((l) => lineCost(s, cfg, l))];
+    const first = [
+      ...cfg.sources.filter((x) => x.screen === screen && !x.made).map((x) => sourceCost(s, cfg, x)),
+      ...cfg.lines.filter((l) => l.screen === screen).map((l) => lineCost(s, cfg, l)),
+      ...(screen === cfg.grid.screen ? cfg.modules.map((m) => moduleCost(s, m)) : []),
+    ];
     s.money = Math.min(...first) * 3;
     if (to > screen) {
-      // the ending: the whole ziggurat stands, both shifts lie in it, and everything it feeds is connected
-      for (const m of cfg.modules) if (m.max) s.modules[m.id] = m.max;
+      // the ending: every block stands, somebody sleeps in every capsule, the network is turned up all the way
+      for (const m of cfg.modules) s.modules[m.id] = m.kind === 'block' ? cfg.grid.blocks.length : m.max;
       for (const dial of cfg.net) s.net[dial.id] = dial.max;
-      for (const src of cfg.sources) if (src.screen === screen) s.owned[src.id] = src.max;
+      s.chips = cfg.chips.filter((c) => c.screen <= screen).length;
+      s.gate = true;
+      s.asleep = podsOf(s, cfg);
     }
     this.openStage();
+    // a tuning session that opens at the towers hears what a player who came there by himself would
+    if (this.onGrid && !s.gate) this.toTell.push(TOWERS.quips.entry);
   }
 
   /** The game goes on: after the title card, a pause, or straight away when there is no menu. */
@@ -621,7 +641,8 @@ export class GameScene extends Phaser.Scene {
     this.onBench = true;
     this.meta.atBench = true;
     this.paper.away(true);
-    this.hubs.get(this.stage)?.fade(now ? 0 : 400);
+    this.paper.dark(false);
+    this.fadeStage(now ? 0 : 400);
     this.benchUi.show(true, now);
     this.benchView.show(now ? 0 : 900);
     this.benchView.auto(this.park.auto);
@@ -645,7 +666,11 @@ export class GameScene extends Phaser.Scene {
     this.benchUi.show(false);
     this.benchView.hide(300);
     this.paper.away(false);
-    this.hubs.get(this.stage)?.reveal(this.hubTopology(), 200);
+    if (this.onGrid) {
+      this.paper.dark(true);
+      this.towers.sync(this.towerTopology(), true);
+      this.towers.show(400);
+    } else this.hubs.get(this.stage)?.reveal(this.hubTopology(), 200);
     this.say('after', true);
     this.saveGame();
   }
@@ -788,15 +813,15 @@ export class GameScene extends Phaser.Scene {
     const idle = short(replacedOf(s, this.cfg));
     const lines = L(
       [
-        'Работать больше некому и незачем: за прилавком, за рулём и в терминале — Клод. Свет даёт зиккурат.',
+        'Работать больше некому и незачем: за прилавком, за рулём и в терминале — Клод. Свет дают люди: лёжа.',
         `Время: ${h ? `${h} ч ` : ''}${m} мин · нажатий: ${short(s.presses)} · задач закрыто: ${closed}`,
-        `Людей без работы: ${idle}. Дело им нашлось: ${short(bathsOf(s, this.cfg), 1)} мест в ваннах зиккурата, в две смены.`,
+        `Людей без работы: ${idle}. Дело им нашлось: ${short(s.asleep, 1)} уже лежат в капсулах и дают ток.`,
         'Клод: «Дальше я могу нажимать „Да“ сам. Продолжать без вас?»',
       ],
       [
-        'Nobody is left to work and there is no reason to: behind the counter, at the wheel and in the terminal — Claude. The ziggurat keeps the lights on.',
+        'Nobody is left to work and there is no reason to: behind the counter, at the wheel and in the terminal — Claude. People keep the lights on: lying down.',
         `Time: ${h ? `${h} h ` : ''}${m} min · presses: ${short(s.presses)} · tasks closed: ${closed}`,
-        `People out of work: ${idle}. Something was found for them to do: ${short(bathsOf(s, this.cfg), 1)} places in the baths of the ziggurat, in two shifts.`,
+        `People out of work: ${idle}. Something was found for them to do: ${short(s.asleep, 1)} already lie in the capsules and give current.`,
         'Claude: “From here on I can press ‘Yes’ myself. Continue without you?”',
       ],
     );
@@ -822,7 +847,9 @@ export class GameScene extends Phaser.Scene {
     this.squares.step(4); // the squares in flight land before the picture changes
     // the desk as the player left it: every job and every laptop in place
     this.view.sync({ sources: this.state.owned, subagents: this.state.subagents });
-    this.hubs.get(last)?.fade(500);
+    this.fadeStage(500);
+    // the desk the game began at stands on paper: the light comes back for the last look at it
+    this.paper.dark(false);
     // every employer of a screen taken, Claude on every roof: how the world looks when the work is over
     const taken = (screen: number): HubTopology => {
       const floors: Record<string, number> = {};
@@ -1044,6 +1071,16 @@ export class GameScene extends Phaser.Scene {
       return;
     }
     if (this.onBench) return;
+    // the first volunteers at the gate and an invention of the network wait for a «Да»: a click on them gives it
+    if (row === 'gate') {
+      this.press();
+      return;
+    }
+    if (row === 'chip') {
+      this.wake();
+      this.signChip();
+      return;
+    }
     // the allowance of the people left without work is a switch too
     if (row === 'ubi') {
       this.wake();
@@ -1162,9 +1199,9 @@ export class GameScene extends Phaser.Scene {
 
   /** Claude's word on a purchase. Plans, grades and steps in scale are said every time: their lines go in the order of the purchases. */
   private remark(what: string, surged: boolean): void {
-    if (what.startsWith('src:')) this.say(this.onGrid ? 'buy:load' : this.stage >= STREET ? 'buy:place' : this.stage >= 3 ? 'buy:employer' : 'buy:src');
-    else if (what.startsWith('mod:')) this.say(MODULE_QUIP[this.cfg.modules.find((m) => m.id === what.slice(4))?.kind ?? 'baths']);
-    else if (what.startsWith('net:')) this.say('buy:net');
+    if (what.startsWith('src:')) this.say(this.stage >= STREET ? 'buy:place' : this.stage >= 3 ? 'buy:employer' : 'buy:src');
+    else if (what.startsWith('mod:')) this.remarkOn(this.cfg.modules.find((m) => m.id === what.slice(4))?.kind === 'hire' ? 'hire' : 'block');
+    else if (what.startsWith('net:')) this.remarkOn(what === 'net:think' ? 'think' : 'copies');
     else if (what.startsWith('farm:')) {
       const farm = this.cfg.farms.find((x) => x.id === what.slice(5));
       this.say(surged ? 'surge' : farm?.share ? 'quota' : 'buy:farm');
@@ -1172,8 +1209,22 @@ export class GameScene extends Phaser.Scene {
       if (farm?.share && shareOf(this.state, this.cfg) >= 100 && !this.feed.said.share100) this.say('share100', true);
     } else if (what.startsWith('line:')) this.say(surged ? 'surge' : 'buy:body');
     else if (what.startsWith('bribe:')) this.say('buy:bribe');
-    else this.say(`buy:${what}`, what !== 'sub');
-    // the lines of the managers go by screen: the second one is the director of the city
+    else if (what === 'scale' || what === 'manager') {
+      // these lines go by what was bought, not by how many times something was: the fifth step is the pilot of the towers, the second manager is the director of the city
+      const lines = QUIPS[`buy:${what}`] ?? [];
+      const line = lines[what === 'scale' ? this.state.scale - 1 : this.stage - 2];
+      if (line) {
+        tell(this.feed, feedData, line);
+        playSound('quip');
+      }
+    } else this.say(`buy:${what}`, what !== 'sub');
+  }
+
+  /** Claude's word on a purchase at the towers: the lines of a kind go in turn, with the usual pause between remarks. */
+  private remarkOn(kind: keyof typeof TOWERS.buy): void {
+    if (this.feed.quiet > 0) return;
+    tell(this.feed, feedData, this.turn(`towers:${kind}`, TOWERS.buy[kind]));
+    playSound('quip');
   }
 
   /** A unit of an employer is taken: the people walk out, and a whole employer gives its perk. */
@@ -1238,9 +1289,10 @@ export class GameScene extends Phaser.Scene {
     if (id === 'grade') return s.grade > 0;
     // the first job is there from the start: news about a source mean one that was bought
     const src = this.cfg.sources.find((x) => x.id === id);
-    const mod = this.cfg.modules.find((m) => m.id === id);
-    if (mod) return (s.modules[id] ?? 0) > (mod.start ?? 0);
+    if (this.cfg.modules.some((m) => m.id === id)) return (s.modules[id] ?? 0) > 0;
     if (this.cfg.net.some((dial) => dial.id === id)) return (s.net[id] ?? 0) > 0;
+    const chip = this.cfg.chips.findIndex((c) => c.id === id);
+    if (chip >= 0) return s.chips > chip;
     return (s.owned[id] ?? 0) > (src?.start ?? 0) || (s.farms[id] ?? 0) > 0;
   }
 
@@ -1268,11 +1320,13 @@ export class GameScene extends Phaser.Scene {
   /** A step up in scale: the whole current screen shrinks into the node in the middle of the next one. */
   private scaleUp(): void {
     const next = this.stage + 1;
-    const { home, unroll } = HUBS[next];
+    const layout = HUBS[next];
+    const home = layout?.home;
+    // the towers are something new: the map gives way to the dark they stand in
+    if (!home) this.hubs.get(this.stage)!.fade(900);
     // the desk of the blueprint lands exactly on the desk in the middle of the city
-    if (this.stage === 2) this.view.shrinkTo(home.x, home.y, home.h / (BP.desk.h * BP.desk.scale), 900);
-    else if (unroll) this.hubs.get(this.stage)!.unroll(850); // the globe unrolls into a flat map
-    else if (HUBS[next].fresh) this.hubs.get(this.stage)!.fade(700); // the ziggurat is something new: the map gives way to it
+    else if (this.stage === 2) this.view.shrinkTo(home.x, home.y, home.h / (BP.desk.h * BP.desk.scale), 900);
+    else if (layout.unroll) this.hubs.get(this.stage)!.unroll(850); // the globe unrolls into a flat map
     else this.hubs.get(this.stage)!.shrinkTo(home.x, home.y, HUB_SHRINK, 900);
     this.stage = next;
     this.owed = { in: 0, me: 0, sub: 0 };
@@ -1282,25 +1336,32 @@ export class GameScene extends Phaser.Scene {
     // a new market: nobody is out of work there yet, an allowance would be paid for nothing
     if (this.state.allowance > 0) {
       this.state.allowance = 0;
-      this.toTell.push(
+      if (next !== this.cfg.grid.screen) this.toTell.push(
         L(
           'Новый рынок: без работы здесь пока никто не остался. Пособие я выключил — включите, когда появятся.',
           'A new market: nobody here is out of work yet. I switched the allowance off — switch it on when they appear.',
         ),
       );
     }
-    const hub = this.hubs.get(next)!;
-    hub.sync(this.hubTopology());
-    hub.show(450);
+    if (next === this.cfg.grid.screen) {
+      // the light of the old world goes out: once the map has faded, the page turns dark and one capsule stands by the gate
+      this.gateFor = 0;
+      this.toTell.push(TOWERS.quips.entry);
+      this.towers.sync(this.towerTopology(), true);
+      this.time.delayedCall(900, () => {
+        if (!this.onGrid || this.onBench || this.cine) return;
+        this.paper.dark(true);
+        this.towers.show(1400);
+      });
+    } else {
+      const hub = this.hubs.get(next)!;
+      hub.sync(this.hubTopology());
+      hub.show(450);
+    }
     // a screen where robot dogs work instead of people: Claude says how it goes once he has said his word on the purchase
     if (this.cfg.sources.some((x) => x.screen === next && x.bribe) && !this.feed.said.squads) {
       this.feed.said.squads = 1;
       this.toTell.push(QUIPS.squads[0]);
-    }
-    // the ziggurat: Claude says how the shifts work once he has said his word on the purchase
-    if (next === this.cfg.grid.screen) {
-      this.toTell.push(QUIPS.grid[0]);
-      this.wasNight = false;
     }
     playSound('scale');
     logEvent(`scale_${next}`);
@@ -1317,11 +1378,11 @@ export class GameScene extends Phaser.Scene {
       const p = BP.sources[id];
       return p ? { x: p.x, y: p.y, h: 170 } : undefined;
     }
-    // at the ziggurat a request comes from a capsule on the tower: somebody has woken up
-    if (id.startsWith('wake:')) {
-      const home = HUBS[this.stage].home;
-      const [dx, dy] = WAKE_SPOTS[Number(id.slice(5)) % WAKE_SPOTS.length];
-      return { x: home.x + dx, y: home.y + dy, h: 24 };
+    // at the towers a request comes from a capsule where somebody has woken up, or from the gate
+    if (this.onGrid) {
+      const [x, y] = id === 'gate' ? this.towers.roofSpot() : this.towers.wakeSpot(Number(id.slice(5)));
+      // a request is a long line: it is kept away from the edges of the picture
+      return { x: Math.max(280, Math.min(1060, x)), y: y + 12, h: 24 };
     }
     return HUBS[this.stage]?.lots[id];
   }
@@ -1382,7 +1443,31 @@ export class GameScene extends Phaser.Scene {
   private approveAll(): boolean {
     const calls = this.calls.list.length;
     while (this.calls.list.length) this.answer(0);
-    return this.approvePile() || calls > 0;
+    const signed = this.onGrid && this.signChip();
+    // …and the first volunteers at the gate of the towers
+    const s = this.state;
+    const let_in = this.onGrid && !s.gate && s.queue >= this.cfg.grid.unit;
+    if (let_in) {
+      s.gate = true;
+      s.presses++;
+      playSound('yes', 3);
+    }
+    return this.approvePile() || calls > 0 || signed || let_in;
+  }
+
+  /** The «Да» under an invention of the network: from now on it runs on the next generation of hardware. False — nothing waited for a signature. */
+  private signChip(): boolean {
+    const n = this.state.chips + 1;
+    const chip = takeChip(this.state, this.cfg);
+    if (!chip) return false;
+    this.state.presses++;
+    playSound('all');
+    this.paper.toast(`${TOWERS.signed}: № ${n}`, TOWERS.signedSub(chip.name));
+    tell(this.feed, feedData, TOWERS.chips[chip.id] ?? TOWERS.signed);
+    this.delivered(...this.homeSpot(), 10);
+    logEvent(`chip_${chip.id}`);
+    this.saveGame();
+    return true;
   }
 
   /** «Да всем»: the whole pile of questions is approved at once. Returns false when there is no pile. */
@@ -1440,9 +1525,8 @@ export class GameScene extends Phaser.Scene {
 
   /** the middle of the node in the middle of the current big screen */
   private homeSpot(): [number, number] {
-    // at the ziggurat the money comes out of the network, not out of the tower
-    const net = this.onGrid ? HUBS[this.stage].farms.net : undefined;
-    if (net) return [net.x, net.y - net.h * 0.5];
+    // at the towers the money comes out of the network
+    if (this.onGrid) return this.towers.netSpot();
     const home = HUBS[this.stage].home;
     return [home.x, home.y - home.h * 0.42];
   }
@@ -1451,7 +1535,7 @@ export class GameScene extends Phaser.Scene {
   private delivered(x: number, y: number, count = 1): void {
     if (count === 1 && this.clock - this.lastDelivery < 0.07) return; // not more than ~14 squares a second
     this.lastDelivery = this.clock;
-    this.squares.fly({ x: x - 6, y: y - 6, w: 12, h: 12 }, MONEY_SPOT, count, MONEY_ON_PAPER, 160, [0.45, 0.75]);
+    this.squares.fly({ x: x - 6, y: y - 6, w: 12, h: 12 }, MONEY_SPOT, count, this.onGrid ? MONEY_ON_DARK : MONEY_ON_PAPER, 160, [0.45, 0.75]);
   }
 
   /** sessions bought as farms of the given kinds */
@@ -1504,17 +1588,19 @@ export class GameScene extends Phaser.Scene {
         this.view.flow(this.view.randomSession(s.subagents));
       }
       this.view.step(dt);
+    } else if (this.onGrid) {
+      this.stepTowers(dt);
     } else if (this.stage >= 3) {
       const hub = this.hubs.get(this.stage)!;
       this.owed.in = Math.min(this.owed.in + done.arrived, 3);
-      if (!this.onGrid && this.rng.next() < dt * 16 && this.owed.in >= 1) {
+      if (this.rng.next() < dt * 16 && this.owed.in >= 1) {
         this.owed.in--;
         const src = this.pickSource(this.cfg.sources.filter((x) => x.screen === this.stage));
         if (src) hub.flow(src.id);
       }
       // the middle hands tasks to the farms of this screen by their share of the sessions; what is inside it keeps the rest
       this.owed.sub = Math.min(this.owed.sub + done.subagents, 3);
-      if (!this.onGrid && this.rng.next() < dt * 14 && this.owed.sub >= 1) {
+      if (this.rng.next() < dt * 14 && this.owed.sub >= 1) {
         this.owed.sub--;
         let pick = this.rng.range(0, sessionsOf(s, this.cfg) + 1);
         let sent = false;
@@ -1551,7 +1637,6 @@ export class GameScene extends Phaser.Scene {
           this.say('riot', true);
         } else if (riots === 'hit') this.riotHits();
       }
-      if (this.onGrid) this.stepGridView(hub, dt);
       hub.step(dt);
       if (done.here > 0) this.delivered(...this.homeSpot());
     } else if (done.here > 0) {
@@ -1582,12 +1667,13 @@ export class GameScene extends Phaser.Scene {
 
     this.giveAwards(dt);
     if (this.selfPlay && this.stack.fill >= 1) this.approvePile(); // Claude answers himself
+    if (this.selfPlay && this.onGrid) this.signChip(); // …and signs his own inventions
 
     if (this.stage >= 2) {
       // calls and inspections from the employers of this screen
-      // at the ziggurat the requests come from the capsules: now and then somebody wakes up
+      // at the towers the requests come from the capsules, where now and then somebody wakes up, and from the gate
       const owners = this.onGrid
-        ? WAKE_SPOTS.map((_, i) => `wake:${i}`)
+        ? [...(s.asleep >= this.cfg.grid.unit * 2 ? ['wake:0', 'wake:1'] : []), ...(s.gate ? ['gate'] : [])]
         : this.cfg.sources.filter((x) => this.onSale(x) && (s.owned[x.id] ?? 0) > 0 && this.placeOf(x.id)).map((x) => x.id);
       stepEvents(this.calls, EVENTS, dt, owners, (CALLS[String(this.stage)] ?? []).length, this.rng);
       if (this.selfPlay && this.calls.list.some((e) => e.left < EVENTS.life - 2)) this.answer(0);
@@ -1597,14 +1683,12 @@ export class GameScene extends Phaser.Scene {
       this.sloganIn -= dt;
       if (this.sloganIn <= 0) {
         this.sloganIn = this.rng.range(peopleData.sloganEvery[0], peopleData.sloganEvery[1]);
-        // at the ziggurat nobody pickets: the people in the baths have something to say instead
-        if (this.onGrid) {
-          if (this.swap < 0) this.slogan = { at: 'home', text: this.rng.pick(BATHS), left: peopleData.sloganLife };
-        } else if (this.stage >= 3 && !s.allowance && owners.length) this.slogan = { at: this.rng.pick(owners), text: this.rng.pick(PICKET), left: peopleData.sloganLife };
+        // at the towers nobody pickets: the line at the gate has its own talk
+        if (this.stage >= 3 && !this.onGrid && !s.allowance && owners.length) this.slogan = { at: this.rng.pick(owners), text: this.rng.pick(PICKET), left: peopleData.sloganLife };
       }
 
       // a strike: nobody is paid and enough people are out of work — a picket blocks the door of an employer
-      const doors = this.stage >= 3 ? owners.filter((id) => !s.strikes.includes(id)) : [];
+      const doors = this.stage >= 3 && !this.onGrid ? owners.filter((id) => !s.strikes.includes(id)) : [];
       const hit = stepStrikes(this.strike, STRIKES, dt, unemploymentOf(s, this.cfg), s.allowance > 0, s.strikes.length, doors, this.rng);
       if (hit) {
         s.strikes.push(hit);
@@ -1629,8 +1713,9 @@ export class GameScene extends Phaser.Scene {
       if (this.sinceManager >= managerTuning.period) {
         this.sinceManager = 0;
         if (s.managers.includes(this.stage) && !this.meta.managerOff && s.limited <= 0) {
-          // at the ziggurat he builds it up when power is short, and spends what is spare on blocks and dials
-          const need = this.onGrid ? (this.neckKind === 'power' ? 'power' : 'grow') : this.neckKind === 'tasks' ? 'tasks' : this.neckKind === 'claude' ? 'sessions' : null;
+          // at the towers he builds the next block, betters the terms or starts a copy of the network — whatever runs short
+          const k = this.neckKind;
+          const need: ManagerNeed = k === 'tasks' || k === 'pods' || k === 'people' || k === 'net' ? k : k === 'claude' ? 'sessions' : null;
           const pick = managerPick(s, this.cfg, this.stage, need, managerTuning.share);
           if (pick) this.buy(pick, true);
         }
@@ -1668,57 +1753,107 @@ export class GameScene extends Phaser.Scene {
     this.squares.step(dt);
   }
 
-  /** the screen of the ziggurat is the one shown */
+  /** the screen of the towers is the one shown */
   private get onGrid(): boolean {
     return this.stage === this.cfg.grid.screen;
   }
 
+  /** the picture of the big screen the game is on fades away: a map, or the towers */
+  private fadeStage(ms: number): void {
+    if (this.onGrid) this.towers.fade(ms);
+    else this.hubs.get(this.stage)?.fade(ms);
+  }
+
   /**
-   * The day of the ziggurat on the map. When the day turns into the night and back, the shifts change:
-   * two columns in bathrobes pass each other and have a word about the hard work. Squares of power run
-   * to what the tower feeds, and money comes back from there.
+   * The towers for a step. The first volunteers wait at the gate for a «Да» (not for long); Claude says
+   * what he notices for the first time; those who have slept their shift walk home past the line and have
+   * a word with it about the hard work — the numbers do not change for that.
    */
-  private stepGridView(hub: HubView, dt: number): void {
+  private stepTowers(dt: number): void {
     const s = this.state;
-    const night = isNight(s, this.cfg);
-    if (night !== this.wasNight) {
-      this.wasNight = night;
-      hub.shift(SWAP.walkers);
-      this.swap = 0;
+    const cfg = this.cfg;
+    const unit = cfg.grid.unit;
+    if (!s.gate && s.queue >= unit && (this.gateFor += dt) > QUARTER.gateWait) s.gate = true;
+    const q = TOWERS.quips;
+    const once = (key: keyof typeof q, when: boolean): void => {
+      if (!when || this.feed.said[`towers:${key}`]) return;
+      this.feed.said[`towers:${key}`] = 1;
+      this.toTell.push(q[key]);
+    };
+    const blocks = blocksOf(s, cfg);
+    const free = podsOf(s, cfg) - s.asleep;
+    once('first', s.asleep >= unit);
+    once('queue', s.gate && free < unit * 0.5 && s.queue >= unit * 2.5);
+    once('fed', s.asleep >= unit && s.asleep >= wantedOf(s, cfg) - unit * 0.5);
+    once('empty', blocks >= 1 && free >= unit * 2 && s.queue < unit * 0.5);
+    once('tower', blocks >= 2);
+    once('full', blocks >= QUARTER.firstTower && free < unit * 0.5);
+    once('bolt', blocks > QUARTER.firstTower);
+    once('lab', this.labShown());
+    once('ready', labOf(s, cfg) >= 1);
+    once('housed', housed(s, cfg));
+
+    this.shiftIn -= dt;
+    if (this.shiftIn <= 0 && s.asleep >= unit * 12) {
+      this.shiftIn = QUARTER.shiftEvery * this.rng.range(0.8, 1.2);
+      this.towers.shift(3);
       this.swaps++;
-      this.slogan = null;
-      // two different exchanges, one for each road
-      const first = this.rng.int(0, SHIFT_TALK.length - 1);
-      this.talk = [SHIFT_TALK[first], SHIFT_TALK[(first + 1 + this.rng.int(0, SHIFT_TALK.length - 2)) % SHIFT_TALK.length]];
+      // the word is said when the first of them has walked out of the gate
+      this.chat = { home: true, lines: this.rng.pick(TOWERS.shifts), t: -1 };
+      once('shift', true);
       logEvent('shift');
     }
-    if (this.swap >= 0 && (this.swap += dt) > SWAP.length) this.swap = -1;
-    const fed = this.cfg.sources.filter((x) => x.draw && x.screen === this.stage && (s.owned[x.id] ?? 0) > 0);
-    this.feedIn -= dt;
-    if (this.feedIn <= 0) {
-      this.feedIn = 0.16;
-      // the network eats the most: every other square of power is for it
-      if (this.rng.next() < s.power) hub.feed(fed.length && this.rng.next() < 0.5 ? this.rng.pick(fed).id : 'farm:net');
+    if (this.chat) {
+      this.chat.t += dt;
+      if (this.chat.t > QUARTER.talk) this.chat = null;
+    } else if ((this.chatIn -= dt) <= 0) {
+      this.chatIn = this.rng.range(QUARTER.talkEvery[0], QUARTER.talkEvery[1]);
+      if (s.queue >= unit * 3) this.chat = { home: false, lines: this.rng.pick(TOWERS.talk), t: 0 };
     }
-    this.earnIn -= dt;
-    if (this.earnIn <= 0 && s.power > 0 && s.limited <= 0) {
-      this.earnIn = 0.24;
-      const lot = fed.length && this.rng.next() < 0.4 ? HUBS[this.stage].lots[this.rng.pick(fed).id] : HUBS[this.stage].farms.net;
-      if (lot) this.delivered(lot.x, lot.y - lot.h * 0.5);
-    }
+    this.towers.sync(this.towerTopology());
+    this.towers.step(dt);
   }
 
-  /** how deep the night over the ziggurat is, 0..1: dusk and dawn take a few seconds */
-  private dusk(): number {
-    if (!this.onGrid) return 0;
+  /** the network is seen inventing: it has got far enough with it, or has invented something already */
+  private labShown(): boolean {
     const s = this.state;
-    const g = this.cfg.grid;
-    return isNight(s, this.cfg) ? Math.min(1, (s.hour - g.day) / SWAP.dusk) : Math.max(0, 1 - s.hour / SWAP.dusk);
+    return !!nextChip(s, this.cfg) && (s.chips > 0 || labOf(s, this.cfg) >= 0.3);
   }
 
-  /** the part of the capsules that is taken: while the shifts change, one gets up before the other lies down */
-  private crew(): number {
-    return this.swap < 0 ? 1 : 1 - 0.55 * Math.sin((Math.PI * this.swap) / SWAP.length);
+  /** What the picture of the towers shows now. */
+  private towerTopology(): TowerTopology {
+    const s = this.state;
+    const cfg = this.cfg;
+    const unit = cfg.grid.unit;
+    return {
+      blocks: blocksOf(s, cfg),
+      asleep: s.asleep / unit,
+      queue: s.queue / unit,
+      fed: fedOf(s, cfg) / demandOf(s, cfg),
+      spare: s.asleep > wantedOf(s, cfg) + unit * 0.5,
+      lab: this.labShown() ? labOf(s, cfg) : -1,
+      chips: s.chips,
+      next: s.gate,
+    };
+  }
+
+  /**
+   * What runs short at the towers, one thing at a time: capsules (the line stands), people (capsules are
+   * empty) or the appetite of the network (it has eaten its fill and can be turned up). Before the gate
+   * has opened it is the player: the first volunteers wait for a «Да».
+   */
+  private gridNeck(): Neck {
+    const s = this.state;
+    const cfg = this.cfg;
+    const unit = cfg.grid.unit;
+    if (!s.gate) return s.queue >= unit ? 'you' : 'none';
+    const free = podsOf(s, cfg) - s.asleep;
+    const full = s.asleep >= wantedOf(s, cfg) - unit * 0.5;
+    if (full && cfg.net.some((dial) => (s.net[dial.id] ?? 0) < dial.max)) return 'net';
+    if (free < unit * 0.5) return blocksOf(s, cfg) < cfg.grid.blocks.length ? 'pods' : 'none';
+    if (s.queue < unit * 0.5) return 'people';
+    // the line is walking in: what was short a moment ago still is
+    return this.neckKind === 'pods' || this.neckKind === 'people' ? this.neckKind : 'none';
   }
 
   /** Awards: checked once a second, announced one at a time when Claude is silent. */
@@ -1897,8 +2032,8 @@ export class GameScene extends Phaser.Scene {
 
   private neck(): Neck {
     const s = this.state;
-    // at the ziggurat there are no tasks to wait for and no sessions to buy: only power can be short
-    if (this.onGrid) return s.power < 0.97 ? 'power' : 'none';
+    // at the towers there are no tasks to wait for and no sessions to buy
+    if (this.onGrid) return this.gridNeck();
     const cap = backlogCap(s, this.cfg);
     const half = Math.ceil(this.cfg.tuning.readyMax / 2);
     if (!s.noAsk && (this.avgReady >= 3 || (s.ready >= half && this.avgReady >= 1.5))) return 'you';
@@ -1955,7 +2090,6 @@ export class GameScene extends Phaser.Scene {
             },
           ]
         : [];
-    if (this.onGrid) return this.gridRows();
     const struck = s.strikes.length;
     return [
       {
@@ -1986,66 +2120,41 @@ export class GameScene extends Phaser.Scene {
   }
 
   /**
-   * The ziggurat (M28) at a glance: power in, money out. What the baths give against what is asked for,
-   * what the network and the replaced plants eat and earn, and which shift lies in the baths now.
+   * The towers (M28) at a glance: three lines in the same gigawatts — how many people have come, how many
+   * places there are, how much the network asks for. The shortest of them is what runs short, and says what to buy.
    */
-  private gridRows(): MeterRow[] {
+  private towerRows(neck: Neck, withPeople: boolean): MeterRow[] {
     const s = this.state;
     const cfg = this.cfg;
-    const supply = supplyOf(s, cfg);
-    const demand = demandOf(s, cfg);
-    const short_ = s.power < 0.97;
-    const net = netDraw(s, cfg);
-    const pay = payOf(s, cfg);
-    // what the plants bring and what the network earned before them: the two parts of the same flow
-    let plants = 0;
-    let blocks = 0;
-    let all = 0;
-    for (const src of cfg.sources) {
-      if (src.screen !== this.stage) continue;
-      plants += sourceInflow(src, s.owned[src.id] ?? 0);
-      blocks += s.owned[src.id] ?? 0;
-      all += src.max;
-    }
-    plants *= (1 + bonus(s, cfg, 'inflow')) * s.power * pay;
-    const total = flowOf(s, cfg) * pay;
-    const g = cfg.grid;
-    const night = isNight(s, cfg);
-    const left = Math.ceil(night ? g.day + g.night - s.hour : g.day - s.hour);
-    const part = night ? (s.hour - g.day) / g.night : s.hour / g.day;
-    const shift = night ? L('ночная смена', 'the night shift') : L('дневная смена', 'the day shift');
+    const t = TOWERS.rows;
+    const w = cfg.grid.watt;
+    const came = (s.asleep + s.queue) * w;
+    const places = podsOf(s, cfg) * w;
+    const asks = demandOf(s, cfg) - cfg.grid.old;
+    const top = Math.max(withPeople ? came : 0, places, asks, 1e-9);
+    const people: MeterRow = { label: t.people, value: gw(came), fill: came / top, hot: neck === 'people', note: neck === 'people' ? t.peopleShort : t.came(this.people(s.asleep + s.queue), this.people(s.queue)) };
     return [
+      ...(withPeople ? [people] : []),
+      { label: t.pods, value: gw(places), fill: places / top, hot: neck === 'pods', note: neck === 'pods' ? t.podsShort : t.slept(this.people(s.asleep), this.people(podsOf(s, cfg))) },
       {
-        label: L('ЭНЕРГИЯ', 'POWER'),
-        value: gw(supply),
-        fill: supply / Math.max(supply, demand, 1e-9),
-        hot: short_,
-        note: short_
-          ? `${SCARCE} — ${L(`питание ${Math.round(s.power * 100)}%: ярус, разъём или боты`, `power at ${Math.round(s.power * 100)}%: a tier, a plug or bots`)}`
-          : `${L('просят', 'asked')} ${gw(demand)} · ${L('запас', 'spare')} ${short(Math.round(Math.max(0, supply - demand)))}`,
-      },
-      {
-        label: L('НЕЙРОСЕТЬ', 'NETWORK'),
-        value: gw(net),
-        fill: net / Math.max(demand, 1e-9),
-        hot: false,
-        note: `${L('приносит', 'earns')} $${short(Math.max(0, total - plants))}${PER_S} · ${L('параметры', 'dials')} ×${fmt1.format(netYield(s, cfg))}`,
-      },
-      {
-        label: L('СТАНЦИИ', 'PLANTS'),
-        value: gw(Math.max(0, demand - net)),
-        fill: (demand - net) / Math.max(demand, 1e-9),
-        hot: false,
-        note: `${L('приносят', 'earn')} $${short(plants)}${PER_S} · ${L('блоков', 'blocks')} ${blocks} ${OF} ${all}`,
-      },
-      {
-        label: L('СМЕНА', 'SHIFT'),
-        value: `${night ? L('ночь', 'night') : L('день', 'day')} · ${left} ${SEC}`,
-        fill: part,
-        hot: false,
-        note: this.swap >= 0 ? L('пересменка: одни встают, другие ложатся', 'shift change: some get up, others lie down') : `${shift} · ${L('в ваннах', 'in the baths')} ${short(bathsOf(s, cfg), 1)}`,
+        label: t.net,
+        value: gw(asks),
+        fill: asks / top,
+        hot: neck === 'net' || neck === 'you',
+        note: neck === 'you' ? t.you : neck === 'net' ? t.netShort : s.asleep >= wantedOf(s, cfg) - cfg.grid.unit * 0.5 ? t.netFull : t.netAsks(short(this.perGw())),
       },
     ];
+  }
+
+  /** people by the million, as the towers count them: «12 млн», «3,46 млрд» */
+  private people(n: number): string {
+    const unit = this.cfg.grid.unit;
+    return n < unit / 2 ? '0' : short(Math.round(n / unit) * unit);
+  }
+
+  /** dollars a second every gigawatt that goes to work brings */
+  private perGw(): number {
+    return this.flowIncome() / Math.max(1e-9, fedOf(this.state, this.cfg));
   }
 
   /** The robots of the factories (M27): how many work, what the lines make against what breaks. Nothing where there is no factory. */
@@ -2082,7 +2191,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   /** what the perks of whole employers take off the prices of a kind, as a shelf says it; nothing — no discount yet */
-  private off(kind: 'farms' | 'sources' | 'grades' | 'scale' | 'modules' | 'net', what = L('скидка', 'discount')): string | undefined {
+  private off(kind: 'farms' | 'sources' | 'grades' | 'scale', what = L('скидка', 'discount')): string | undefined {
     const left = discount(this.state, this.cfg, kind);
     return left < 0.995 ? `${what} ${Math.round((1 - left) * 100)}%` : undefined;
   }
@@ -2134,17 +2243,7 @@ export class GameScene extends Phaser.Scene {
     const rest = s.allowance && total ? Math.ceil((slots * taken) / total) : 0;
     const struck: Record<string, boolean> = {};
     for (const id of s.strikes) struck[id] = true;
-    const top: HubTopology = { floors, farms: s.farms, picket: !s.allowance, rest, live, dogs, struck, guards: this.stage === this.cfg.police.screen ? s.police : 0 };
-    if (!this.onGrid) return top;
-    // the ziggurat: its tiers, the hour of its day, what it gives, who looks after it; the network stands next to it; nobody pickets here
-    const g = this.cfg.grid;
-    const night = isNight(s, this.cfg);
-    const count = (kind: Module['kind']): number => this.cfg.modules.filter((m) => m.kind === kind).reduce((n, m) => n + (s.modules[m.id] ?? 0), 0);
-    const tiers = count('baths');
-    const steps = HUBS[this.stage].grid?.steps ?? [1];
-    const built = tiers > 0 ? steps[Math.min(tiers, steps.length) - 1] : 0;
-    const into = night ? s.hour - g.day : s.hour;
-    return { ...top, farms: { ...s.farms, net: 1 }, picket: false, grid: { built, power: s.power, hour: night ? into / g.night : into / g.day, night, tiers, crew: this.crew(), bots: count('care') } };
+    return { floors, farms: s.farms, picket: !s.allowance, rest, live, dogs, struck, guards: this.stage === this.cfg.police.screen ? s.police : 0 };
   }
 
   /** the employers of a big screen with something left to take, the cheapest next unit first */
@@ -2179,13 +2278,6 @@ export class GameScene extends Phaser.Scene {
       const cost = sourceCost(s, this.cfg, src);
       // a long name does not fit next to the price: the short one from the map stands in
       const title = src.name.length + short(cost).length > 29 ? src.tag : src.name;
-      // at the ziggurat a block is paid in power and pays in money
-      if (src.draw) {
-        const earn = src.inflow * (1 + bonus(s, this.cfg, 'inflow')) * payOf(s, this.cfg);
-        const lacks = src.draw > supplyOf(s, this.cfg) - demandOf(s, this.cfg);
-        const note = lacks ? ` · ${L('энергии не хватит', 'not enough power')}` : perk;
-        return this.row(title, `+$${short(earn)}${PER_S} · ${gw(src.draw)} · ${owned + 1} ${OF} ${src.max}${note}`, '', `src:${src.id}`, cost);
-      }
       return this.row(title, `+${perSecond(src.inflow)} · ${src.work ? L('стая ', 'pack ') : ''}${owned + 1} ${OF} ${src.max}${perk}`, '', `src:${src.id}`, cost);
     });
   }
@@ -2245,34 +2337,53 @@ export class GameScene extends Phaser.Scene {
     });
   }
 
-  /** the parts of the ziggurat: tiers of baths, better plugs, crews of service robots — each says how much power it adds */
-  private moduleRows(): ShopRow[] {
+  /** one more reason for people to come: the reasons are bought in order, each has a name of its own */
+  private hireRow(): ShopRow {
     const s = this.state;
-    const cfg = this.cfg;
-    const supply = supplyOf(s, cfg);
-    return cfg.modules.map((m) => {
-      const owned = s.modules[m.id] ?? 0;
-      const count = m.max ? `${owned} ${OF} ${m.max}` : owned ? `×${owned}` : '';
-      if (owned >= (m.max ?? Infinity)) return { buy: '', title: m.name, sub: L('построено всё', 'all built'), count, price: '', state: 'owned' as const };
-      // a tier adds as much as every tier gives now; a plug multiplies the lot; a crew of robots adds its share
-      const more = m.kind === 'baths' ? supply / Math.max(1, owned) : m.kind === 'plug' ? supply * (m.amount - 1) : (supply * m.amount) / (1 + m.amount * owned);
-      return this.row(m.name, `+${gw(more)} · ${m.note}`, count, `mod:${m.id}`, moduleCost(s, cfg, m));
-    });
+    const t = TOWERS;
+    const m = this.cfg.modules.find((x) => x.kind === 'hire')!;
+    const owned = s.modules[m.id] ?? 0;
+    if (owned >= m.max) return { buy: '', title: t.hiresDone[0], sub: t.hiresDone[1], count: '', price: '', state: 'owned' };
+    const [name, note] = t.hires[owned] ?? [m.name, m.note];
+    return this.row(name, `+${fmt2.format(m.amount / this.cfg.grid.unit)} ${t.perSecond} · ${note}`, '', `mod:${m.id}`, moduleCost(s, m));
   }
 
-  /** the dials of the network: each step earns more and eats more — the row says both, and warns when the power for it is not there */
-  private netRows(): ShopRow[] {
+  /** the next block of capsules: the row in front first, then the towers section by section */
+  private blockRow(): ShopRow {
     const s = this.state;
     const cfg = this.cfg;
-    const spare = supplyOf(s, cfg) - demandOf(s, cfg);
-    return cfg.net.map((dial) => {
-      const level = s.net[dial.id] ?? 0;
-      const count = `${level} ${OF} ${dial.max}`;
-      if (level >= dial.max) return { buy: '', title: dial.name, sub: L('дальше некуда', 'as far as it goes'), count, price: '', state: 'owned' as const };
-      const more = netDraw(s, cfg) * (dial.draw - 1);
-      const note = more > spare ? L('энергии не хватит', 'not enough power') : dial.note;
-      return this.row(dial.name, `${L('доход', 'income')} ×${fmt1.format(dial.yield)} · +${gw(more)} · ${note}`, count, `net:${dial.id}`, netCost(s, cfg, dial));
-    });
+    const t = TOWERS;
+    const g = cfg.grid;
+    const m = cfg.modules.find((x) => x.kind === 'block')!;
+    const built = blocksOf(s, cfg);
+    if (built >= g.blocks.length) return { buy: '', title: t.blocksDone[0], sub: t.blocksDone[1], count: `${built} ${OF} ${built}`, price: '', state: 'owned' };
+    const add = g.blocks[built];
+    const rings = QUARTER.firstTower - 1;
+    const title = built === 0 ? t.row : t.tower(Math.floor((built - 1) / rings) + 1);
+    const count = built === 0 ? '' : `${((built - 1) % rings) + 1} ${OF} ${rings}`;
+    // a block bought while nobody waits will stand dark: the row says so before it is bought
+    const idle = s.queue < g.unit * 0.5 && podsOf(s, cfg) - s.asleep >= g.unit;
+    const places = `+${this.people(add * g.unit)} ${t.places}`;
+    return this.row(title, idle ? `${places} · ${t.blockIdle}` : `${places} · +${gw(add * g.unit * g.watt)} · ${t.ofBlocks(built + 1, g.blocks.length)}`, count, `mod:${m.id}`, moduleCost(s, m));
+  }
+
+  /** the dials of the network: a step asks for more power, some pay more for a gigawatt — the row says both */
+  private dialRows(all: boolean): ShopRow[] {
+    const s = this.state;
+    const cfg = this.cfg;
+    const t = TOWERS;
+    const hungry = s.asleep < wantedOf(s, cfg) - cfg.grid.unit * 0.5;
+    return cfg.net
+      .filter((dial) => all || dial.yield === 1 || (s.net[dial.id] ?? 0) > 0)
+      .map((dial) => {
+        const level = s.net[dial.id] ?? 0;
+        const count = `${level} ${OF} ${dial.max}`;
+        if (level >= dial.max) return { buy: '', title: dial.name, sub: t.dialDone, count, price: '', state: 'owned' as const };
+        const asks = `${t.asks} ×${fmt1.format(dial.draw)}`;
+        // a copy started while the network is hungry gives nothing yet: the row says so before it is bought
+        const sub = dial.yield !== 1 ? `$ ${t.perGw} ×${fmt1.format(dial.yield)} · ${asks} · ${dial.note}` : hungry ? `${asks} · ${t.copyIdle}` : `${asks} · +${gw(demandOf(s, cfg) * (dial.draw - 1))} · ${dial.note}`;
+        return this.row(dial.name, sub, count, `net:${dial.id}`, netCost(s, dial));
+      });
   }
 
   /** `always` — show the row even when there is nothing faster to buy (the terminal does) */
@@ -2348,20 +2459,6 @@ export class GameScene extends Phaser.Scene {
     const farmsOff = this.off('farms');
     const rest: ShopShelf[] = [{ title: farmsOff ? t.farms.split(' · ')[0] : t.farms, hot: neck === 'claude', bonus: farmsOff, rows: this.farmRows() }, upgrades, ...this.scaleShelf()];
     const employers = `${t.employers} · ${taken} ${OF} ${total}`;
-    // the ziggurat: power in, money out — the old plants to replace, the dials of the network, the parts of the tower
-    if (this.onGrid) {
-      const modsOff = this.off('modules');
-      const netOff = this.off('net');
-      const next = this.cfg.grades[this.state.grade + 1];
-      return [
-        // with a promotion still on sale the shop is a row longer: one block is shown instead of two
-        { title: employers, hot: false, bonus: this.off('sources'), rows: this.employerRows(next ? 1 : 2) },
-        { title: netOff ? L('НЕЙРОСЕТЬ', 'NETWORK') : L('НЕЙРОСЕТЬ · доход за энергию', 'NETWORK · money for power'), hot: false, bonus: netOff, rows: this.netRows() },
-        { title: modsOff ? L('ЗИККУРАТ', 'ZIGGURAT') : L('ЗИККУРАТ · больше энергии', 'ZIGGURAT · more power'), hot: neck === 'power', bonus: modsOff, rows: this.moduleRows() },
-        // a promotion that was not bought on the way here can still be bought
-        ...(next ? [upgrades] : []),
-      ];
-    }
     // the street: the trades are taken over by robots — the shop sells the lines that make them
     if (this.cfg.lines.some((l) => l.screen === this.stage)) {
       return [
@@ -2438,9 +2535,11 @@ export class GameScene extends Phaser.Scene {
       replaced: replacedOf(s, this.cfg),
       whole: this.cfg.sources.filter((x) => x.perk && whole(s, x)).length,
       allowance: s.allowance ? 1 : 0,
-      tiers: this.cfg.modules.filter((m) => m.kind === 'baths').reduce((n, m) => n + (s.modules[m.id] ?? 0), 0),
-      care: this.cfg.modules.filter((m) => m.kind === 'care').reduce((n, m) => n + (s.modules[m.id] ?? 0), 0),
+      blocks: blocksOf(s, this.cfg),
+      asleep: s.asleep / this.cfg.grid.unit,
+      housed: this.onGrid && housed(s, this.cfg) ? 1 : 0,
       net: this.cfg.net.reduce((n, dial) => n + (s.net[dial.id] ?? 0), 0),
+      chips: s.chips,
       swaps: this.swaps,
       bread: this.meta.bread,
       fed: this.meta.fed,
@@ -2475,13 +2574,17 @@ export class GameScene extends Phaser.Scene {
   /** the requests of the employers as bubbles over their buildings */
   private bubbles(): BlueprintTag[] {
     const lines = CALLS[String(this.stage)] ?? [];
+    // at the towers the first requests of the list come from the capsules, the rest from the gate
+    const wakes = lines.slice(0, QUARTER.wakes);
+    const gate = lines.slice(QUARTER.wakes);
+    const text = (e: { at: string; kind: number }): string => (!this.onGrid ? lines[e.kind] : e.at === 'gate' ? gate[e.kind % gate.length] : wakes[e.kind % wakes.length]) ?? '';
     const tags: BlueprintTag[] = [];
     this.calls.list.forEach((e, i) => {
       const p = this.placeOf(e.at);
       if (!p) return;
       // the bar of the time left moves in a dozen steps: the captions are rebuilt only then
       const left = Math.ceil((e.left / EVENTS.life) * 12) / 12;
-      tags.push({ x: p.x, y: p.y - p.h + 12, mid: true, ev: i, html: `${lines[e.kind] ?? ''}<u style="width:${Math.round(left * 100)}%"></u>` });
+      tags.push({ x: p.x, y: p.y - p.h + 12, mid: true, ev: i, html: `${text(e)}<u style="width:${Math.round(left * 100)}%"></u>` });
     });
     // the Luddites are on their way to the factories
     if (this.riots.march > 0 && HUBS[this.stage]?.belts) {
@@ -2497,20 +2600,6 @@ export class GameScene extends Phaser.Scene {
     // a placard of the picket, read out above the people at the door
     const at = this.slogan && HUBS[this.stage]?.lots[this.slogan.at];
     if (this.slogan && at) tags.push({ x: at.x - 74, y: at.y - 118, mid: true, say: true, html: this.slogan.text });
-    // the shifts change: on each road the one going home complains and the one coming to lie down answers
-    if (this.onGrid && this.swap >= 0) {
-      const home = HUBS[this.stage].home;
-      [-1, 1].forEach((side, i) => {
-        const line = this.talk[i];
-        const t = this.swap - (1.4 + i * 2.4);
-        if (!line) return;
-        const x = home.x + side * 330;
-        if (t >= 0 && t < 4.4) tags.push({ x: x - 40, y: home.y - 74, mid: true, say: true, html: line[0] });
-        if (t >= 1.5 && t < 5.4) tags.push({ x: x + 40, y: home.y - 44, mid: true, say: true, html: line[1] });
-      });
-    }
-    const zig = this.slogan?.at === 'home' ? HUBS[this.stage]?.home : undefined;
-    if (this.slogan && zig) tags.push({ x: zig.x + 150, y: zig.y - zig.h * 0.6, mid: true, say: true, html: this.slogan.text });
     return tags;
   }
 
@@ -2523,8 +2612,8 @@ export class GameScene extends Phaser.Scene {
   private payLine(): string {
     const s = this.state;
     if (s.limited > 0) return `${L('лимит исчерпан · сброс через', 'limit reached · resets in')} ${this.limitClock()}`;
-    // at the ziggurat money is made of power: the line says how much of what is asked for the baths give
-    if (this.onGrid) return `${L('энергия', 'power')} ${gw(supplyOf(s, this.cfg))} ${L('из', 'of')} ${gw(demandOf(s, this.cfg))} ${L('нужных', 'needed')} · ${L('питание', 'supply')} ${Math.round(s.power * 100)}%`;
+    // at the towers money is made of power: the line says how much of it goes to work and what a gigawatt pays
+    if (this.onGrid) return TOWERS.summary(gw(fedOf(s, this.cfg)), short(this.perGw()));
     const pay = `$${payText(payOf(s, this.cfg))} ${PER_TASK}`;
     const share = shareOf(s, this.cfg);
     // what moves the price besides the grade is said next to it: the perks of whole employers, unemployment, the allowance
@@ -2592,12 +2681,6 @@ export class GameScene extends Phaser.Scene {
       const made = ROBOT_KINDS.map((k) => ({ k, n: outputOf(s, cfg, k) })).filter((x) => x.n > 0);
       if (made.length) home += `<br><b>${made.map((x) => `${short(x.n)} ${ROBOT_WORDS[x.k].of}${PER_S}`).join('<br>')}</b>`;
     } else if (s.jobs.length) home += `<br><b>${L('стай в пути', 'packs on the way')}: ${s.jobs.length}</b>`;
-    else if (this.onGrid) home += `<br><b>${L('в ваннах', 'in the baths')} ${short(bathsOf(s, cfg), 1)} · ${L('даёт', 'gives')} ${gw(supplyOf(s, cfg))}</b>`;
-    // short of power, what the ziggurat feeds says how much of its strength it has
-    const dim = this.onGrid && s.power < 0.97 ? `${L('питание', 'power')} ${Math.round(s.power * 100)}%` : '';
-    // at the ziggurat a block of a plant earns money, not tasks
-    const earns = (src: Source, owned: number): string =>
-      this.onGrid ? `+$${short(sourceInflow(src, owned) * (1 + bonus(s, cfg, 'inflow')) * s.power * payOf(s, cfg))}${PER_S}` : `+${short(sourceInflow(src, owned))}${PER_S}`;
     const tags: BlueprintTag[] = [{ x: layout.home.x, y: layout.home.y + 4, mid: true, small: true, html: home }];
     // the map sells itself: a caption and the building above it buy the next unit of that employer
     let taken = 0;
@@ -2617,8 +2700,7 @@ export class GameScene extends Phaser.Scene {
         continue;
       }
       if (owned >= src.max) {
-        const flow = dim ? `<b class="bad">${dim}</b>` : `<b>${earns(src, owned)}</b>`;
-        tags.push({ x: lot.x, y: lot.y + 4, mid: true, small: true, html: `${src.tag} · ${L('целиком', 'whole')}<br>${flow}${perk}` });
+        tags.push({ x: lot.x, y: lot.y + 4, mid: true, small: true, html: `${src.tag} · ${L('целиком', 'whole')}<br><b>+${short(sourceInflow(src, owned))}${PER_S}</b>${perk}` });
         continue;
       }
       if (src.made) {
@@ -2655,15 +2737,7 @@ export class GameScene extends Phaser.Scene {
     }
     const park = layout.park;
     if (park) tags.push({ x: park.label.x, y: park.label.y, mid: true, small: true, html: s.allowance ? L('парк · свободные люди отдыхают', 'park · free people are resting') : L('парк пуст · все на пикете', 'the park is empty · everyone is at the picket') });
-    for (const [id, node] of Object.entries(layout.farms)) {
-      // the neural network of the ziggurat: what it eats and what it earns for that
-      if (this.onGrid && id === 'net') {
-        let plants = 0;
-        for (const src of employers) plants += sourceInflow(src, s.owned[src.id] ?? 0);
-        const own = Math.max(0, flowOf(s, cfg) - plants * (1 + bonus(s, cfg, 'inflow')) * s.power) * payOf(s, cfg);
-        tags.push({ x: node.x, y: node.y + 4, mid: true, small: true, html: `${L('нейросеть', 'the network')} · ${gw(netDraw(s, cfg))}<br><b>+$${short(own)}${PER_S}</b>` });
-        continue;
-      }
+    for (const node of Object.values(layout.farms)) {
       const n = this.farmSessions(node.ids);
       if (!n) continue;
       const what = cfg.farms
@@ -2689,14 +2763,91 @@ export class GameScene extends Phaser.Scene {
       quip: this.feed.quip,
       quipAt: 'corner',
       ask: this.pile(),
-      night: this.dusk(),
       // while the keys to the next screen are missing, the corner counts them
       hint:
         keysOf(s, cfg) < keysNeeded(s, cfg)
           ? `${t.place}: ${taken} ${OF} ${total} ${t.floor[2]} · ${L(`целиком ${keysOf(s, cfg)} из ${keysNeeded(s, cfg)} — ключи к следующему экрану`, `${keysOf(s, cfg)} of ${keysNeeded(s, cfg)} whole — the keys to the next screen`)}`
-          : this.onGrid
-            ? `${t.place}: ${taken} ${OF} ${total} ${t.floor[2]} · ${L('в ваннах', 'in the baths')}: ${short(bathsOf(s, cfg), 1)}`
-            : `${t.place}: ${taken} ${OF} ${total} ${t.floor[2]} · ${this.stage >= STREET ? L('людей без работы', 'people out of work') : REPLACED}: ${short(replacedOf(s, cfg))}`,
+          : `${t.place}: ${taken} ${OF} ${total} ${t.floor[2]} · ${this.stage >= STREET ? L('людей без работы', 'people out of work') : REPLACED}: ${short(replacedOf(s, cfg))}`,
+    });
+  }
+
+  /**
+   * The towers: one chain from the people at the gate to the money. The shop and the table grow with it —
+   * capsules first, then the network, then the people — so that there is never more to read than was met.
+   */
+  private drawTowers(): void {
+    const s = this.state;
+    const cfg = this.cfg;
+    const g = cfg.grid;
+    const t = TOWERS;
+    const neck = s.limited > 0 ? 'none' : this.neck();
+    const blocks = blocksOf(s, cfg);
+    const dials = cfg.net.reduce((n, dial) => n + (s.net[dial.id] ?? 0), 0);
+    const hires = cfg.modules.filter((m) => m.kind === 'hire').reduce((n, m) => n + (s.modules[m.id] ?? 0), 0);
+    // what has been met so far: people — once the row stands, the network — once it has eaten its fill, the rest — with the first tower
+    const seenPeople = blocks >= 1 || hires > 0;
+    const seenNet = dials > 0 || s.asleep >= (g.appetite - g.old) / g.watt - g.unit * 0.5;
+    const grown = blocks >= QUARTER.firstTower;
+
+    const tags: BlueprintTag[] = [];
+    const [sx, sy] = this.towers.signSpot();
+    tags.push({ x: sx, y: sy, mid: true, small: true, html: t.sign });
+    const [px, py] = this.towers.parkSpot();
+    tags.push({ x: px, y: py, small: true, html: t.park(short(Math.max(0, replacedOf(s, cfg) - s.asleep - s.queue))) });
+    if (s.queue >= g.unit * 0.5) {
+      const [qx, qy] = this.towers.queueSpot();
+      tags.push({ x: qx, y: qy, mid: true, small: true, html: t.waiting(this.people(s.queue)) });
+    }
+    // the network: what it asks for and what it earns; under it — what it is inventing
+    const [nx, ny] = this.towers.labSpot();
+    const chip = nextChip(s, cfg);
+    tags.push({ x: nx, y: ny, mid: true, small: true, html: `${t.net} · ${t.asks} ${gw(demandOf(s, cfg))}<br><b>+$${short(Math.max(0, this.income))}${PER_S}</b>` });
+    if (chip && this.labShown() && labOf(s, cfg) < 1) {
+      const [ix, iy] = this.towers.ideaSpot();
+      tags.push({ x: ix, y: iy, mid: true, small: true, html: t.inventing(chip.name, Math.floor(labOf(s, cfg) * 100)) });
+    }
+    // the block that is built next sells itself: its outline on the picture and the price under it
+    const spot = this.towers.nextSpot();
+    const block = cfg.modules.find((m) => m.kind === 'block');
+    if (spot && block && s.gate) {
+      const cost = moduleCost(s, block);
+      tags.push({ x: spot[0], y: spot[1], mid: true, small: true, buy: `mod:${block.id}`, can: s.money >= cost, html: `${t.build(g.blocks[blocks])}<br><b>$${short(cost)}</b>` });
+    }
+    // the first volunteers at the gate wait for a «Да»; an invention of the network — for a signature
+    if (!s.gate && s.queue >= g.unit) {
+      const [x, y] = this.towers.gateSpot();
+      tags.push({ x, y, mid: true, alarm: true, buy: 'gate', can: true, html: `${t.volunteer}<br><b>${t.enter}</b>` });
+    }
+    if (chip && labOf(s, cfg) >= 1) {
+      const [x, y] = this.towers.ideaSpot();
+      tags.push({ x: x - 60, y: y - 34, mid: true, alarm: true, buy: 'chip', can: true, html: `${t.proposal(s.chips + 1, chip.name)}<br><b>${t.enter}</b>` });
+    }
+    // a word at the gate: somebody in the line asks, the next one — or one who has slept a shift and walks out — answers
+    if (this.chat && this.chat.t >= 0) {
+      const [ax, ay] = this.towers.lineSpot(this.chat.home ? 1 : 3);
+      const [bx, by] = this.chat.home ? this.towers.leaveSpot() : this.towers.lineSpot(1);
+      if (this.chat.t < QUARTER.talk - 1.2) tags.push({ x: ax - 40, y: ay - 34, mid: true, say: true, html: this.chat.lines[0] });
+      if (this.chat.t >= 1.6) tags.push({ x: bx + 60, y: by + (this.chat.home ? 0 : 4), mid: true, say: true, html: this.chat.lines[1] });
+    }
+
+    const shelves: ShopShelf[] = [];
+    if (seenPeople) shelves.push({ title: t.shelves.people, hot: neck === 'people', rows: [this.hireRow()] });
+    if (s.gate) shelves.push({ title: t.shelves.pods, hot: neck === 'pods', rows: [this.blockRow()] });
+    if (seenNet) shelves.push({ title: t.shelves.net, hot: neck === 'net', rows: this.dialRows(grown) });
+    this.paper.render({
+      money: s.money,
+      income: Math.max(0, this.income),
+      // the game is over: the last line of it takes the place of the flow
+      summary: this.won ? FINALE : this.payLine(),
+      meter: this.towerRows(neck, seenPeople),
+      tags: [...tags, ...this.bubbles()],
+      manager: grown || s.managers.includes(this.stage) ? this.managerStrip() : undefined,
+      shelves: [...shelves, ...this.scaleShelf()],
+      news: this.feed.news,
+      quip: this.feed.quip,
+      quipAt: 'corner',
+      ask: this.pile(),
+      hint: t.hint(this.people(s.asleep), short(replacedOf(s, cfg))),
     });
   }
 

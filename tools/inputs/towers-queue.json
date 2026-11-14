@@ -1,0 +1,6 @@
+[
+  {"t": 6.0, "eval": "window.__gym.press()"},
+  {"t": 9.0, "eval": "window.__gym.gift(3e17); window.__gym.buy('mod:block'); window.__gym.buy('mod:hire'); window.__gym.buy('mod:hire'); window.__gym.buy('mod:hire'); window.__gym.buy('mod:hire')"},
+  {"t": 58.0, "eval": "window.__gym.buy('net:copies'); window.__gym.buy('net:copies'); for (let i = 0; i < 6; i++) window.__gym.buy('mod:block')"},
+  {"t": 66.0, "eval": "window.__gym.call()"}
+]

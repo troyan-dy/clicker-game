@@ -1,0 +1,5 @@
+[
+  {"t": 1.5, "eval": "window.__gym.fleet(80); for (const id of ['checkout','coffee','courier','taxi','barber','depot','build','clinic','school','farm']) window.__gym.take(id)"},
+  {"t": 4.0, "eval": "window.__gym.gift(3e16); window.__gym.buy('scale')"},
+  {"t": 17.0, "eval": "window.__gym.press()"}
+]

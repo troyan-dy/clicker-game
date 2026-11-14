@@ -825,3 +825,58 @@
 .bl-over.away .bl-toast {
   display: none;
 }
+
+/* The last screen is dark, like the terminal the game began in: the same layout in the colours of the night.
+   The paper goes dark slowly: the light of the old world is switched off. */
+.bl {
+  transition: background-color 1.4s ease-in-out;
+}
+.bl.dark,
+.bl-over.dark {
+  --paper: #1f1e1d;
+  --card: #262624;
+  --ink: #f0eee6;
+  --dim: #87867f;
+  --rule: #3d3a36;
+  --money: #7cc68d;
+}
+/* …and the picture there is big and leaves the frame at the top, so it lies under the page, and the page
+   is see-through: the money, the table and the shop stay on top of the towers */
+.bl.dark {
+  background-color: transparent;
+  background-image: none;
+}
+#stage.under #game {
+  z-index: 0;
+}
+/* the cards of the page go dark together with it */
+.bl-meter,
+.bl-shop,
+.bl-news {
+  transition:
+    background-color 1.4s ease-in-out,
+    border-color 1.4s ease-in-out,
+    color 1.4s ease-in-out;
+}
+.bl.dark .bl-mrow u {
+  background: #3d3a36;
+}
+.bl.dark .bl-shop,
+.bl.dark .bl-news {
+  border-color: var(--rule);
+}
+.bl.dark .bl-item.can:hover {
+  background: #2e2d2a;
+}
+/* Claude's dark cards need an edge of their own against the dark */
+.bl.dark .bl-quip,
+.bl.dark .bl-mgr,
+.bl-over.dark .bl-toast {
+  outline: 1.5px solid var(--rule);
+}
+/* a word said aloud stays a light bubble with dark letters */
+.bl-over.dark .bl-tag.say {
+  background: #f0eee6;
+  border-color: #f0eee6;
+  color: #262624;
+}

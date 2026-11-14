@@ -18,14 +18,6 @@ const PICKET_H = 86; // a figure with a placard, px
 const PICKETS = ['node_picket1', 'node_picket2', 'node_picket3'];
 const RESTS = ['node_rest_bench', 'node_rest_chess', 'node_rest_hammock', 'node_rest_picnic', 'node_rest_easel', 'node_rest_fishing'];
 const MASCOT = 'mascot';
-const POWER = 0x6a9bcc; // what runs from the ziggurat to the things it feeds
-const SUN = 0xd4a27f;
-const SPARKS = 28;
-const POD = 0xe59a84; // a capsule with a sleeper in it: warm against the dark wall
-const POD_EMPTY = 0x4a4844; // …and one that is waiting for the next shift
-const DRONES = 7;
-/** the pictures a service drone is drawn with: flying, at work, with a towel */
-const DRONE_LOOK = ['node_drone', 'node_drone_work', 'node_drone_towel'];
 
 /** What the player owns on a big screen: units of the employers and farms of sessions. */
 export interface HubTopology {
@@ -45,13 +37,6 @@ export interface HubTopology {
   struck: Record<string, boolean>;
   /** units of robot police on guard at the middle */
   guards: number;
-  /**
-   * The ziggurat of the screen (M28): `built` — the part of its tiers that stands, `power` — the part of
-   * the power asked for that is given, `hour` — how far the day or the night has gone, each 0..1;
-   * `tiers` — how many of them stand, `crew` — the part of the capsules that is taken, 0..1 (it dips
-   * while the shifts change), `bots` — how many service drones look after the tower.
-   */
-  grid?: { built: number; power: number; hour: number; night: boolean; tiers: number; crew: number; bots: number };
 }
 
 interface Route {
@@ -102,18 +87,6 @@ export class HubView {
   private readonly dots: Dot[] = [];
   private readonly rests: Phaser.GameObjects.Image[] = [];
   private readonly police: Phaser.GameObjects.Image[] = [];
-  /** small squares of power that run from the ziggurat to what it feeds */
-  private readonly sparks: Dot[] = [];
-  /** the ziggurat in the middle, coloured in tier by tier */
-  private zig?: Lot;
-  /** the capsules on the walls of the tower, tier by tier, in the order people lie down in them */
-  private heads?: Phaser.GameObjects.Graphics;
-  private readonly beds: { x: number; y: number; tier: number }[] = [];
-  private lying = '';
-  /** the service drones: where each one is, where it flies, how long it still works on the spot */
-  private readonly drones: { img: Phaser.GameObjects.Image; tx: number; ty: number; wait: number; t: number }[] = [];
-  private tiers = 0;
-  private dial?: Phaser.GameObjects.Graphics;
   private resting = 0;
   private readonly rng: Rng;
   private readonly walkers: Walkers;
@@ -159,17 +132,10 @@ export class HubView {
     ].sort((a, b) => a.y - b.y);
     for (const p of places) {
       const img = scene.add.image(p.x, p.y, `node_${p.key}`).setOrigin(0.5, 1);
-      const zig = p.id === 'home' && !!layout.grid;
-      const scale = this.fit(img, p.h, p.id === 'home' ? layout.homeWidth : undefined);
-      img.setScale(scale).setAlpha(p.id === 'home' && !zig ? 1 : GHOST);
+      const scale = this.fit(img, p.h);
+      img.setScale(scale).setAlpha(p.id === 'home' ? 1 : GHOST);
       this.root.add(img);
-      if (zig) {
-        // the ziggurat is built like an employer is taken: the outline first, the colour tier by tier
-        const fill = scene.add.image(p.x, p.y, `node_${p.key}`).setOrigin(0.5, 1).setScale(scale);
-        fill.setCrop(0, fill.height, fill.width, 0);
-        this.root.add(fill);
-        this.zig = { ghost: img, fill, scale, shown: 0, target: -1, pickets: [], dogs: [] };
-      } else if (p.id in layout.lots) {
+      if (p.id in layout.lots) {
         // the same picture in full colour, cut off above the part that is taken
         const fill = scene.add.image(p.x, p.y, `node_${p.key}`).setOrigin(0.5, 1).setScale(scale);
         fill.setCrop(0, fill.height, fill.width, 0);
@@ -177,45 +143,12 @@ export class HubView {
         this.lots.set(p.id, { ghost: img, fill, scale, shown: 0, target: 0, pickets: [], dogs: [] });
       } else this.nodes.set(p.id, img);
     }
-    if (layout.grid) {
-      this.dial = scene.add.graphics();
-      this.heads = scene.add.graphics();
-      this.root.add([this.dial, this.heads]);
-      // capsules in two rows along the front wall of every tier, on both sides of the cables
-      const k = this.zig!.fill.scaleX;
-      const left = layout.home.x - (layout.grid.size[0] * k) / 2;
-      const top = layout.home.y - layout.grid.size[1] * k;
-      layout.grid.faces.forEach(([y, x0, x1, cables, h], tier) => {
-        const rows = h > 120 ? [0.2, 0.5, 0.8] : [0.3, 0.72];
-        for (const part of rows) {
-          for (let x = x0 + 18; x <= x1 - 14; x += 27) {
-            if (Math.abs(x - cables) > 40) this.beds.push({ x: left + x * k, y: top + (y + h * part + (x - x0) * layout.grid!.slope) * k, tier });
-          }
-        }
-      });
-      // people lie down where they like, not from left to right
-      for (let i = this.beds.length - 1; i > 0; i--) {
-        const j = rng.int(0, i);
-        [this.beds[i], this.beds[j]] = [this.beds[j], this.beds[i]];
-      }
-      for (let i = 0; i < DRONES; i++) {
-        const img = scene.add.image(layout.home.x, layout.home.y - 60, DRONE_LOOK[0]).setOrigin(0.5, 0.5).setVisible(false);
-        img.setScale(58 / img.height);
-        this.root.add(img);
-        this.drones.push({ img, tx: img.x, ty: img.y, wait: 0, t: rng.range(0, 6) });
-      }
-    }
     this.walkers = new Walkers(scene, this.root, rng);
 
     for (let i = 0; i < DOTS; i++) {
       const rect = scene.add.rectangle(0, 0, 11, 11, CORAL).setVisible(false);
       this.root.add(rect);
       this.dots.push({ rect, route: null, dist: 0 });
-    }
-    for (let i = 0; layout.grid && i < SPARKS; i++) {
-      const rect = scene.add.rectangle(0, 0, 7, 7, POWER).setVisible(false);
-      this.root.add(rect);
-      this.sparks.push({ rect, route: null, dist: 0 });
     }
   }
 
@@ -302,10 +235,7 @@ export class HubView {
         this.scene.tweens.add({ targets: [lot.ghost, lot.fill], scale: { from: lot.scale * 1.07, to: lot.scale }, duration: 300, ease: 'Back.Out' });
       }
       if (!this.routes.has(id)) {
-        // tasks run in from an employer; at the ziggurat power runs out to what it feeds
-        const route = this.spoke([place.x, place.y - 22], !!this.layout.grid);
-        route.pays = false;
-        this.routes.set(id, route);
+        this.routes.set(id, this.spoke([place.x, place.y - 22], false));
         changed = true;
       }
     }
@@ -321,14 +251,10 @@ export class HubView {
       const scale = img.scale;
       img.setScale(scale * 0.7);
       this.scene.tweens.add({ targets: img, scale, alpha: 1, duration: 320, ease: 'Back.Out' });
-      const route = this.spoke(f.above ? [f.x, f.y + 6] : [f.x, f.y - f.h - 6], true);
-      // at the ziggurat it is power that runs to the node: the money comes out of it by itself
-      if (this.layout.grid) route.pays = false;
-      this.routes.set(node, route);
+      this.routes.set(node, this.spoke(f.above ? [f.x, f.y + 6] : [f.x, f.y - f.h - 6], true));
       changed = true;
     }
     if (changed) this.redrawLines();
-    if (t.grid) this.syncGrid(t.grid);
     this.rest(Math.min(this.rests.length, t.rest));
     // robot police: androids in a cold blue stand in front of the middle
     while (this.police.length < Math.min(5, t.guards)) {
@@ -339,100 +265,6 @@ export class HubView {
       this.scene.tweens.add({ targets: img, alpha: 1, duration: 300 });
       this.police.push(img);
     }
-  }
-
-  /** The ziggurat: its tiers, the night over the field, what its power reaches, the dial of its day. */
-  private syncGrid(g: NonNullable<HubTopology['grid']>): void {
-    const zig = this.zig;
-    if (zig && g.built !== zig.target) {
-      const first = zig.target < 0;
-      zig.target = g.built;
-      this.scene.tweens.add({ targets: zig, shown: g.built, duration: first ? 0 : 420, ease: 'Cubic.Out', onUpdate: () => this.crop(zig) });
-      if (first) {
-        zig.shown = g.built;
-        this.crop(zig);
-      } else this.scene.tweens.add({ targets: [zig.ghost, zig.fill], scale: { from: zig.scale * 1.04, to: zig.scale }, duration: 320, ease: 'Back.Out' });
-    }
-    // the capsules: on the tiers that stand, taken as far as the shift has lain down
-    this.tiers = g.tiers;
-    const beds = this.beds.filter((b) => b.tier < g.tiers);
-    const taken = Math.round(beds.length * Math.max(0, Math.min(1, g.crew)));
-    const key = `${g.tiers}:${taken}`;
-    if (this.heads && key !== this.lying) {
-      this.lying = key;
-      const h = this.heads;
-      h.clear();
-      beds.forEach((b, i) => {
-        h.fillStyle(i < taken ? POD : POD_EMPTY, 1).fillEllipse(b.x, b.y, 9, 5.6);
-        h.lineStyle(1, 0xf0eee6, i < taken ? 0.9 : 0.35).strokeEllipse(b.x, b.y, 9, 5.6);
-        if (i < taken) h.fillStyle(INK, 1).fillCircle(b.x - 2, b.y, 1.2);
-      });
-    }
-    // the drones that look after them: as many as were bought
-    this.drones.forEach((d, i) => {
-      const on = i < Math.min(DRONES, g.bots);
-      if (on === d.img.visible) return;
-      d.img.setVisible(on);
-      if (on) this.roam(d, true);
-    });
-    // short of power, what the ziggurat feeds fades towards its outline
-    const lit = 0.3 + 0.7 * g.power;
-    for (const lot of this.lots.values()) lot.fill.setAlpha(lit);
-    const d = this.dial;
-    if (!d) return;
-    // the path of the sun over the top of the ziggurat: the sun by day, the moon by night
-    const { x, y, h } = this.layout.home;
-    const cy = y - h + 46;
-    const r = 168;
-    d.clear();
-    d.lineStyle(2, RULE, 1);
-    d.beginPath();
-    d.arc(x, cy, r, Math.PI, Math.PI * 2);
-    d.strokePath();
-    d.lineBetween(x - r - 14, cy, x - r + 14, cy);
-    d.lineBetween(x + r - 14, cy, x + r + 14, cy);
-    const a = Math.PI * (1 + Math.max(0, Math.min(1, g.hour)));
-    const bx = x + Math.cos(a) * r;
-    const by = cy + Math.sin(a) * r;
-    d.fillStyle(g.night ? POWER : SUN, 1).fillCircle(bx, by, 12);
-    d.lineStyle(2, INK, 1).strokeCircle(bx, by, 12);
-    if (g.night) d.fillStyle(0xcccac5, 1).fillCircle(bx + 5, by - 4, 8); // a bite out of the moon, the colour of the night paper
-  }
-
-  /**
-   * The shifts change: `count` people in bathrobes walk out of the tower towards each edge of the map,
-   * and as many walk in from there — the two columns pass each other on the way, as on the way to any job.
-   */
-  shift(count: number): void {
-    const { x, y } = this.layout.home;
-    const kind: WalkerKind = this.scene.textures.exists('node_sleeper1') ? 'sleeper' : 'person';
-    for (const side of [-1, 1]) {
-      const door: Pt = [x + side * 150, y + 26];
-      const edge: Pt = [side < 0 ? FIELD.x0 + 24 : FIELD.x1 - 24, y + 34];
-      this.walkers.spawn(kind, door, edge, count);
-      this.walkers.spawn(kind, edge, door, count);
-    }
-  }
-
-  /** A square of power runs from the ziggurat to the lot `id`, or to the node `farm:<id>`. */
-  feed(id: string): void {
-    const route = this.routes.get(id);
-    const dot = this.sparks.find((d) => !d.route);
-    if (!route || !dot) return;
-    dot.route = route;
-    dot.dist = 0;
-    dot.rect.setPosition(route.from[0], route.from[1]).setVisible(true);
-  }
-
-  /** A drone picks the next capsule to look after: one on a tier that stands. `now` — it appears there at once. */
-  private roam(d: { img: Phaser.GameObjects.Image; tx: number; ty: number; wait: number }, now = false): void {
-    const beds = this.beds.filter((b) => b.tier < Math.max(1, this.tiers));
-    const bed = beds[this.rng.int(0, Math.max(0, beds.length - 1))];
-    if (!bed) return;
-    // it hovers just above the capsule, a little to the side of it
-    d.tx = bed.x + this.rng.range(-6, 6);
-    d.ty = bed.y - 22;
-    if (now) d.img.setPosition(d.tx, d.ty);
   }
 
   /** `want` people with placards stand at the door of a building; the rest of them go. */
@@ -527,7 +359,7 @@ export class HubView {
 
 
   step(dt: number): void {
-    for (const d of [...this.dots, ...this.sparks]) {
+    for (const d of this.dots) {
       if (!d.route) continue;
       d.dist += DOT_SPEED * dt;
       const { from, to, len, pays } = d.route;
@@ -539,27 +371,6 @@ export class HubView {
       }
       const f = d.dist / len;
       d.rect.setPosition(from[0] + (to[0] - from[0]) * f, from[1] + (to[1] - from[1]) * f);
-    }
-    for (const d of this.drones) {
-      if (!d.img.visible) continue;
-      d.t += dt;
-      const dx = d.tx - d.img.x;
-      const dy = d.ty - d.img.y;
-      const far = Math.hypot(dx, dy);
-      if (far > 3) {
-        // on its way to the next capsule
-        const step = Math.min(far, 120 * dt);
-        d.img.setPosition(d.img.x + (dx / far) * step, d.img.y + (dy / far) * step + Math.sin(d.t * 5) * 0.25);
-        d.img.setFlipX(dx > 0);
-        if (d.img.texture.key !== DRONE_LOOK[0]) d.img.setTexture(DRONE_LOOK[0]);
-      } else if (d.wait <= 0) {
-        // arrived: it tops up the warm water or straightens a plug for a while
-        d.wait = this.rng.range(1.6, 3.6);
-        d.img.setTexture(DRONE_LOOK[this.rng.next() < 0.5 ? 1 : 2]);
-      } else {
-        d.img.y = d.ty + Math.sin(d.t * 4) * 1.6;
-        if ((d.wait -= dt) <= 0) this.roam(d);
-      }
     }
     this.walkers.step(dt);
   }
@@ -623,8 +434,8 @@ export class HubView {
     return g;
   }
 
-  private fit(img: Phaser.GameObjects.Image, h: number, maxWidth = this.layout.maxWidth): number {
-    return Math.min(h / img.height, maxWidth / img.width);
+  private fit(img: Phaser.GameObjects.Image, h: number): number {
+    return Math.min(h / img.height, this.layout.maxWidth / img.width);
   }
 
   /**

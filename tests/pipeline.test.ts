@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { createRng } from '../src/core/rng';
 import autoData from '../src/data/balance/auto.json';
+import chipData from '../src/data/balance/chips.json';
 import farmData from '../src/data/balance/farms.json';
 import gradeData from '../src/data/balance/grades.json';
 import lineData from '../src/data/balance/lines.json';
@@ -20,7 +21,6 @@ import { createStrikes, stepStrikes } from '../src/systems/strikes/strikes';
 import type { Plan } from '../src/systems/plan/plan';
 import {
   backlogCap,
-  bonus,
   buyFarm,
   aimAt,
   buyBribe,
@@ -39,15 +39,17 @@ import {
   createPipe,
   demandOf,
   farmCost,
+  fedOf,
   farmPrice,
   finished,
   flowOf,
   inflowOf,
   keysNeeded,
   keysOf,
+  labOf,
   netCost,
-  netDraw,
   payOf,
+  podsOf,
   pressPipe,
   riot,
   riotShare,
@@ -57,7 +59,9 @@ import {
   sourcePrice,
   stepPipe,
   supplyOf,
+  takeChip,
   unemploymentOf,
+  wantedOf,
   type Farm,
   type Line,
   type Module,
@@ -78,6 +82,7 @@ const cfg: PipeConfig = {
   police: policeData,
   modules: moduleData as Module[],
   net: netData,
+  chips: chipData,
   grid: gridData,
   auto: autoData,
 };
@@ -497,98 +502,133 @@ describe('pipeline', () => {
     const last = 2 + cfg.scales.length;
     expect(finished(s, cfg)).toBe(false);
     for (const src of cfg.sources) if (src.screen === last) s.owned[src.id] = src.max;
+    // the last screen is the towers: every block built and somebody asleep in every capsule
+    for (const m of cfg.modules) if (m.kind === 'block') s.modules[m.id] = cfg.grid.blocks.length;
+    expect(finished(s, cfg)).toBe(false);
+    s.asleep = podsOf(s, cfg);
     expect(finished(s, cfg)).toBe(true);
     s.scale--;
     expect(finished(s, cfg)).toBe(false);
   });
 
-  it('test_ziggurat_turns_power_into_money_and_a_shortage_dims_everything', () => {
+  /** a game that has just come to the towers */
+  const atTowers = (): PipeState => {
     const s = createPipe(cfg);
     s.noAsk = true;
-    s.scale = cfg.scales.length; // the ziggurat
-    s.money = 0;
-    stepPipe(s, cfg, DT);
-    // the first tier feeds the network as it comes: everything that arrives is closed, no queue, no sessions to buy
-    expect(demandOf(s, cfg)).toBe(cfg.grid.net);
-    expect(supplyOf(s, cfg)).toBeGreaterThanOrEqual(demandOf(s, cfg));
-    expect(s.power).toBe(1);
-    expect(flowOf(s, cfg)).toBe(inflowOf(s, cfg));
-    s.money = 0;
-    for (let i = 0; i < 60; i++) stepPipe(s, cfg, DT);
-    expect(s.money).toBeCloseTo(inflowOf(s, cfg) * payOf(s, cfg), -2);
-    expect(s.backlog).toBe(0);
-    // a block of an old plant is replaced: its customers pay, and it asks for power
+    s.scale = cfg.grid.screen - 2;
+    return s;
+  };
+
+  it('test_towers_people_wait_at_the_gate_and_lie_down_where_there_is_room', () => {
+    const s = atTowers();
+    const g = cfg.grid;
+    // people come by themselves and stand in line: nobody is let in before the first «Да»
+    for (let i = 0; i < 120; i++) stepPipe(s, cfg, DT);
+    expect(s.queue).toBeCloseTo(g.trickle * 2, -3);
+    expect(s.asleep).toBe(0);
+    pressPipe(s, cfg);
+    expect(s.gate).toBe(true);
+    // the pilot capsule is taken, the rest wait: the line never holds more than it has room for
+    for (let i = 0; i < 60 * 120; i++) stepPipe(s, cfg, DT);
+    expect(s.asleep).toBeCloseTo(g.pilot * g.unit);
+    expect(s.queue).toBeCloseTo(g.line);
+    expect(supplyOf(s, cfg)).toBeCloseTo(g.old + g.pilot * g.unit * g.watt);
+    // a block gives the line somewhere to lie down; whoever lies down stays
     s.money = 1e30;
-    const diesel = cfg.sources.find((x) => x.id === 'diesel')!;
-    const before = inflowOf(s, cfg);
-    expect(buySource(s, cfg, 'diesel')).toBe(true);
-    stepPipe(s, cfg, DT);
-    expect(demandOf(s, cfg)).toBe(cfg.grid.net + diesel.draw!);
-    expect(inflowOf(s, cfg)).toBeCloseTo(before + diesel.inflow * (1 + bonus(s, cfg, 'inflow')), -3);
-    // more is connected than the baths give: everything — the old work too — runs at a part of its strength
-    s.owned.coal = cfg.sources.find((x) => x.id === 'coal')!.max;
-    stepPipe(s, cfg, DT);
-    expect(s.power).toBeCloseTo(supplyOf(s, cfg) / demandOf(s, cfg));
-    expect(s.power).toBeLessThan(1);
-    expect(finished(s, cfg)).toBe(false);
-    const dim = inflowOf(s, cfg);
-    // a tier, a better plug and a crew of service robots each add to what the baths give
-    const one = supplyOf(s, cfg);
-    expect(buyModule(s, cfg, 'tier')).toBe(true);
-    expect(supplyOf(s, cfg)).toBeCloseTo(one * 2);
-    expect(buyModule(s, cfg, 'plug')).toBe(true);
-    expect(supplyOf(s, cfg)).toBeCloseTo(one * 2 * cfg.modules.find((m) => m.id === 'plug')!.amount);
-    const care = cfg.modules.find((m) => m.id === 'care')!;
-    const two = supplyOf(s, cfg);
-    expect(buyModule(s, cfg, 'care')).toBe(true);
-    expect(supplyOf(s, cfg)).toBeCloseTo((two * (1 + care.amount * 2)) / (1 + care.amount));
-    stepPipe(s, cfg, DT);
-    expect(s.power).toBe(1);
-    expect(inflowOf(s, cfg)).toBeGreaterThan(dim);
-    const tier = cfg.modules.find((m) => m.id === 'tier')!;
-    s.modules.tier = tier.max!;
-    expect(buyModule(s, cfg, 'tier')).toBe(false); // the ziggurat has only so many tiers
+    expect(buyModule(s, cfg, 'block')).toBe(true);
+    expect(podsOf(s, cfg)).toBe((g.pilot + g.blocks[0]) * g.unit);
+    for (let i = 0; i < 60 * 60; i++) stepPipe(s, cfg, DT);
+    expect(s.asleep).toBeCloseTo(podsOf(s, cfg));
+    // better terms bring more people a second; there are only so many of them, and of blocks
+    const hire = cfg.modules.find((m) => m.kind === 'hire')!;
+    const before = supplyOf(s, cfg);
+    expect(buyModule(s, cfg, hire.id)).toBe(true);
+    expect(supplyOf(s, cfg)).toBe(before);
+    s.modules.block = g.blocks.length;
+    expect(buyModule(s, cfg, 'block')).toBe(false);
+    s.modules[hire.id] = hire.max;
+    expect(buyModule(s, cfg, hire.id)).toBe(false);
   });
 
-  it('test_network_dial_earns_more_and_eats_more', () => {
-    const s = createPipe(cfg);
-    s.noAsk = true;
-    s.scale = cfg.scales.length;
+  it('test_towers_network_eats_no_more_than_it_asks_for_and_a_dial_changes_what_it_asks_and_pays', () => {
+    const s = atTowers();
+    const g = cfg.grid;
+    // on the way in nothing is lost: the old grid feeds the network as before, everything that comes in is closed
+    const entry = inflowOf(s, cfg);
+    s.scale--;
+    expect(inflowOf(s, cfg)).toBeCloseTo(entry);
+    s.scale++;
+    expect(fedOf(s, cfg)).toBe(g.old);
+    expect(flowOf(s, cfg)).toBe(inflowOf(s, cfg));
+    // sleepers add to what it gets — until it has eaten its fill
+    s.asleep = 5 * g.unit;
+    expect(inflowOf(s, cfg)).toBeCloseTo((entry * (g.old + 5 * g.unit * g.watt)) / g.old);
+    s.asleep = wantedOf(s, cfg) * 3;
+    expect(fedOf(s, cfg)).toBe(g.appetite);
+    const full = inflowOf(s, cfg);
+    expect(full).toBeCloseTo((entry * g.appetite) / g.old);
+    // a copy asks for more and pays the same; a dial with a yield pays more for every gigawatt
     s.money = 1e30;
-    const dial = cfg.net[0];
+    const copy = cfg.net.find((p) => p.yield === 1)!;
+    const think = cfg.net.find((p) => p.yield > 1)!;
     const pay = payOf(s, cfg);
-    const draw = netDraw(s, cfg);
-    const price = netCost(s, cfg, dial);
-    expect(buyNet(s, cfg, dial.id)).toBe(true);
-    expect(payOf(s, cfg)).toBeCloseTo(pay * dial.yield);
-    expect(netDraw(s, cfg)).toBeCloseTo(draw * dial.draw);
-    expect(netCost(s, cfg, dial)).toBeGreaterThan(price);
-    // a dial has only so many steps, and a whole plant may make them cheaper
-    s.net[dial.id] = dial.max;
-    expect(buyNet(s, cfg, dial.id)).toBe(false);
-    s.net[dial.id] = 1;
-    const full = netCost(s, cfg, dial);
-    s.owned.gas = cfg.sources.find((x) => x.id === 'gas')!.max;
-    expect(netCost(s, cfg, dial)).toBeLessThan(full);
-    // before the ziggurat the dials do nothing and cannot be turned
+    const price = netCost(s, copy);
+    expect(buyNet(s, cfg, copy.id)).toBe(true);
+    expect(demandOf(s, cfg)).toBeCloseTo(g.appetite * copy.draw);
+    expect(inflowOf(s, cfg)).toBeCloseTo(full * copy.draw);
+    expect(payOf(s, cfg)).toBeCloseTo(pay);
+    expect(netCost(s, copy)).toBeGreaterThan(price);
+    expect(buyNet(s, cfg, think.id)).toBe(true);
+    expect(payOf(s, cfg)).toBeCloseTo(pay * think.yield);
+    expect(demandOf(s, cfg)).toBeCloseTo(g.appetite * copy.draw * think.draw);
+    // money is what goes to work times what it pays
+    s.money = 0;
+    s.gate = true;
+    for (let i = 0; i < 60; i++) stepPipe(s, cfg, DT);
+    expect(s.money).toBeCloseTo(inflowOf(s, cfg) * payOf(s, cfg), -6);
+    expect(s.backlog).toBe(0);
+    // a dial has only so many steps; before the towers the dials do nothing and cannot be turned
+    s.net[copy.id] = copy.max;
+    expect(buyNet(s, cfg, copy.id)).toBe(false);
     s.scale--;
     expect(payOf(s, cfg)).toBeCloseTo(pay);
-    expect(buyNet(s, cfg, dial.id)).toBe(false);
+    expect(buyNet(s, cfg, think.id)).toBe(false);
   });
 
-  it('test_manager_builds_the_ziggurat_up_before_connecting_what_it_cannot_feed', () => {
-    const s = createPipe(cfg);
-    s.noAsk = true;
-    s.scale = cfg.scales.length;
+  it('test_towers_hardware_is_invented_on_the_power_of_the_sleepers_and_waits_for_a_yes', () => {
+    const s = atTowers();
+    const g = cfg.grid;
+    const chip = cfg.chips[0];
+    s.gate = true;
+    s.modules.block = 3;
+    s.asleep = podsOf(s, cfg);
+    const pay = payOf(s, cfg);
+    const asks = demandOf(s, cfg);
+    expect(takeChip(s, cfg)).toBeUndefined();
+    // what the sleepers give adds up, gigawatt-second by gigawatt-second
+    const seconds = Math.ceil(chip.need / (s.asleep * g.watt)) + 1;
+    for (let i = 0; i < seconds * 60; i++) stepPipe(s, cfg, DT);
+    expect(labOf(s, cfg)).toBe(1);
+    expect(payOf(s, cfg)).toBeCloseTo(pay); // nothing changes until it is signed
+    expect(takeChip(s, cfg)).toBe(chip);
+    expect(s.chips).toBe(1);
+    expect(payOf(s, cfg)).toBeCloseTo(pay * chip.yield);
+    expect(demandOf(s, cfg)).toBeCloseTo(asks * chip.draw);
+    // what was given above the need is not lost: it goes towards the next one
+    expect(labOf(s, cfg)).toBeGreaterThan(0);
+    expect(labOf(s, cfg)).toBeLessThan(0.5);
+  });
+
+  it('test_manager_at_the_towers_buys_what_runs_short_and_leaves_the_price_of_a_gigawatt_to_the_player', () => {
+    const s = atTowers();
     s.money = 1e30;
-    const last = 2 + cfg.scales.length;
-    // there is power to spare: he replaces the cheapest block or turns the cheapest dial that fits
-    expect(supplyOf(s, cfg) - demandOf(s, cfg)).toBeGreaterThanOrEqual(cfg.sources.find((x) => x.id === 'diesel')!.draw!);
-    expect(managerPick(s, cfg, last, 'grow', 1)).toBe('src:diesel');
-    // nothing more fits into what the first tier gives: the ziggurat is built up first
-    s.owned.diesel = 2;
-    expect(managerPick(s, cfg, last, 'grow', 1)).toMatch(/^mod:/);
-    expect(managerPick(s, cfg, last, 'power', 1)).toMatch(/^mod:/);
+    const screen = cfg.grid.screen;
+    expect(managerPick(s, cfg, screen, 'pods', 1)).toBe('mod:block');
+    expect(managerPick(s, cfg, screen, 'people', 1)).toBe('mod:hire');
+    expect(managerPick(s, cfg, screen, 'net', 1)).toBe(`net:${cfg.net.find((p) => p.yield === 1)!.id}`);
+    // nothing is left to build: he does not buy a block that is not there
+    s.modules.block = cfg.grid.blocks.length;
+    expect(managerPick(s, cfg, screen, 'pods', 1)).toBeNull();
   });
 
   it('test_pipe_prices_grow_and_money_is_required', () => {

@@ -1,15 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import awardsEn from '../src/content/awards.en.json';
 import awards from '../src/content/awards.json';
-import bathsEn from '../src/content/baths.en.json';
-import baths from '../src/content/baths.json';
 import callsEn from '../src/content/calls.en.json';
 import calls from '../src/content/calls.json';
 import legendsEn from '../src/content/legends.en.json';
 import legends from '../src/content/legends.json';
 import newsEn from '../src/content/news.en.json';
-import shiftsEn from '../src/content/shifts.en.json';
-import shifts from '../src/content/shifts.json';
 import news from '../src/content/news.json';
 import quipsEn from '../src/content/quips.en.json';
 import quips from '../src/content/quips.json';
@@ -17,6 +13,7 @@ import takeoversEn from '../src/content/takeovers.en.json';
 import takeovers from '../src/content/takeovers.json';
 import { TICKETS_EN } from '../src/content/tickets.en';
 import { TICKETS } from '../src/content/tickets';
+import chips from '../src/data/balance/chips.json';
 import farms from '../src/data/balance/farms.json';
 import grades from '../src/data/balance/grades.json';
 import lines from '../src/data/balance/lines.json';
@@ -42,8 +39,6 @@ describe('the English text follows the Russian one', () => {
     expect(keys(takeoversEn)).toEqual(keys(takeovers));
     expect(sizes(quipsEn)).toEqual(sizes(quips));
     expect(sizes(callsEn)).toEqual(sizes(calls));
-    expect(bathsEn.length).toBe(baths.length);
-    expect(shiftsEn.length).toBe(shifts.length);
     // the tests run in Russian: TICKETS here is the Russian list
     expect(TICKETS_EN.map((t) => [t.id, t.asks.length])).toEqual(TICKETS.map((t) => [t.id, t.asks.length]));
   });
@@ -56,6 +51,7 @@ describe('the English text follows the Russian one', () => {
     expect(keys(names.lines)).toEqual(ids(lines));
     expect(keys(names.modules)).toEqual(ids(modules));
     expect(keys(names.net)).toEqual(ids(net));
+    expect(keys(names.chips)).toEqual(ids(chips));
     expect(keys(names.plans)).toEqual(ids(plans));
     expect(keys(names.scales)).toEqual(ids(scales));
     expect(keys(names.managers)).toEqual(managers.map((m) => String(m.screen)).sort());

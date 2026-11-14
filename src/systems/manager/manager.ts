@@ -5,18 +5,14 @@
  */
 import {
   bribeCost,
-  demandOf,
   farmCost,
-  gridOn,
   jobOf,
   lineCost,
   locked,
   moduleCost,
   netCost,
-  netDraw,
   sourceCost,
   subagentPrice,
-  supplyOf,
   type PipeConfig,
   type PipeState,
 } from '../pipeline/pipeline';
@@ -28,49 +24,42 @@ export interface ManagerTuning {
   share: number;
 }
 
+/** what runs short on a screen, as the manager sees it: tasks or sessions before the towers; at them — capsules, people, or the appetite of the network */
+export type ManagerNeed = 'tasks' | 'sessions' | 'pods' | 'people' | 'net' | null;
+
 /**
  * What the manager of `screen` buys now: `src:<id>`, `bribe:<id>`, `farm:<id>`, `line:<id>`, `mod:<id>`,
- * `net:<id>` or `sub` — the cheapest thing that relieves `need`. At the ziggurat the needs are «power»
- * (it gives less than is asked for) and «grow» (there is power to spare: one more block of an old plant
- * or one more step of a dial of the network). Null — nothing is needed, or it costs more than his share of the money.
+ * `net:<id>` or `sub` — the cheapest thing that relieves `need`. At the towers he builds the next block
+ * when the line stands, gives people one more reason to come when capsules are empty, and starts one
+ * more copy of the network when it has eaten its fill; the dials that change what a gigawatt costs are
+ * the player's to turn. Null — nothing is needed, or it costs more than his share of the money.
  */
-export function managerPick(s: PipeState, cfg: PipeConfig, screen: number, need: 'tasks' | 'sessions' | 'power' | 'grow' | null, share: number): string | null {
+export function managerPick(s: PipeState, cfg: PipeConfig, screen: number, need: ManagerNeed, share: number): string | null {
   if (!need) return null;
   let best: { key: string; price: number } | null = null;
   const offer = (key: string, price: number): void => {
     if (!best || price < best.price) best = { key, price };
   };
-  // what would ask the ziggurat for more than it can give waits until it is built up
-  const spare = gridOn(s, cfg) ? supplyOf(s, cfg) - demandOf(s, cfg) : Infinity;
-  let starved = false;
-  const fits = (draw: number | undefined): boolean => {
-    if (!draw || draw <= spare) return true;
-    starved = true;
-    return false;
-  };
-  // one more tier, a better plug or a crew of service robots
-  const power = (): void => {
-    for (const m of cfg.modules) if ((s.modules[m.id] ?? 0) < (m.max ?? Infinity)) offer(`mod:${m.id}`, moduleCost(s, cfg, m));
-  };
-  if (need === 'power') power();
-  else if (need === 'tasks' || need === 'grow') {
+  if (need === 'pods' || need === 'people') {
+    const kind = need === 'pods' ? 'block' : 'hire';
+    for (const m of cfg.modules) {
+      const max = m.kind === 'block' ? Math.min(m.max, cfg.grid.blocks.length) : m.max;
+      if (m.kind === kind && (s.modules[m.id] ?? 0) < max) offer(`mod:${m.id}`, moduleCost(s, m));
+    }
+  } else if (need === 'net') {
+    // a copy asks for more and pays the same for a gigawatt: there is nothing to decide about it
+    for (const p of cfg.net) if (p.yield === 1 && (s.net[p.id] ?? 0) < p.max) offer(`net:${p.id}`, netCost(s, p));
+  } else if (need === 'tasks') {
     for (const src of cfg.sources) {
       const owned = s.owned[src.id] ?? 0;
       const onSale = screen >= 3 ? src.screen === screen : src.screen <= screen;
       if (!onSale || src.made || owned >= src.max || jobOf(s, src.id)) continue; // one pack of robot dogs at a time
-      if (!fits(src.draw)) continue;
       // where a bribe opens the door, it comes first
       if (locked(s, src)) offer(`bribe:${src.id}`, bribeCost(s, cfg, src));
       else offer(`src:${src.id}`, sourceCost(s, cfg, src));
     }
     // on the street the tasks come with the robots: one more line
     for (const l of cfg.lines) if (l.screen === screen) offer(`line:${l.id}`, lineCost(s, cfg, l));
-    // at the ziggurat the network grows by its dials: a step eats what it eats now times `draw`
-    if (need === 'grow') {
-      for (const p of cfg.net) {
-        if ((s.net[p.id] ?? 0) < p.max && fits(netDraw(s, cfg) * (p.draw - 1))) offer(`net:${p.id}`, netCost(s, cfg, p));
-      }
-    }
   } else if (screen === 2) offer('sub', subagentPrice(cfg, s.subagents));
   else {
     for (const f of cfg.farms) {
@@ -78,7 +67,6 @@ export function managerPick(s: PipeState, cfg: PipeConfig, screen: number, need:
       if (f.screen === screen && owned < (f.max ?? Infinity)) offer(`farm:${f.id}`, farmCost(s, cfg, f));
     }
   }
-  if (!best && starved) power();
   const pick = best as { key: string; price: number } | null;
   return pick && pick.price <= s.money * share ? pick.key : null;
 }

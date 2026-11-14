@@ -9,6 +9,7 @@ import {
   gridOn,
   inflowOf,
   payOf,
+  podsOf,
   subagentRate,
   type PipeConfig,
   type PipeState,
@@ -152,10 +153,10 @@ export function restorePipe(cfg: PipeConfig, raw: unknown): PipeState {
   for (const [kind, id] of Object.entries(counts(r.aim))) {
     if (cfg.sources.some((x) => x.id === id && x.made === kind)) s.aim[kind] = id as string;
   }
-  // the ziggurat: its parts, the dials of the network, the hour of its day
+  // the towers: what they are built of, the dials and the hardware of the network, who stands in line and who sleeps
   const modules = counts(r.modules);
   for (const m of cfg.modules) {
-    const n = Math.floor(num(modules[m.id], m.start ?? 0, m.start ?? 0, m.max ?? Number.MAX_VALUE));
+    const n = Math.floor(num(modules[m.id], 0, 0, m.kind === 'block' ? Math.min(m.max, cfg.grid.blocks.length) : m.max));
     if (n > 0) s.modules[m.id] = n;
   }
   const net = counts(r.net);
@@ -163,8 +164,12 @@ export function restorePipe(cfg: PipeConfig, raw: unknown): PipeState {
     const n = Math.floor(num(net[p.id], 0, 0, p.max));
     if (n > 0) s.net[p.id] = n;
   }
-  s.hour = num(r.hour, 0, 0, cfg.grid.day + cfg.grid.night);
-  s.power = num(r.power, 1, 0, 1);
+  s.asleep = num(r.asleep, 0, 0, podsOf(s, cfg));
+  s.queue = num(r.queue, 0, 0, cfg.grid.line);
+  // whoever has let somebody in once does not have to say «Да» at the gate again
+  s.gate = r.gate === true || s.asleep > 0;
+  s.chips = Math.floor(num(r.chips, 0, 0, cfg.chips.length));
+  s.lab = num(r.lab, 0);
   const farms = counts(r.farms);
   const surge = counts(r.surge);
   for (const f of cfg.farms) {
@@ -210,7 +215,7 @@ export function offlineReport(s: PipeState, cfg: PipeConfig, tuning: SaveTuning,
   if (!(seconds >= tuning.offlineMinSeconds)) return null;
   const counted = Math.min(seconds, tuning.offlineCapHours * 3600);
   if (!s.noAsk) return { seconds: counted, tasks: 0, dollars: 0, waited: true };
-  // at the ziggurat the network closes whatever comes in; before it — what the sessions manage
+  // at the towers the network closes whatever comes in; before them — what the sessions manage
   const flow = gridOn(s, cfg) ? inflowOf(s, cfg) : Math.min(inflowOf(s, cfg), claudeRate(s, cfg) + subagentRate(s, cfg));
   const tasks = Math.floor(flow * counted * tuning.offlineRate);
   return { seconds: counted, tasks, dollars: tasks * payOf(s, cfg), waited: false };

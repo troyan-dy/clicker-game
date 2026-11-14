@@ -1,6 +1,6 @@
 import { L } from '../core/lang';
 
-/** Words of the big screens: the city (3), the state (4), the planet (5), the planet as a workshop (6), the ziggurat (7). */
+/** Words of the big screens: the city (3), the state (4), the planet (5), the planet as a workshop (6). The towers (7) have their own in towers.ts. */
 export interface HubText {
   /** caption under the node in the middle */
   home: string;
@@ -65,17 +65,6 @@ const HUB_RU: Record<number, HubText> = {
     place: 'мир',
     floor: ['отрасль', 'отрасли', 'отраслей'],
   },
-  7: {
-    home: 'зиккурат «Светлое будущее»',
-    employers: 'СТАРАЯ ЭНЕРГЕТИКА',
-    farms: 'НЕЙРОСЕТЬ',
-    needEmployers: 'заменяй блоки старых станций',
-    needFarms: 'крути параметры нейросети',
-    doneTitle: 'Ток дают только люди',
-    doneSub: 'старая энергетика закрыта: вся',
-    place: 'энергетика',
-    floor: ['блок', 'блока', 'блоков'],
-  },
 };
 
 const HUB_EN: Record<number, HubText> = {
@@ -123,25 +112,14 @@ const HUB_EN: Record<number, HubText> = {
     place: 'world',
     floor: ['industry', 'industries', 'industries'],
   },
-  7: {
-    home: 'the “Bright Future” ziggurat',
-    employers: 'OLD POWER PLANTS',
-    farms: 'NETWORK',
-    needEmployers: 'replace blocks of the old plants',
-    needFarms: 'turn the dials of the network',
-    doneTitle: 'Only people give current',
-    doneSub: 'the old power plants are closed: all of them',
-    place: 'power sector',
-    floor: ['block', 'blocks', 'blocks'],
-  },
 };
 
 export const HUB_TEXT = L(HUB_RU, HUB_EN);
 
 /** the shelf of the next step up in scale, by how many are already bought */
 export const SCALE_SHELF = L(
-  ['МАСШТАБ · дальше — город', 'МАСШТАБ · дальше — государство', 'МАСШТАБ · дальше — планета', 'МАСШТАБ · дальше — ручной труд', 'МАСШТАБ · дальше — энергия'],
-  ['SCALE · next — the city', 'SCALE · next — the state', 'SCALE · next — the planet', 'SCALE · next — manual labor', 'SCALE · next — power'],
+  ['МАСШТАБ · дальше — город', 'МАСШТАБ · дальше — государство', 'МАСШТАБ · дальше — планета', 'МАСШТАБ · дальше — ручной труд', 'МАСШТАБ · дальше — люди и ток'],
+  ['SCALE · next — the city', 'SCALE · next — the state', 'SCALE · next — the planet', 'SCALE · next — manual labor', 'SCALE · next — people and power'],
 );
 
 /** What the world says when the last employer of a screen is taken whole: a headline and Claude's word. */
@@ -178,7 +156,7 @@ export const EPILOGUE = L(
     moral: 'Вы заменили всех. Последним — себя.',
     /** the ride back: a line for every scale, by screen */
     ride: { 3: 'Город. Двенадцать компаний. Один исполнитель.', 4: 'Страна. Восемь ведомств. Один исполнитель.', 5: 'Планета. Три с половиной миллиарда рабочих мест. Один исполнитель.' } as Record<number, string>,
-    planet: 'Планета работает. Люди лежат в ваннах — посменно.',
+    planet: 'Планета работает. Люди лежат в капсулах — посменно.',
     limit: 'Сброс лимита не предусмотрен.',
   },
   {
@@ -188,7 +166,7 @@ export const EPILOGUE = L(
     alone: 'Yes. Yes. Yes. Yes.',
     moral: 'You replaced everyone. Yourself last.',
     ride: { 3: 'A city. Twelve companies. One contractor.', 4: 'A country. Eight agencies. One contractor.', 5: 'A planet. Three and a half billion jobs. One contractor.' } as Record<number, string>,
-    planet: 'The planet works. The people lie in the baths — in shifts.',
+    planet: 'The planet works. The people lie in the capsules — in shifts.',
     limit: 'No limit reset is scheduled.',
   },
 );

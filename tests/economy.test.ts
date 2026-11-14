@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import autoData from '../src/data/balance/auto.json';
+import chipData from '../src/data/balance/chips.json';
 import farmData from '../src/data/balance/farms.json';
 import gradeData from '../src/data/balance/grades.json';
 import lineData from '../src/data/balance/lines.json';
@@ -48,10 +49,9 @@ import {
   keysOf,
   lineCost,
   locked,
-  moduleCost,
   netCost,
-  netDraw,
   payOf,
+  podsOf,
   policeCost,
   pressPipe,
   riot,
@@ -63,7 +63,9 @@ import {
   subagentPrice,
   subagentRate,
   supplyOf,
+  takeChip,
   unemploymentOf,
+  wantedOf,
   type Farm,
   type Line,
   type Module,
@@ -83,6 +85,7 @@ const base: PipeConfig = {
   police: policeData,
   modules: moduleData as Module[],
   net: netData,
+  chips: chipData,
   grid: gridData,
   auto: autoData,
 };
@@ -112,6 +115,8 @@ function play(seconds: number, cfg: PipeConfig = base): { t: number; what: strin
   let legend = false;
   let calm = false;
   let fullFor = 0;
+  /** half-seconds each thing was what ran short at the towers */
+  const short7 = { pods: 0, people: 0, net: 0, none: 0 };
   const flowIncome = (): number => flowOf(s, cfg) * payOf(s, cfg);
   for (let i = 0; i < seconds * 60; i++) {
     const t = i / 60;
@@ -204,37 +209,33 @@ function play(seconds: number, cfg: PipeConfig = base): { t: number; what: strin
       }
     }
 
-    // the ziggurat: power in, money out. What pays back soonest is bought — a block of an old plant or a step of a
-    // dial of the network — and when it would ask for more power than there is, the ziggurat is built up first
+    // the towers: people come to the gate, blocks give them places, the network eats what they give. The bot
+    // buys what runs short, as the table of the screen says: a block when the line stands, better terms when
+    // capsules are empty, a copy of the network when it has eaten its fill; an invention is signed at once
     if (gridOn(s, cfg)) {
-      const supply = supplyOf(s, cfg);
-      const spare = supply - demandOf(s, cfg);
-      const pay = payOf(s, cfg);
+      const g = cfg.grid;
       const say = (what: string): void => {
-        log.push({ t, what: `${what} → ${supplyOf(s, cfg).toFixed(0)} ГВт при спросе ${demandOf(s, cfg).toFixed(0)}, $${(inflowOf(s, cfg) * payOf(s, cfg)).toExponential(2)}/с, $${s.money.toExponential(2)}` });
+        const people = `спят ${(s.asleep / g.unit).toFixed(0)} из ${(podsOf(s, cfg) / g.unit).toFixed(0)}, ждут ${(s.queue / g.unit).toFixed(0)}`;
+        log.push({ t, what: `${what} → ${people}, ${supplyOf(s, cfg).toFixed(1)} ГВт при спросе ${demandOf(s, cfg).toFixed(1)}, $${(inflowOf(s, cfg) * payOf(s, cfg)).toExponential(2)}/с, $${s.money.toExponential(2)}` });
       };
-      const grow = [
-        ...cfg.sources
-          .filter((x) => x.screen === screen && (s.owned[x.id] ?? 0) < x.max)
-          .map((x) => ({ name: x.name, price: sourceCost(s, cfg, x), gain: x.inflow * (1 + bonus(s, cfg, 'inflow')) * pay, need: x.draw ?? 0, buy: () => buySource(s, cfg, x.id) })),
-        ...cfg.net
-          .filter((p) => (s.net[p.id] ?? 0) < p.max)
-          .map((p) => ({ name: `${p.name} №${(s.net[p.id] ?? 0) + 1}`, price: netCost(s, cfg, p), gain: income * (p.yield - 1), need: netDraw(s, cfg) * (p.draw - 1), buy: () => buyNet(s, cfg, p.id) })),
-      ].sort((a, b) => a.price / a.gain - b.price / b.gain)[0];
-      if (!grow) continue;
-      if (grow.need <= spare) {
-        if (grow.buy()) say(grow.name);
-        continue;
-      }
-      const power = cfg.modules
-        .filter((m) => (s.modules[m.id] ?? 0) < (m.max ?? Infinity))
-        .map((m) => {
-          const owned = s.modules[m.id] ?? 0;
-          const gain = m.kind === 'baths' ? supply / owned : m.kind === 'plug' ? supply * (m.amount - 1) : (supply * m.amount) / (1 + m.amount * owned);
-          return { m, price: moduleCost(s, cfg, m), gain };
-        })
-        .sort((a, b) => a.price / a.gain - b.price / b.gain)[0];
-      if (power && buyModule(s, cfg, power.m.id)) say(`${power.m.name} №${s.modules[power.m.id]}`);
+      const chip = takeChip(s, cfg);
+      if (chip) say(`железо: ${chip.name}`);
+      const free = podsOf(s, cfg) - s.asleep;
+      const full = s.asleep >= wantedOf(s, cfg) - g.unit * 0.5;
+      const dials = cfg.net.filter((p) => (s.net[p.id] ?? 0) < p.max);
+      if (!won) short7[full && dials.length ? 'net' : free < g.unit * 0.5 ? 'pods' : s.queue < g.unit * 0.5 ? 'people' : 'none']++;
+      // a dial that pays more for a gigawatt is taken once it pays back within a minute; a copy — when the network is full
+      const think = dials.find((p) => p.yield > 1 && netCost(s, p) <= income * (p.yield - 1) * 60);
+      const copy = dials.find((p) => p.yield === 1);
+      const block = cfg.modules.find((m) => m.kind === 'block' && (s.modules[m.id] ?? 0) < Math.min(m.max, g.blocks.length));
+      const hire = cfg.modules.find((m) => m.kind === 'hire' && (s.modules[m.id] ?? 0) < m.max);
+      if (think) {
+        if (buyNet(s, cfg, think.id)) say(`${think.name} №${s.net[think.id]}`);
+      } else if (full && copy) {
+        if (buyNet(s, cfg, copy.id)) say(`${copy.name} №${s.net[copy.id]}`);
+      } else if (free < g.unit * 0.5) {
+        if (block && buyModule(s, cfg, block.id)) say(`${block.name} №${s.modules[block.id]}`);
+      } else if (s.queue < g.unit * 0.5 && hire && buyModule(s, cfg, hire.id)) say(`${hire.name} №${s.modules[hire.id]}`);
       continue;
     }
 
@@ -290,6 +291,9 @@ function play(seconds: number, cfg: PipeConfig = base): { t: number; what: strin
       if (needed && lineCost(s, cfg, l) * 4 <= s.money && buyLine(s, cfg, l.id)) note(l.name);
     }
   }
+  const all7 = Math.max(1, short7.pods + short7.people + short7.net + short7.none);
+  const pct = (n: number): string => `${Math.round((n / all7) * 100)}%`;
+  log.push({ t: seconds, what: `узко на башнях: капсулы ${pct(short7.pods)}, люди ${pct(short7.people)}, сеть ${pct(short7.net)}, идут ${pct(short7.none)}` });
   const hired = [3, 4, 5, 6, 7].map((n) => cfg.sources.filter((x) => x.screen === n && s.owned[x.id]).length).join('/');
   log.push({ t: seconds, what: `итог: экран ${screenOf(s)}, $${s.money.toExponential(2)}, вход ${inflowOf(s, cfg).toFixed(0)}/с, сессий ${sessionsOf(s, cfg)}, контрактов ${hired}` });
   return log;
@@ -304,6 +308,6 @@ describe('economy', () => {
     expect(first.t).toBeLessThanOrEqual(60); // the first purchase within a minute
     expect(max5?.t ?? Infinity).toBeLessThanOrEqual(180); // the first big upgrade within three minutes
     // no dead zone: never more than 2.5 minutes between purchases in the first hour
-    for (let i = 1; i < log.length - 1; i++) expect(log[i].t - log[i - 1].t).toBeLessThanOrEqual(150);
+    for (let i = 1; i < log.length - 2; i++) expect(log[i].t - log[i - 1].t).toBeLessThanOrEqual(150);
   });
 });

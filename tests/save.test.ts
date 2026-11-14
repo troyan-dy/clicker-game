@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import autoData from '../src/data/balance/auto.json';
+import chipData from '../src/data/balance/chips.json';
 import farmData from '../src/data/balance/farms.json';
 import gradeData from '../src/data/balance/grades.json';
 import lineData from '../src/data/balance/lines.json';
@@ -46,6 +47,7 @@ const cfg: PipeConfig = {
   police: policeData,
   modules: moduleData as Module[],
   net: netData,
+  chips: chipData,
   grid: gridData,
   auto: autoData,
 };
@@ -76,12 +78,15 @@ describe('save', () => {
     s.police = 2;
     s.aim.robodog = 'depot';
     s.owned.depot = 1.25; // robots are half-way through the second unit
-    // the ziggurat: three tiers, two crews of service robots, a dial of the network turned twice, the middle of the day
-    s.modules.tier = 3;
-    s.modules.care = 2;
+    // the towers: five blocks, terms bettered twice, a dial of the network turned twice, people in line and asleep, an invention on its way
+    s.modules.block = 5;
+    s.modules.hire = 2;
     s.net.copies = 2;
-    s.hour = 12.5;
-    s.power = 0.7;
+    s.queue = 3.5e6;
+    s.asleep = 21e6;
+    s.gate = true;
+    s.lab = 120.5;
+    s.chips = 1;
     const meta = { legends: ['rust'], awards: ['first_yes', 'no_ask'], piles: 4, reports: 1, calls: 3, limits: 1, riots: 2, news: ['Первая новость', 'Вторая'], managerOff: true, auto: true, bread: 31, fed: 28, refused: 2, feeder: true, benchAuto: false, atBench: true };
     const json = packSave({ at: 123, state: s, feed: { shown: [1, 4], said: { yes: 2 } }, meta, won: false, seconds: 600 });
     const file = unpackSave(json, cfg)!;
