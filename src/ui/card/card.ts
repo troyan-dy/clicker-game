@@ -1,4 +1,5 @@
 import './card.css';
+import { L } from '../../core/lang';
 
 export interface CardOption {
   label: string;
@@ -108,7 +109,7 @@ export function createCard(layer: HTMLElement, blip: () => void = () => undefine
       q('h2 span').textContent = next.title;
       q('.card-lines').innerHTML = next.lines.map((l) => `<p>${l}</p>`).join('');
       q('.card-lines').classList.toggle('dense', !!next.dense);
-      q('.card-hint').textContent = next.hint ?? 'Enter — Да';
+      q('.card-hint').textContent = next.hint ?? L('Enter — Да', 'Enter — Yes');
       paint();
       veil.classList.add('on');
     },

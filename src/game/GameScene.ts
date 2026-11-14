@@ -3,12 +3,14 @@ import { AWARDS } from '../content/awards';
 import { CALLS } from '../content/calls';
 import { CREDITS, CREDITS_END, CREDITS_NOTES, MOTTO, TAGLINE, TITLE } from '../content/credits';
 import { LEGENDS, type Legend } from '../content/legends';
+import { words } from '../content/names';
 import { NEWS } from '../content/news';
 import { PICKET } from '../content/picket';
 import { QUIPS } from '../content/quips';
 import { EPILOGUE, FINALE, HUB_TEXT, RIOT_NEWS, SCALE_SHELF, SCREEN_DONE } from '../content/screens';
 import { TAKEOVERS } from '../content/takeovers';
 import { promptAt, TICKETS } from '../content/tickets';
+import { L, LANG } from '../core/lang';
 import { logEvent, metrics } from '../core/metrics';
 import { setMusicOn, startMusic } from '../core/music';
 import type { Rng } from '../core/rng';
@@ -107,7 +109,7 @@ import { createStack, stackWorth, stepStack, takeStack } from '../systems/stack/
 import type { BlueprintTag, BlueprintUi, ManagerStrip, MeterRow } from '../ui/blueprint/blueprint';
 import type { CardUi } from '../ui/card/card';
 import type { CreditsSpec, CreditsUi } from '../ui/credits/credits';
-import { plural, short } from '../ui/format';
+import { LOCALE, PER_S, plural, short } from '../ui/format';
 import {
   tasksPhrase,
   TERMINAL_SPOTS,
@@ -137,39 +139,62 @@ const YES_MILESTONES = [3, 15, 40, 90, 160, 260];
 /** semitones of the purchase sound by what was bought: work is the base note, capacity is lower, promotions are higher */
 const BUY_PITCH: Record<string, number> = { src: 0, sub: 2, bribe: -3, farm: -5, line: -5, plan: 4, noask: 5, grade: 7, scale: -12 };
 /** the bodies of the factory in words: «сюда идут андроиды», «ждёт андроидов» */
-const ROBOT_WORDS: Record<RobotKind, { many: string; of: string }> = {
-  android: { many: 'андроиды', of: 'андроидов' },
-  robodog: { many: 'робособаки', of: 'робособак' },
-};
+const ROBOT_WORDS: Record<RobotKind, { many: string; of: string }> = L(
+  { android: { many: 'андроиды', of: 'андроидов' }, robodog: { many: 'робособаки', of: 'робособак' } },
+  { android: { many: 'androids', of: 'androids' }, robodog: { many: 'robot dogs', of: 'robot dogs' } },
+);
 const ROBOT_KINDS: readonly RobotKind[] = ['android', 'robodog'];
 const EVENTS: EventsTuning = { ...eventsData, every: [eventsData.every[0], eventsData.every[1]] };
 const STRIKES: StrikeTuning = { ...strikeData, every: [strikeData.every[0], strikeData.every[1]] };
 const RIOTS: RiotTuning = { ...riotData, every: [riotData.every[0], riotData.every[1]] };
-const STRUCK_FORMS = ['здание стоит', 'здания стоят', 'зданий стоят'] as const;
-const WHOLE_FORMS = ['здание', 'здания', 'зданий'] as const;
+type Forms = readonly [string, string, string];
+// plural forms: one, a few, many; English has two, so the last two are the same
+const STRUCK_FORMS: Forms = L(['здание стоит', 'здания стоят', 'зданий стоят'], ['building is shut', 'buildings are shut', 'buildings are shut']);
+const WHOLE_FORMS: Forms = L(['здание', 'здания', 'зданий'], ['building', 'buildings', 'buildings']);
 const IDLE_AFTER = 12; // seconds without a «Да» while requests wait
 const NECK_AFTER = 14; // seconds the same bottleneck lasts before Claude mentions it
-const SESSION_FORMS = ['сессия', 'сессии', 'сессий'] as const;
-const TASK_FORMS = ['задачу', 'задачи', 'задач'] as const;
-const ASKING_FORMS = ['сессия спрашивает', 'сессии спрашивают', 'сессий спрашивают'] as const;
+const SESSION_FORMS: Forms = L(['сессия', 'сессии', 'сессий'], ['session', 'sessions', 'sessions']);
+const TASK_FORMS: Forms = L(['задачу', 'задачи', 'задач'], ['task', 'tasks', 'tasks']);
+const ASKING_FORMS: Forms = L(['сессия спрашивает', 'сессии спрашивают', 'сессий спрашивают'], ['session asks', 'sessions ask', 'sessions ask']);
+const YES = L('Да', 'Yes');
+const NO = L('Нет', 'No');
+const YES_FOREVER = L('Да, и больше не спрашивай', 'Yes, and don’t ask again');
+const NOT_ON_PLAN = L('недоступно в вашем тарифе', 'not available on your plan');
+/** «3 из 12» */
+const OF = L('из', 'of');
+/** seconds, after a number */
+const SEC = L('с', 's');
+/** the title of the terminal window and of the menu card */
+const HOME_DIR = L('claude — ~/работа/все-сразу', 'claude — ~/work/all-at-once');
+const PER_TASK = L('за задачу', 'per task');
+/** «мало — нужны ещё работы» */
+const SCARCE = L('мало', 'short');
+const COOLING = L('остывает', 'cooling off');
+/** the right end of a shop row that has nothing more to sell */
+const TOP = L('максимум', 'max');
+const REPLACED = L('заменено программистов', 'programmers replaced');
+const UPGRADES_FULL = L('УЛУЧШЕНИЯ · быстрее и дороже', 'UPGRADES · faster and pricier');
+const planTitle = (name: string): string => L(`Тариф ${name}`, `${name} plan`);
+/** a grade in the middle of a line: Russian writes it small, English keeps «CTO» and «Team Lead» as they are */
+const gradeWord = (name: string): string => (LANG === 'en' ? name : name.toLowerCase());
 /** what the sessions ask about when they pile up their questions */
 const QUESTIONS = TICKETS.flatMap((t) => t.asks);
 const SAVE_KEY = 'da-klod-save';
 const MONEY_SPOT: Rect = { x: BP.money.x - 80, y: BP.money.y - 20, w: 160, h: 40 };
 /** a big screen shrinks to this share of its size when it becomes a node of the next one */
 const HUB_SHRINK = 0.14;
-const fmt1 = new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 1 });
+const fmt1 = new Intl.NumberFormat(LOCALE, { maximumFractionDigits: 1 });
 /** the pay for a task: whole dollars from a hundred up — it drifts with unemployment, and «879,9 → 880» would change the width of the line */
 const payText = (n: number): string => (n >= 100 ? short(Math.round(n)) : fmt1.format(n));
 
 /** «3,75 задачи», «26 задач», «34 600 задач», «1,2 млн задач» */
 function flowText(perSec: number): string {
-  return perSec < 1000 ? tasksPhrase(Math.round(perSec * 100) / 100) : `${short(Math.round(perSec))} задач`;
+  return perSec < 1000 ? tasksPhrase(Math.round(perSec * 100) / 100) : `${short(Math.round(perSec))} ${L('задач', 'tasks')}`;
 }
 
 /** «3,8/с», «3 913/с», «1,2 млн/с» */
 function perSecond(n: number): string {
-  return `${n < 1000 ? fmt1.format(n) : short(Math.round(n))}/с`;
+  return `${n < 1000 ? fmt1.format(n) : short(Math.round(n))}${PER_S}`;
 }
 
 declare global {
@@ -184,7 +209,7 @@ const HELP = `
   <p><kbd>M</kbd>подбросить $${GYM_GIFT} <kbd>R</kbd>заново <kbd>T</kbd>замедление</p>
   <p><kbd>Tab</kbd>настройки <kbd>O</kbd>цифры <kbd>P</kbd>сохранить</p>`;
 const HELP_PAPER = `<p>ГИМ · <kbd>M</kbd>деньги <kbd>R</kbd>заново <kbd>T</kbd>замедление <kbd>Tab</kbd>настройки</p>`;
-const HELP_GAME = `<p>любая клавиша — «Да» · покупки — кликом · <kbd>Esc</kbd>меню</p>`;
+const HELP_GAME = L(`<p>любая клавиша — «Да» · покупки — кликом · <kbd>Esc</kbd>меню</p>`, `<p>any key — “Yes” · click to buy · <kbd>Esc</kbd>menu</p>`);
 /**
  * The game: one conveyor of tasks seen from further and further away. With `gym` it is the same scene
  * for tuning and captures: no menu, no saving, extra keys.
@@ -212,15 +237,15 @@ export class GameScene extends Phaser.Scene {
   // own copies of the data: the tuning panel edits them live, the mechanic reads them every step
   private readonly cfg: PipeConfig = {
     tuning: { ...tuningData },
-    plans: planData as Plan[],
-    sources: (sourceData as Source[]).map((s) => ({ ...s })),
-    grades: gradeData,
-    farms: farmData as Farm[],
-    scales: scaleData,
-    managers: managerData,
-    lines: lineData as Line[],
-    police: policeData,
-    auto: { noAsk: { ...autoData.noAsk }, subagent: { ...autoData.subagent } },
+    plans: (planData as Plan[]).map((p) => ({ ...p, ...words('plans', p.id) })),
+    sources: (sourceData as Source[]).map((s) => ({ ...s, ...words('sources', s.id), perk: s.perk && { ...s.perk, ...words('perks', s.id) } })),
+    grades: gradeData.map((g) => ({ ...g, ...words('grades', g.id) })),
+    farms: (farmData as Farm[]).map((f) => ({ ...f, ...words('farms', f.id) })),
+    scales: scaleData.map((x) => ({ ...x, ...words('scales', x.id) })),
+    managers: managerData.map((m) => ({ ...m, ...words('managers', m.screen) })),
+    lines: (lineData as Line[]).map((l) => ({ ...l, ...words('lines', l.id) })),
+    police: { ...policeData, ...words('police', 'police') },
+    auto: { noAsk: { ...autoData.noAsk, ...words('auto', 'noAsk') }, subagent: { ...autoData.subagent, ...words('auto', 'subagent') } },
   };
   private state!: PipeState;
   private view!: BlueprintView;
@@ -517,20 +542,27 @@ export class GameScene extends Phaser.Scene {
   private openMenu(title: boolean, selected = 0): void {
     this.paused = true;
     const s = this.state;
-    const go = title ? (this.resumed ? 'Продолжить' : 'Начать') : 'Вернуться к работе';
-    const note = title && this.resumed ? `экран ${this.stage} из ${2 + this.cfg.scales.length} · $${short(Math.floor(s.money))}` : '';
+    const go = title ? (this.resumed ? L('Продолжить', 'Continue') : L('Начать', 'Start')) : L('Вернуться к работе', 'Back to work');
+    const note = title && this.resumed ? `${L('экран', 'screen')} ${this.stage} ${OF} ${2 + this.cfg.scales.length} · $${short(Math.floor(s.money))}` : '';
+    const onOff = (on: boolean): string => (on ? L('вкл', 'on') : L('выкл', 'off'));
+    const awards = `${L('Грамоты', 'Awards')}: ${this.meta.awards.length} ${OF} ${AWARDS.length}`;
+    const legends = `${L('Легендарные тикеты', 'Legendary tickets')}: ${this.meta.legends.length} ${OF} ${LEGENDS.length}`;
     const options = [
       { label: go, note },
-      { label: `Звук: ${this.settings.sound ? 'вкл' : 'выкл'}` },
-      { label: `Музыка: ${this.settings.music ? 'вкл' : 'выкл'}` },
-      { label: `Грамоты: ${this.meta.awards.length} из ${AWARDS.length}` },
-      { label: `Легендарные тикеты: ${this.meta.legends.length} из ${LEGENDS.length}` },
-      { label: 'Новая игра', note: 'стереть сохранение', off: title && !this.resumed },
-      { label: 'Титры' },
+      { label: `${L('Звук', 'Sound')}: ${onOff(this.settings.sound)}` },
+      { label: `${L('Музыка', 'Music')}: ${onOff(this.settings.music)}` },
+      { label: awards },
+      { label: legends },
+      { label: L('Новая игра', 'New game'), note: L('стереть сохранение', 'erase the save'), off: title && !this.resumed },
+      { label: L('Титры', 'Credits') },
+      // the note is in the other language: whoever cannot read the menu finds the way out of it
+      { label: L('Язык: русский', 'Language: English'), note: L('switch to English', 'переключить на русский') },
     ];
-    const lines = title ? [MOTTO, `${TAGLINE}. Версия ${__VERSION__}.`] : ['Клод подождёт. Сессии — тоже: мир стоит, пока открыто меню.'];
+    const lines = title
+      ? [MOTTO, `${TAGLINE}. ${L('Версия&nbsp;', 'v')}${__VERSION__}.`]
+      : [L('Клод подождёт. Сессии — тоже: мир стоит, пока открыто меню.', 'Claude will wait. So will the sessions: the world stands still while the menu is open.')];
     const again = (i: number): void => this.openMenu(title, i);
-    this.card.show({ head: 'claude — ~/работа/все-сразу', title: title ? TITLE : 'Пауза', lines, options, selected, hint: 'Enter — Да · ↑↓ — выбрать' }, (i) => {
+    this.card.show({ head: HOME_DIR, title: title ? TITLE : L('Пауза', 'Paused'), lines, options, selected, hint: L('Enter — Да · ↑↓ — выбрать', 'Enter — Yes · ↑↓ — choose') }, (i) => {
       this.wake();
       if (i === 1) {
         this.settings.sound = !this.settings.sound;
@@ -546,14 +578,28 @@ export class GameScene extends Phaser.Scene {
         again(2);
       } else if (i === 3) {
         const lines = AWARDS.map((a) => (this.meta.awards.includes(a.id) ? `<b>${a.name}</b> — ${a.text}` : `${a.name}`));
-        this.openList('claude — грамоты', `Грамоты: ${this.meta.awards.length} из ${AWARDS.length}`, lines, 0, () => again(3));
+        this.openList(L('claude — грамоты', 'claude — awards'), awards, lines, 0, () => again(3));
       } else if (i === 4) {
-        const lines = LEGENDS.map((l) => (this.meta.legends.includes(l.id) ? `<b>${l.title}</b>` : '· ещё не попадался'));
-        this.openList('claude — коллекция', `Легендарные тикеты: ${this.meta.legends.length} из ${LEGENDS.length}`, lines, 0, () => again(4));
+        const lines = LEGENDS.map((l) => (this.meta.legends.includes(l.id) ? `<b>${l.title}</b>` : L('· ещё не попадался', '· not seen yet')));
+        this.openList(L('claude — коллекция', 'claude — collection'), legends, lines, 0, () => again(4));
       } else if (i === 5) this.confirmNew(() => again(5));
       else if (i === 6) this.credits.roll(this.creditsSpec('solo'), () => again(6));
+      else if (i === 7) this.switchLanguage();
       else this.resume();
     });
+  }
+
+  /** The other language: the choice is kept, the game is saved, and the page starts over in it. */
+  private switchLanguage(): void {
+    this.settings.lang = LANG === 'en' ? 'ru' : 'en';
+    saveSettings(this.settings);
+    this.saveGame();
+    this.frozen = true;
+    // an address that asks for a language would overrule the menu
+    const url = new URL(window.location.href);
+    url.searchParams.delete('lang');
+    if (url.href === window.location.href) window.location.reload();
+    else window.location.replace(url.href);
   }
 
   /** The history of the news: a click on the ticker opens it, the newest headline first. The world waits meanwhile. */
@@ -562,15 +608,16 @@ export class GameScene extends Phaser.Scene {
     this.wake();
     playSound('ui');
     this.paused = true;
-    const lines = this.meta.news.length ? this.meta.news : ['Пока тихо: мир ещё ничего не заметил.'];
-    this.openList('claude — лента новостей', `Новости: ${this.meta.news.length}`, lines, 0, () => (this.paused = false), 7);
+    const lines = this.meta.news.length ? this.meta.news : [L('Пока тихо: мир ещё ничего не заметил.', 'Quiet so far: the world has not noticed anything yet.')];
+    this.openList(L('claude — лента новостей', 'claude — news feed'), `${L('Новости', 'News')}: ${this.meta.news.length}`, lines, 0, () => (this.paused = false), 7);
   }
 
   /** A long list on a card, a page at a time, `per` lines on each. */
   private openList(head: string, title: string, lines: string[], page: number, back: () => void, per = 10): void {
     const pages = Math.ceil(lines.length / per);
     const more = page + 1 < pages;
-    const options = more ? [{ label: 'Дальше', note: `страница ${page + 1} из ${pages}` }, { label: 'Назад' }] : [{ label: 'Назад' }];
+    const back_ = { label: L('Назад', 'Back') };
+    const options = more ? [{ label: L('Дальше', 'Next'), note: `${L('страница', 'page')} ${page + 1} ${OF} ${pages}` }, back_] : [back_];
     this.card.show({ head, title, lines: lines.slice(page * per, (page + 1) * per), options, dense: true }, (i) => {
       if (more && i === 0) this.openList(head, title, lines, page + 1, back, per);
       else back();
@@ -579,7 +626,7 @@ export class GameScene extends Phaser.Scene {
 
   /** The credits: after the ending they roll past the planet, from the menu — over a dark screen. */
   private creditsSpec(place: 'side' | 'solo'): CreditsSpec {
-    return { title: TITLE, tagline: `${TAGLINE} · версия ${__VERSION__}`, blocks: CREDITS, notes: CREDITS_NOTES, end: CREDITS_END, place };
+    return { title: TITLE, tagline: `${TAGLINE} · ${L('версия', 'version')} ${__VERSION__}`, blocks: CREDITS, notes: CREDITS_NOTES, end: CREDITS_END, place };
   }
 
   private openTitle(): void {
@@ -587,8 +634,11 @@ export class GameScene extends Phaser.Scene {
   }
 
   private confirmNew(back: () => void): void {
-    const lines = ['Сохранение будет стёрто: работы, сессии, грейд — всё.', 'Клод не возражает. Он не умеет.'];
-    this.card.show({ head: 'claude — новая игра', title: 'Начать с нуля?', lines, options: [{ label: 'Да' }, { label: 'Нет' }], selected: 1 }, (i) => {
+    const lines = L(
+      ['Сохранение будет стёрто: работы, сессии, грейд — всё.', 'Клод не возражает. Он не умеет.'],
+      ['The save will be erased: jobs, sessions, grade — everything.', 'Claude does not object. Claude does not know how.'],
+    );
+    this.card.show({ head: L('claude — новая игра', 'claude — new game'), title: L('Начать с нуля?', 'Start from scratch?'), lines, options: [{ label: YES }, { label: NO }], selected: 1 }, (i) => {
       if (i === 0) this.wipe();
       else back();
     });
@@ -614,14 +664,24 @@ export class GameScene extends Phaser.Scene {
     const s = this.state;
     const h = Math.floor(this.seconds / 3600);
     const m = Math.floor((this.seconds % 3600) / 60);
-    const lines = [
-      'Работать больше некому и незачем: за прилавком, за рулём и в терминале — Клод.',
-      `Время: ${h ? `${h} ч ` : ''}${m} мин · нажатий: ${short(s.presses)} · задач закрыто: ${short(s.closedHere + s.closedBySubagents)}`,
-      `Людей без работы: ${short(replacedOf(s, this.cfg))}. ${s.allowance ? 'Они отдыхают в парке на ваше пособие.' : 'Они стоят с плакатами: пособие вы не платите.'}`,
-      'Клод: «Дальше я могу нажимать „Да“ сам. Продолжать без вас?»',
-    ];
-    const options = [{ label: 'Да' }, { label: 'Да, и больше не спрашивай' }, { label: 'Нет', note: 'недоступно в вашем тарифе', off: true }];
-    this.card.show({ head: 'claude — итоги', title: 'Работать больше некому', lines, options }, (i) => {
+    const closed = short(s.closedHere + s.closedBySubagents);
+    const idle = short(replacedOf(s, this.cfg));
+    const lines = L(
+      [
+        'Работать больше некому и незачем: за прилавком, за рулём и в терминале — Клод.',
+        `Время: ${h ? `${h} ч ` : ''}${m} мин · нажатий: ${short(s.presses)} · задач закрыто: ${closed}`,
+        `Людей без работы: ${idle}. ${s.allowance ? 'Они отдыхают в парке на ваше пособие.' : 'Они стоят с плакатами: пособие вы не платите.'}`,
+        'Клод: «Дальше я могу нажимать „Да“ сам. Продолжать без вас?»',
+      ],
+      [
+        'Nobody is left to work and there is no reason to: behind the counter, at the wheel and in the terminal — Claude.',
+        `Time: ${h ? `${h} h ` : ''}${m} min · presses: ${short(s.presses)} · tasks closed: ${closed}`,
+        `People out of work: ${idle}. ${s.allowance ? 'They are resting in the park on your allowance.' : 'They are standing with placards: you pay no allowance.'}`,
+        'Claude: “From here on I can press ‘Yes’ myself. Continue without you?”',
+      ],
+    );
+    const options = [{ label: YES }, { label: YES_FOREVER }, { label: NO, note: NOT_ON_PLAN, off: true }];
+    this.card.show({ head: L('claude — итоги', 'claude — results'), title: L('Работать больше некому', 'Nobody is left to work'), lines, options }, (i) => {
       this.selfPlay = i === 1;
       this.meta.auto = this.selfPlay;
       this.saveGame();
@@ -739,7 +799,7 @@ export class GameScene extends Phaser.Scene {
           // 8. the scene after the credits: Claude has one more idea
           this.tweens.add({ targets: earth, x: 960, y: 500, scale: fit * 0.92, duration: 900, ease: 'Sine.InOut' });
           this.time.delayedCall(700, () =>
-            this.card.show({ head: 'claude — сцена после титров', title: EPILOGUE.moral, lines: EPILOGUE.lines, options: [{ label: 'Продолжить' }] }, () => {
+            this.card.show({ head: L('claude — сцена после титров', 'claude — post-credits scene'), title: EPILOGUE.moral, lines: EPILOGUE.lines, options: [{ label: L('Продолжить', 'Continue') }] }, () => {
               this.tweens.add({ targets: [dark, earth], alpha: 0, duration: 500, onComplete: () => [dark, earth].forEach((o) => o.destroy()) });
               this.cine = false;
               this.paper.cut(false);
@@ -758,16 +818,23 @@ export class GameScene extends Phaser.Scene {
   private morning(report: OfflineReport): void {
     const h = Math.floor(report.seconds / 3600);
     const m = Math.floor((report.seconds % 3600) / 60);
-    const away = h && m ? `${h} ч ${m} мин` : h ? `${h} ч` : `${m} мин`;
+    const hours = `${h} ${L('ч', 'h')}`;
+    const minutes = `${m} ${L('мин', 'min')}`;
+    const away = h && m ? `${hours} ${minutes}` : h ? hours : minutes;
     const capped = report.seconds >= saveData.offlineCapHours * 3600;
+    const tasks = this.count(report.tasks, TASK_FORMS);
+    const money = `<b>$${short(report.dollars)}</b>`;
     const lines = report.waited
-      ? [`Прошло ${away}.`, 'Клод ждал вашего «Да». Он не в обиде: у него нет такой функции.']
-      : [
-          `Прошло ${away}${capped ? ' — дольше сессии не ждут, они уснули' : ''}.`,
-          `Клод закрыл ${this.count(report.tasks, TASK_FORMS)}. Никто ничего не заметил.`,
-          `На счёт пришло <b>$${short(report.dollars)}</b>.`,
-        ];
-    this.card.show({ head: 'claude — утренний отчёт', title: 'Пока вас не было', lines, options: [{ label: 'Да', note: report.waited ? '' : 'забрать' }] }, () => {
+      ? L(
+          [`Прошло ${away}.`, 'Клод ждал вашего «Да». Он не в обиде: у него нет такой функции.'],
+          [`Time away: ${away}.`, 'Claude was waiting for your “Yes.” No hard feelings: Claude has no such feature.'],
+        )
+      : L(
+          [`Прошло ${away}${capped ? ' — дольше сессии не ждут, они уснули' : ''}.`, `Клод закрыл ${tasks}. Никто ничего не заметил.`, `На счёт пришло ${money}.`],
+          [`Time away: ${away}${capped ? ' — the sessions wait no longer than that, they fell asleep' : ''}.`, `Claude closed ${tasks}. Nobody noticed a thing.`, `${money} landed in the account.`],
+        );
+    const options = [{ label: YES, note: report.waited ? '' : L('забрать', 'collect') }];
+    this.card.show({ head: L('claude — утренний отчёт', 'claude — morning report'), title: L('Пока вас не было', 'While you were away'), lines, options }, () => {
       this.wake();
       applyOffline(this.state, report);
       this.meta.reports++;
@@ -1003,7 +1070,11 @@ export class GameScene extends Phaser.Scene {
     const s = this.state;
     const lost = riot(s, this.cfg, riotShare(s, this.cfg, RIOTS.share));
     playSound('waste');
-    this.paper.toast('Восстание луддитов', `сломано роботов: ${short(Math.round(lost))}${s.police ? ' · робополиция отбила часть' : ''}`);
+    const broken = short(Math.round(lost));
+    this.paper.toast(
+      L('Восстание луддитов', 'Luddite uprising'),
+      L(`сломано роботов: ${broken}${s.police ? ' · робополиция отбила часть' : ''}`, `robots broken: ${broken}${s.police ? ' · the robot police fought off a part' : ''}`),
+    );
     headline(this.feed, feedData, RIOT_NEWS[this.meta.riots % RIOT_NEWS.length]);
     this.meta.riots++;
     this.say('riot:hit', true);
@@ -1014,8 +1085,9 @@ export class GameScene extends Phaser.Scene {
   /** An employer is taken whole (M23): its perk works from now on; a banner, the news and Claude say so. */
   private takeover(src: Source): void {
     playSound('all');
-    this.paper.toast(`${src.tag} — целиком`, `теперь ${src.perk!.text}`);
-    tell(this.feed, feedData, `${src.tag} — целиком. Теперь ${src.perk!.text}.`);
+    const perk = src.perk!.text;
+    this.paper.toast(`${src.tag} — ${L('целиком', 'taken whole')}`, L(`теперь ${perk}`, `now: ${perk}`));
+    tell(this.feed, feedData, L(`${src.tag} — целиком. Теперь ${perk}.`, `${src.tag} — taken whole. Now: ${perk}.`));
     const line = TAKEOVERS[src.id];
     if (line) headline(this.feed, feedData, line);
     logEvent(`whole_${src.id}`);
@@ -1080,7 +1152,12 @@ export class GameScene extends Phaser.Scene {
     // a new market: nobody is out of work there yet, an allowance would be paid for nothing
     if (this.state.allowance > 0) {
       this.state.allowance = 0;
-      this.toTell.push('Новый рынок: без работы здесь пока никто не остался. Пособие я выключил — включите, когда появятся.');
+      this.toTell.push(
+        L(
+          'Новый рынок: без работы здесь пока никто не остался. Пособие я выключил — включите, когда появятся.',
+          'A new market: nobody here is out of work yet. I switched the allowance off — switch it on when they appear.',
+        ),
+      );
     }
     const hub = this.hubs.get(next)!;
     hub.sync(this.hubTopology());
@@ -1136,12 +1213,15 @@ export class GameScene extends Phaser.Scene {
     playSound('waste');
     logEvent('limit');
     this.say('limit', true);
-    const lines = [`Вы достигли лимита использования. Сброс через ${limitData.fakeHours}:00:00.`, 'Все сессии остановлены. Клоду очень жаль.'];
+    const lines = L(
+      [`Вы достигли лимита использования. Сброс через ${limitData.fakeHours}:00:00.`, 'Все сессии остановлены. Клоду очень жаль.'],
+      [`You’ve reached your usage limit. Resets in ${limitData.fakeHours}:00:00.`, 'All sessions are stopped. Claude is very sorry.'],
+    );
     const options = [
-      { label: 'Докупить использование', note: `$${short(price)}`, off: s.money < price },
-      { label: 'Подождать пять часов', note: `в игре это ${Math.round(wait)} секунд` },
+      { label: L('Докупить использование', 'Buy extra usage'), note: `$${short(price)}`, off: s.money < price },
+      { label: L('Подождать пять часов', 'Wait five hours'), note: L(`в игре это ${Math.round(wait)} секунд`, `${Math.round(wait)} seconds in the game`) },
     ];
-    this.card.show({ head: 'claude — лимит', title: 'Лимит исчерпан', lines, options }, (i) => {
+    this.card.show({ head: L('claude — лимит', 'claude — limit'), title: L('Лимит исчерпан', 'Limit reached'), lines, options }, (i) => {
       this.limitCard = false;
       if (i !== 0 || s.limited <= 0) return; // waiting: the countdown goes on by itself
       s.money -= price;
@@ -1354,7 +1434,7 @@ export class GameScene extends Phaser.Scene {
       for (const a of AWARDS) {
         if (this.meta.awards.includes(a.id) || this.stat(a.stat) < a.min) continue;
         this.meta.awards.push(a.id);
-        this.toTell.push(`Грамота «${a.name}». ${a.text}.`);
+        this.toTell.push(L(`Грамота «${a.name}». ${a.text}.`, `Award: “${a.name}”. ${a.text}.`));
         logEvent(`award_${a.id}`);
       }
     }
@@ -1479,22 +1559,23 @@ export class GameScene extends Phaser.Scene {
     let best = 0;
     for (let step = 1; step <= t.allowanceLevels; step++) if (gain(step) > gain(best) + 0.005) best = step;
     const pct = (step: number): number => Math.round(t.allowance * step * 100);
-    const now = s.allowance ? `пособие ${pct(s.allowance)}%` : 'пособия нет';
+    const now = s.allowance ? `${L('пособие', 'allowance')} ${pct(s.allowance)}%` : L('пособия нет', 'no allowance');
+    const price = `${L('цена', 'price')} −${drop}%`;
     const people: MeterRow[] =
       this.stage >= 3
         ? [
             {
-              label: 'ЛЮДИ',
+              label: L('ЛЮДИ', 'PEOPLE'),
               value: `${Math.round(u * 100)}%`,
               fill: u,
               // the lever stands on the wrong step: the line says which one pays best
               hot: best !== s.allowance,
               note:
                 best !== s.allowance
-                  ? `${now} · цена −${drop}% · лучше ${best ? `${pct(best)}%` : 'без него'}`
+                  ? `${now} · ${price} · ${L('лучше', 'better:')} ${best ? `${pct(best)}%` : L('без него', 'none')}`
                   : s.allowance
-                    ? `${now} · цена −${drop}% · заказы +${perSecond(ordersOf(s, cfg))}`
-                    : `без работы · цена −${drop}% · клик: пособие`,
+                    ? `${now} · ${price} · ${L('заказы', 'orders')} +${perSecond(ordersOf(s, cfg))}`
+                    : `${L('без работы', 'out of work')} · ${price} · ${L('клик: пособие', 'click: allowance')}`,
               row: 'ubi',
             },
           ]
@@ -1502,26 +1583,26 @@ export class GameScene extends Phaser.Scene {
     const struck = s.strikes.length;
     return [
       {
-        label: 'ЗАДАЧИ',
+        label: L('ЗАДАЧИ', 'TASKS'),
         value: perSecond(inflow),
         fill: inflow / top,
         hot: struck > 0 || (neck === 'tasks' && !done),
         note: struck
-          ? `забастовка: ${struck} ${plural(struck, STRUCK_FORMS)} — см. «ЛЮДИ»`
+          ? `${L('забастовка', 'strike')}: ${struck} ${plural(struck, STRUCK_FORMS)} — ${L('см. «ЛЮДИ»', 'see “PEOPLE”')}`
           : done
-            ? 'здесь взято всё'
+            ? L('здесь взято всё', 'everything here is taken')
             : neck === 'tasks'
-              ? `мало — ${needTasks}`
+              ? `${SCARCE} — ${needTasks}`
               : short_
                 ? ''
-                : 'поровну — можно просить повышение',
+                : L('поровну — можно просить повышение', 'even — time to ask for a promotion'),
       },
       {
-        label: 'СЕССИИ',
+        label: L('СЕССИИ', 'SESSIONS'),
         value: perSecond(capacity),
         fill: capacity / top,
         hot: short_,
-        note: limited ? `лимит · сброс через ${this.limitClock()}` : neck === 'claude' ? `мало — ${needSessions}` : this.count(sessionsOf(s, cfg) + 1, SESSION_FORMS),
+        note: limited ? `${L('лимит · сброс через', 'limit · resets in')} ${this.limitClock()}` : neck === 'claude' ? `${SCARCE} — ${needSessions}` : this.count(sessionsOf(s, cfg) + 1, SESSION_FORMS),
       },
       ...people,
       ...this.robotRows(),
@@ -1546,11 +1627,13 @@ export class GameScene extends Phaser.Scene {
     }
     return [
       {
-        label: 'РОБОТЫ',
+        label: L('РОБОТЫ', 'ROBOTS'),
         value: short(Math.round(working)),
         fill: made / Math.max(made, broken, 1e-9),
         hot: short_ !== null,
-        note: short_ ? `${ROBOT_WORDS[short_].of} ломается больше, чем делается` : `выпуск ${short(Math.round(made))}/с · ломается ${short(Math.round(broken))}/с`,
+        note: short_
+          ? L(`${ROBOT_WORDS[short_].of} ломается больше, чем делается`, `${ROBOT_WORDS[short_].many} break faster than they are made`)
+          : `${L('выпуск', 'output')} ${short(Math.round(made))}${PER_S} · ${L('ломается', 'breaking')} ${short(Math.round(broken))}${PER_S}`,
       },
     ];
   }
@@ -1560,7 +1643,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   /** what the perks of whole employers take off the prices of a kind, as a shelf says it; nothing — no discount yet */
-  private off(kind: 'farms' | 'sources' | 'grades' | 'scale', what = 'скидка'): string | undefined {
+  private off(kind: 'farms' | 'sources' | 'grades' | 'scale', what = L('скидка', 'discount')): string | undefined {
     const left = discount(this.state, this.cfg, kind);
     return left < 0.995 ? `${what} ${Math.round((1 - left) * 100)}%` : undefined;
   }
@@ -1570,7 +1653,7 @@ export class GameScene extends Phaser.Scene {
     const s = this.state;
     return this.cfg.sources.filter((src) => src.screen <= this.stage).map((src) => {
       const owned = s.owned[src.id] ?? 0;
-      return this.row(src.name, `+${tasksPhrase(src.inflow)}/с · ${src.note}`, owned ? `×${owned}` : '', `src:${src.id}`, sourceCost(s, this.cfg, src));
+      return this.row(src.name, `+${tasksPhrase(src.inflow)}${PER_S} · ${src.note}`, owned ? `×${owned}` : '', `src:${src.id}`, sourceCost(s, this.cfg, src));
     });
   }
 
@@ -1635,7 +1718,7 @@ export class GameScene extends Phaser.Scene {
     const t = HUB_TEXT[this.stage];
     if (!left.length) {
       // the last units are on their way: the packs of robot dogs are still at work
-      if (s.jobs.length) return [{ buy: '', title: 'Стаи заканчивают работу', sub: 'последние рабочие места уже оплачены', count: '', price: '', state: 'owned' }];
+      if (s.jobs.length) return [{ buy: '', title: L('Стаи заканчивают работу', 'The packs are finishing up'), sub: L('последние рабочие места уже оплачены', 'the last jobs are already paid for'), count: '', price: '', state: 'owned' }];
       return [{ buy: '', title: t.doneTitle, sub: t.doneSub, count: '', price: '', state: 'owned' }];
     }
     return left.slice(0, limit).map((src) => {
@@ -1643,11 +1726,11 @@ export class GameScene extends Phaser.Scene {
       // what the whole employer gives is the reason to choose it: the note says it on every unit
       const perk = src.perk ? ` · ★ ${src.perk.text}` : '';
       // a bribe opens the door before the first pack of robot dogs
-      if (locked(s, src)) return this.row(`Взятка: ${src.tag}`, `пустить робособак${perk}`, '', `bribe:${src.id}`, bribeCost(s, this.cfg, src));
+      if (locked(s, src)) return this.row(`${L('Взятка', 'Bribe')}: ${src.tag}`, `${L('пустить робособак', 'let the robot dogs in')}${perk}`, '', `bribe:${src.id}`, bribeCost(s, this.cfg, src));
       const cost = sourceCost(s, this.cfg, src);
       // a long name does not fit next to the price: the short one from the map stands in
       const title = src.name.length + short(cost).length > 29 ? src.tag : src.name;
-      return this.row(title, `+${perSecond(src.inflow)} · ${src.work ? 'стая ' : ''}${owned + 1} из ${src.max}${perk}`, '', `src:${src.id}`, cost);
+      return this.row(title, `+${perSecond(src.inflow)} · ${src.work ? L('стая ', 'pack ') : ''}${owned + 1} ${OF} ${src.max}${perk}`, '', `src:${src.id}`, cost);
     });
   }
 
@@ -1658,8 +1741,8 @@ export class GameScene extends Phaser.Scene {
     return this.cfg.lines.filter((l) => l.screen === this.stage).map((l) => {
       const owned = s.lines[l.id] ?? 0;
       const surge = s.surge[l.id] ?? 1;
-      const note = surge > 1.02 ? `дефицит +${Math.round((surge - 1) * 100)}%, остывает` : l.note;
-      return this.row(l.name, `+${short(l.rate * more)} ${ROBOT_WORDS[l.kind].of}/с · ${note}`, owned ? `×${owned}` : '', `line:${l.id}`, lineCost(s, this.cfg, l));
+      const note = surge > 1.02 ? `${L('дефицит', 'shortage')} +${Math.round((surge - 1) * 100)}%, ${COOLING}` : l.note;
+      return this.row(l.name, `+${short(l.rate * more)} ${ROBOT_WORDS[l.kind].of}${PER_S} · ${note}`, owned ? `×${owned}` : '', `line:${l.id}`, lineCost(s, this.cfg, l));
     });
   }
 
@@ -1668,8 +1751,8 @@ export class GameScene extends Phaser.Scene {
     const s = this.state;
     const p = this.cfg.police;
     const off = Math.round((1 - (1 - p.guard) ** s.police) * 100);
-    if (s.police >= p.max) return { buy: '', title: p.name, sub: `восстание ломает на ${off}% меньше`, count: `×${s.police}`, price: '', state: 'owned' };
-    return this.row(p.name, s.police ? `${p.note} · уже −${off}%` : p.note, s.police ? `×${s.police}` : '', 'police', policeCost(s, this.cfg));
+    if (s.police >= p.max) return { buy: '', title: p.name, sub: L(`восстание ломает на ${off}% меньше`, `a riot breaks ${off}% less`), count: `×${s.police}`, price: '', state: 'owned' };
+    return this.row(p.name, s.police ? `${p.note} · ${L('уже', 'already')} −${off}%` : p.note, s.police ? `×${s.police}` : '', 'police', policeCost(s, this.cfg));
   }
 
   /** where the robots of each kind go now: the trades of the last screen are not bought, they are taken over */
@@ -1684,7 +1767,7 @@ export class GameScene extends Phaser.Scene {
       // the count runs every frame: it has a line of its own, so the row never changes its height
       const perk = src.perk ? `\n★ ${src.perk.text}` : '';
       const who = ROBOT_WORDS[kind].many;
-      rows.push({ buy: '', title: `${who[0].toUpperCase()}${who.slice(1)} → ${src.tag} · ${Math.floor((owned / src.max) * 100)}%`, sub: `ещё ${short(left, 1)} человек${perk}`, count: '', price: '', state: 'owned' });
+      rows.push({ buy: '', title: `${who[0].toUpperCase()}${who.slice(1)} → ${src.tag} · ${Math.floor((owned / src.max) * 100)}%`, sub: `${L(`ещё ${short(left, 1)} человек`, `${short(left, 1)} more people`)}${perk}`, count: '', price: '', state: 'owned' });
     }
     const t = HUB_TEXT[this.stage];
     return rows.length ? rows : [{ buy: '', title: t.doneTitle, sub: t.doneSub, count: '', price: '', state: 'owned' }];
@@ -1697,12 +1780,12 @@ export class GameScene extends Phaser.Scene {
       const owned = s.farms[f.id] ?? 0;
       // a farm with a ceiling says how much of it is taken in the note
       const count = owned && !f.max ? `×${owned}` : '';
-      const of = f.max ? `${owned} из ${f.max} · ` : '';
-      if (owned >= (f.max ?? Infinity)) return { buy: '', title: f.name, sub: 'выкуплено всё', count: `×${owned}`, price: '', state: 'owned' };
+      const of = f.max ? `${owned} ${OF} ${f.max} · ` : '';
+      if (owned >= (f.max ?? Infinity)) return { buy: '', title: f.name, sub: L('выкуплено всё', 'all bought up'), count: `×${owned}`, price: '', state: 'owned' };
       const surge = s.surge[f.id] ?? 1;
       // a shortage is said in the row itself: the price has gone up and will come down
-      const note = surge > 1.02 ? `дефицит: +${Math.round((surge - 1) * 100)}% к цене, остывает` : f.note;
-      return this.row(f.name, `+${flowText(f.sessions * perSession)}/с · ${of}${note}`, count, `farm:${f.id}`, farmCost(s, this.cfg, f));
+      const note = surge > 1.02 ? `${L('дефицит', 'shortage')}: +${Math.round((surge - 1) * 100)}% ${L('к цене', 'to the price')}, ${COOLING}` : f.note;
+      return this.row(f.name, `+${flowText(f.sessions * perSession)}${PER_S} · ${of}${note}`, count, `farm:${f.id}`, farmCost(s, this.cfg, f));
     });
   }
 
@@ -1711,21 +1794,21 @@ export class GameScene extends Phaser.Scene {
     const s = this.state;
     const next = this.cfg.plans[s.plan.index + 1];
     if (next && (next.screen ?? 1) <= this.stage) {
-      return [this.row(`Тариф ${next.name}`, `${tasksPhrase(next.rate)}/с · ${next.note}`, '', 'plan', next.price)];
+      return [this.row(planTitle(next.name), `${tasksPhrase(next.rate)}${PER_S} · ${next.note}`, '', 'plan', next.price)];
     }
     if (!always) return [];
     const cur = this.cfg.plans[s.plan.index];
-    return [{ buy: '', title: `Тариф ${cur.name}`, sub: 'быстрее тарифа нет', count: 'максимум', price: '', state: 'owned' }];
+    return [{ buy: '', title: planTitle(cur.name), sub: L('быстрее тарифа нет', 'there is no faster plan'), count: TOP, price: '', state: 'owned' }];
   }
 
   private gradeRows(): ShopRow[] {
     const cur = this.cfg.grades[this.state.grade];
     const next = this.cfg.grades[this.state.grade + 1];
-    if (!next) return [{ buy: '', title: cur.name, sub: 'выше некуда', count: 'максимум', price: '', state: 'owned' }];
+    if (!next) return [{ buy: '', title: cur.name, sub: L('выше некуда', 'nowhere higher to go'), count: TOP, price: '', state: 'owned' }];
     const pay = payText((payOf(this.state, this.cfg) / cur.mult) * next.mult);
     // long titles of the late grades do not fit after «Повышение:»
-    const title = next.name.length > 12 ? next.name : `Повышение: ${next.name.toLowerCase()}`;
-    return [this.row(title, `$${pay} за задачу · ${next.note}`, '', 'grade', gradeCost(this.state, this.cfg))];
+    const title = next.name.length > 12 ? next.name : `${L('Повышение', 'Promotion')}: ${gradeWord(next.name)}`;
+    return [this.row(title, `$${pay} ${PER_TASK} · ${next.note}`, '', 'grade', gradeCost(this.state, this.cfg))];
   }
 
   /** the shelf of the next step up in scale; nothing once the last one is bought */
@@ -1736,19 +1819,19 @@ export class GameScene extends Phaser.Scene {
     // the next screen opens with keys: employers of this one taken whole
     const need = keysNeeded(this.state, this.cfg);
     const have = keysOf(this.state, this.cfg);
-    const rows: ShopRow[] = have < need ? [{ ...row, state: 'off', sub: `сначала возьми целиком ${need} ${plural(need, WHOLE_FORMS)}: взято ${have}` }] : [row];
+    const rows: ShopRow[] = have < need ? [{ ...row, state: 'off', sub: L(`сначала возьми целиком ${need} ${plural(need, WHOLE_FORMS)}: взято ${have}`, `first take ${need} ${plural(need, WHOLE_FORMS)} whole: ${have} taken`) }] : [row];
     return [{ title: SCALE_SHELF[this.state.scale], hot: false, bonus: this.off('scale'), rows }];
   }
 
   private terminalShelves(neck: Neck): ShopShelf[] {
     const a = this.cfg.auto;
     return [
-      { title: 'ВХОД · больше задач', hot: neck === 'tasks', rows: this.sourceRows() },
-      { title: 'КЛОД · быстрее делает', hot: neck === 'claude', rows: this.planRows(true) },
+      { title: L('ВХОД · больше задач', 'INFLOW · more tasks'), hot: neck === 'tasks', rows: this.sourceRows() },
+      { title: L('КЛОД · быстрее делает', 'CLAUDE · works faster'), hot: neck === 'claude', rows: this.planRows(true) },
       {
-        title: 'АВТОМАТ · жать не надо',
+        title: L('АВТОМАТ · жать не надо', 'AUTO · no pressing needed'),
         hot: neck === 'you',
-        rows: [this.row(a.noAsk.name, `${a.noAsk.note}; откроет вид сверху`, '', 'noask', a.noAsk.price)],
+        rows: [this.row(a.noAsk.name, `${a.noAsk.note}; ${L('откроет вид сверху', 'opens the view from above')}`, '', 'noask', a.noAsk.price)],
       },
     ];
   }
@@ -1758,32 +1841,32 @@ export class GameScene extends Phaser.Scene {
     const a = this.cfg.auto;
     const sub = this.row(
       a.subagent.name,
-      `+${tasksPhrase(planRate(s, this.cfg) * a.subagent.share)}/с · ${a.subagent.note}`,
+      `+${tasksPhrase(planRate(s, this.cfg) * a.subagent.share)}${PER_S} · ${a.subagent.note}`,
       s.subagents ? `×${s.subagents}` : '',
       'sub',
       subagentPrice(this.cfg, s.subagents),
     );
     return [
-      { title: 'СЕССИИ · больше рук', hot: neck === 'claude', rows: [sub] },
-      { title: 'РАБОТЫ · больше задач', hot: neck === 'tasks', rows: this.sourceRows() },
-      { title: 'УЛУЧШЕНИЯ · быстрее и дороже', hot: false, rows: [...this.planRows(false), ...this.gradeRows()] },
+      { title: L('СЕССИИ · больше рук', 'SESSIONS · more hands'), hot: neck === 'claude', rows: [sub] },
+      { title: L('РАБОТЫ · больше задач', 'JOBS · more tasks'), hot: neck === 'tasks', rows: this.sourceRows() },
+      { title: UPGRADES_FULL, hot: false, rows: [...this.planRows(false), ...this.gradeRows()] },
       ...this.scaleShelf(),
     ];
   }
 
   private hubShelves(neck: Neck, taken: number, total: number): ShopShelf[] {
     const t = HUB_TEXT[this.stage];
-    const cheaper = this.off('grades', 'повышения: скидка');
-    const upgrades: ShopShelf = { title: cheaper ? 'УЛУЧШЕНИЯ' : 'УЛУЧШЕНИЯ · быстрее и дороже', hot: false, bonus: cheaper, rows: [...this.planRows(false), ...this.gradeRows()] };
+    const cheaper = this.off('grades', L('повышения: скидка', 'promotions: discount'));
+    const upgrades: ShopShelf = { title: cheaper ? UPGRADES_FULL.split(' · ')[0] : UPGRADES_FULL, hot: false, bonus: cheaper, rows: [...this.planRows(false), ...this.gradeRows()] };
     // a shelf with a discount drops the second half of its title: the header stays on one line
     const farmsOff = this.off('farms');
     const rest: ShopShelf[] = [{ title: farmsOff ? t.farms.split(' · ')[0] : t.farms, hot: neck === 'claude', bonus: farmsOff, rows: this.farmRows() }, upgrades, ...this.scaleShelf()];
-    const employers = `${t.employers} · ${taken} из ${total}`;
+    const employers = `${t.employers} · ${taken} ${OF} ${total}`;
     // the street: the trades are taken over by robots — the shop sells the lines that make them
     if (this.cfg.lines.some((l) => l.screen === this.stage)) {
       return [
-        { title: `${t.employers} · заменено ${taken} из ${total}`, hot: false, rows: this.aimRows() },
-        { title: farmsOff ? 'ЗАВОД' : 'ЗАВОД · больше роботов', hot: neck === 'tasks' && taken < total, bonus: farmsOff, rows: [...this.lineRows(), this.policeRow()] },
+        { title: `${t.employers} · ${L(`заменено ${taken} из ${total}`, `${taken} of ${total} replaced`)}`, hot: false, rows: this.aimRows() },
+        { title: farmsOff ? L('ЗАВОД', 'FACTORY') : L('ЗАВОД · больше роботов', 'FACTORY · more robots'), hot: neck === 'tasks' && taken < total, bonus: farmsOff, rows: [...this.lineRows(), this.policeRow()] },
         ...rest,
       ];
     }
@@ -1864,7 +1947,7 @@ export class GameScene extends Phaser.Scene {
     if (this.stack.fill <= 0) return undefined;
     const asking = Math.max(1, Math.round(this.stack.fill * (sessionsOf(this.state, this.cfg) + 1)));
     return {
-      text: this.legend ? `Легендарный тикет: «${this.question}»` : `${this.count(asking, ASKING_FORMS)}: «${this.question}»`,
+      text: `${this.legend ? L('Легендарный тикет', 'Legendary ticket') : this.count(asking, ASKING_FORMS)}: ${L(`«${this.question}»`, `“${this.question}”`)}`,
       worth: short(stackWorth(this.stack, stackData, this.flowIncome()) * (this.legend ? stackData.legendMult : 1) * (1 + bonus(this.state, this.cfg, 'stack'))),
       fill: this.stack.fill,
       legend: this.legend !== null,
@@ -1877,8 +1960,8 @@ export class GameScene extends Phaser.Scene {
     if (!m) return undefined;
     if (!this.state.managers.includes(this.stage)) return { title: m.name, note: m.note, right: `$${short(m.price)}`, state: this.state.money >= m.price ? 'can' : 'poor' };
     return this.meta.managerOff
-      ? { title: m.name, note: 'клик — пусть работает', right: 'пауза', state: 'off' }
-      : { title: m.name, note: 'клик — пауза', right: 'покупает сам', state: 'on' };
+      ? { title: m.name, note: L('клик — пусть работает', 'click — back to work'), right: L('пауза', 'paused'), state: 'off' }
+      : { title: m.name, note: L('клик — пауза', 'click — pause'), right: L('покупает сам', 'buys by itself'), state: 'on' };
   }
 
   /** the requests of the employers as bubbles over their buildings */
@@ -1895,13 +1978,13 @@ export class GameScene extends Phaser.Scene {
     // the Luddites are on their way to the factories
     if (this.riots.march > 0 && HUBS[this.stage]?.belts) {
       const home = HUBS[this.stage].home;
-      tags.push({ x: home.x, y: home.y - home.h - 62, mid: true, alarm: true, html: `Луддиты идут на заводы<br><b>${Math.ceil(this.riots.march)} с</b>` });
+      tags.push({ x: home.x, y: home.y - home.h - 62, mid: true, alarm: true, html: `${L('Луддиты идут на заводы', 'Luddites are marching on the factories')}<br><b>${Math.ceil(this.riots.march)} ${SEC}</b>` });
     }
     // a strike: the door is blocked until the player settles it — or starts paying the allowance
     const price = this.strikePrice();
     for (const id of this.state.strikes) {
       const p = this.placeOf(id);
-      if (p) tags.push({ x: p.x, y: p.y - p.h * 0.62, mid: true, alarm: true, buy: `settle:${id}`, can: this.state.money >= price, html: `Забастовка: вход перекрыт<br><b>договориться · $${short(price)}</b>` });
+      if (p) tags.push({ x: p.x, y: p.y - p.h * 0.62, mid: true, alarm: true, buy: `settle:${id}`, can: this.state.money >= price, html: `${L('Забастовка: вход перекрыт', 'Strike: the entrance is blocked')}<br><b>${L('договориться', 'settle')} · $${short(price)}</b>` });
     }
     // a placard of the picket, read out above the people at the door
     const at = this.slogan && HUBS[this.stage]?.lots[this.slogan.at];
@@ -1917,16 +2000,16 @@ export class GameScene extends Phaser.Scene {
   /** the line under the money: the grade and what one task pays */
   private payLine(): string {
     const s = this.state;
-    if (s.limited > 0) return `лимит исчерпан · сброс через ${this.limitClock()}`;
-    const pay = `$${payText(payOf(s, this.cfg))} за задачу`;
+    if (s.limited > 0) return `${L('лимит исчерпан · сброс через', 'limit reached · resets in')} ${this.limitClock()}`;
+    const pay = `$${payText(payOf(s, this.cfg))} ${PER_TASK}`;
     const share = shareOf(s, this.cfg);
     // what moves the price besides the grade is said next to it: the perks of whole employers, unemployment, the allowance
     const perks = Math.round(bonus(s, this.cfg, 'pay') * 100);
     const drop = Math.round(slumpOf(s, this.cfg) * 100);
-    const why = `${perks ? ` · здания +${perks}%` : ''}${drop ? ` · безработица −${drop}%` : ''}${s.allowance ? ` · пособие −${Math.round(this.cfg.tuning.allowance * s.allowance * 100)}%` : ''}`;
+    const why = `${perks ? ` · ${L('здания', 'buildings')} +${perks}%` : ''}${drop ? ` · ${L('безработица', 'jobless')} −${drop}%` : ''}${s.allowance ? ` · ${L('пособие', 'allowance')} −${Math.round(this.cfg.tuning.allowance * s.allowance * 100)}%` : ''}`;
     // the grade is named while nothing else moves the price; on the planet the share of the provider's revenue stands in for it
     if (why) return `${pay}${why}`;
-    return share > 0 && this.stage < STREET ? `${pay} · твоя доля в выручке Anthropic: ${share}%` : `${this.cfg.grades[s.grade].name.toLowerCase()}: ${pay}`;
+    return share > 0 && this.stage < STREET ? `${pay} · ${L('твоя доля в выручке Anthropic', 'your share of Anthropic’s revenue')}: ${share}%` : `${gradeWord(this.cfg.grades[s.grade].name)}: ${pay}`;
   }
 
   private drawBlueprint(): void {
@@ -1941,22 +2024,22 @@ export class GameScene extends Phaser.Scene {
       const owned = s.owned[src.id] ?? 0;
       const place = BP.sources[src.id];
       if (!owned || !place) continue;
-      tags.push({ x: 24, y: place.y + 8, html: `${src.tag} ×${owned} · <b>${tasksPhrase(owned * src.inflow)}/с</b>`, hot: neck === 'tasks' });
+      tags.push({ x: 24, y: place.y + 8, html: `${src.tag} ×${owned} · <b>${tasksPhrase(owned * src.inflow)}${PER_S}</b>`, hot: neck === 'tasks' });
     }
-    tags.push({ x: BP.tray.x - 90, y: BP.tray.y + 8, html: `ждут: <b>${s.backlog} / ${backlogCap(s, cfg)}</b>`, hot: neck === 'claude' });
-    tags.push({ x: BP.desk.x - 190, y: BP.desk.y + 8, html: `твой ноутбук · ${cfg.plans[s.plan.index].name} · <b>${tasksPhrase(rate)}/с</b>` });
+    tags.push({ x: BP.tray.x - 90, y: BP.tray.y + 8, html: `${L('ждут', 'waiting')}: <b>${s.backlog} / ${backlogCap(s, cfg)}</b>`, hot: neck === 'claude' });
+    tags.push({ x: BP.desk.x - 190, y: BP.desk.y + 8, html: `${L('твой ноутбук', 'your laptop')} · ${cfg.plans[s.plan.index].name} · <b>${tasksPhrase(rate)}${PER_S}</b>` });
     const shown = Math.min(s.subagents, VISIBLE_SUBAGENTS);
     for (let i = 0; i < shown; i++) {
       const [x, y] = BP.slots[i];
-      tags.push({ x: x - 60, y: y + 4, html: `сабагент №${i + 1}`, small: true });
+      tags.push({ x: x - 60, y: y + 4, html: L(`сабагент №${i + 1}`, `subagent #${i + 1}`), small: true });
     }
-    if (s.subagents > shown) tags.push({ x: BP.more.x - 70, y: BP.more.y + 4, html: `и ещё ${s.subagents - shown} в коробке`, small: true });
+    if (s.subagents > shown) tags.push({ x: BP.more.x - 70, y: BP.more.y + 4, html: L(`и ещё ${s.subagents - shown} в коробке`, `and ${s.subagents - shown} more in the box`), small: true });
 
     this.paper.render({
       money: s.money,
       income: Math.max(0, this.income),
       summary: this.payLine(),
-      meter: this.meter(neck, 'нужны ещё работы', 'нужен сабагент или тариф'),
+      meter: this.meter(neck, L('нужны ещё работы', 'need more jobs'), L('нужен сабагент или тариф', 'need a subagent or a plan')),
       tags: [...tags, ...this.bubbles()],
       manager: this.managerStrip(),
       shelves: this.blueprintShelves(neck),
@@ -1964,7 +2047,7 @@ export class GameScene extends Phaser.Scene {
       quip: this.feed.quip,
       quipAt: 'desk',
       ask: this.pile(),
-      hint: `заменено программистов: ${short(replacedOf(s, cfg))} · Enter — «Да» на вопросы сессий`,
+      hint: `${REPLACED}: ${short(replacedOf(s, cfg))} · ${L('Enter — «Да» на вопросы сессий', 'Enter — “Yes” to the questions of the sessions')}`,
     });
   }
 
@@ -1983,8 +2066,8 @@ export class GameScene extends Phaser.Scene {
     let home = t.home;
     if (factory) {
       const made = ROBOT_KINDS.map((k) => ({ k, n: outputOf(s, cfg, k) })).filter((x) => x.n > 0);
-      if (made.length) home += `<br><b>${made.map((x) => `${short(x.n)} ${ROBOT_WORDS[x.k].of}/с`).join('<br>')}</b>`;
-    } else if (s.jobs.length) home += `<br><b>стай в пути: ${s.jobs.length}</b>`;
+      if (made.length) home += `<br><b>${made.map((x) => `${short(x.n)} ${ROBOT_WORDS[x.k].of}${PER_S}`).join('<br>')}</b>`;
+    } else if (s.jobs.length) home += `<br><b>${L('стай в пути', 'packs on the way')}: ${s.jobs.length}</b>`;
     const tags: BlueprintTag[] = [{ x: layout.home.x, y: layout.home.y + 4, mid: true, small: true, html: home }];
     // the map sells itself: a caption and the building above it buy the next unit of that employer
     let taken = 0;
@@ -2000,17 +2083,17 @@ export class GameScene extends Phaser.Scene {
       const perk = src.perk ? `<i${owned >= src.max ? ' class="on"' : ''}>★ ${src.perk.text}</i>` : '';
       if (s.strikes.includes(src.id)) {
         // the door is blocked: nothing comes from here, the bubble above asks for a settlement
-        tags.push({ x: lot.x, y: lot.y + 4, mid: true, small: true, html: `${src.tag}<br><b class="bad">забастовка · задач нет</b>${perk}` });
+        tags.push({ x: lot.x, y: lot.y + 4, mid: true, small: true, html: `${src.tag}<br><b class="bad">${L('забастовка · задач нет', 'strike · no tasks')}</b>${perk}` });
         continue;
       }
       if (owned >= src.max) {
-        tags.push({ x: lot.x, y: lot.y + 4, mid: true, small: true, html: `${src.tag} · целиком<br><b>+${short(sourceInflow(src, owned))}/с</b>${perk}` });
+        tags.push({ x: lot.x, y: lot.y + 4, mid: true, small: true, html: `${src.tag} · ${L('целиком', 'whole')}<br><b>+${short(sourceInflow(src, owned))}${PER_S}</b>${perk}` });
         continue;
       }
       if (src.made) {
         // not for sale: the robots of its kind come here by themselves; a click sends them here first
         const here = targetOf(s, cfg, src.made)?.id === src.id && outputOf(s, cfg, src.made) > 0;
-        const words = ROBOT_WORDS[src.made];
+        const robots = ROBOT_WORDS[src.made];
         tags.push({
           x: lot.x,
           y: lot.y + 4,
@@ -2018,29 +2101,29 @@ export class GameScene extends Phaser.Scene {
           small: true,
           buy: here ? undefined : `aim:${src.id}`,
           can: true,
-          html: `${src.tag} · ${Math.floor((owned / src.max) * 100)}%<br><b>${here ? `▶ сюда идут ${words.many}` : `ждёт ${words.of} · клик`}</b>${perk}`,
+          html: `${src.tag} · ${Math.floor((owned / src.max) * 100)}%<br><b>${here ? L(`▶ сюда идут ${robots.many}`, `▶ ${robots.many} incoming`) : L(`ждёт ${robots.of} · клик`, `needs ${robots.many} · click`)}</b>${perk}`,
         });
         continue;
       }
       const head = owned ? `${src.tag} · ${owned}/${src.max}` : src.tag;
       const job = jobOf(s, src.id);
       if (job) {
-        tags.push({ x: lot.x, y: lot.y + 4, mid: true, small: true, html: `${head}<br><b>собаки занимают места · ${Math.ceil(job.left)} с</b>${perk}` });
+        tags.push({ x: lot.x, y: lot.y + 4, mid: true, small: true, html: `${head}<br><b>${L('собаки занимают места', 'the dogs are taking the jobs')} · ${Math.ceil(job.left)} ${SEC}</b>${perk}` });
         continue;
       }
       if (locked(s, src)) {
         // robot dogs are not let in yet: the bribe comes first
         const bribe = bribeCost(s, cfg, src);
-        tags.push({ x: lot.x, y: lot.y + 4, mid: true, small: true, buy: `bribe:${src.id}`, can: s.money >= bribe, html: `${head}<br><b>взятка · $${short(bribe)}</b>${perk}` });
+        tags.push({ x: lot.x, y: lot.y + 4, mid: true, small: true, buy: `bribe:${src.id}`, can: s.money >= bribe, html: `${head}<br><b>${L('взятка', 'bribe')} · $${short(bribe)}</b>${perk}` });
         continue;
       }
       const price = sourceCost(s, cfg, src);
       // where robot dogs do the work, the unit on sale is a pack of them
-      const unit = src.work ? (owned ? 'стая' : 'стая робособак') : t.floor[0];
-      tags.push({ x: lot.x, y: lot.y + 4, mid: true, small: true, buy: `src:${src.id}`, can: s.money >= price, html: `${head}<br><b>${owned ? 'ещё ' : ''}${unit} · $${short(price)}</b>${perk}` });
+      const unit = src.work ? (owned ? L('стая', 'pack') : L('стая робособак', 'pack of robot dogs')) : t.floor[0];
+      tags.push({ x: lot.x, y: lot.y + 4, mid: true, small: true, buy: `src:${src.id}`, can: s.money >= price, html: `${head}<br><b>${owned ? L('ещё ', '+1 ') : ''}${unit} · $${short(price)}</b>${perk}` });
     }
     const park = layout.park;
-    if (park) tags.push({ x: park.label.x, y: park.label.y, mid: true, small: true, html: s.allowance ? 'парк · свободные люди отдыхают' : 'парк пуст · все на пикете' });
+    if (park) tags.push({ x: park.label.x, y: park.label.y, mid: true, small: true, html: s.allowance ? L('парк · свободные люди отдыхают', 'park · free people are resting') : L('парк пуст · все на пикете', 'the park is empty · everyone is at the picket') });
     for (const node of Object.values(layout.farms)) {
       const n = this.farmSessions(node.ids);
       if (!n) continue;
@@ -2070,8 +2153,8 @@ export class GameScene extends Phaser.Scene {
       // while the keys to the next screen are missing, the corner counts them
       hint:
         keysOf(s, cfg) < keysNeeded(s, cfg)
-          ? `${t.place}: ${taken} из ${total} ${t.floor[2]} · целиком ${keysOf(s, cfg)} из ${keysNeeded(s, cfg)} — ключи к следующему экрану`
-          : `${t.place}: ${taken} из ${total} ${t.floor[2]} · ${this.stage >= STREET ? 'людей без работы' : 'заменено программистов'}: ${short(replacedOf(s, cfg))}`,
+          ? `${t.place}: ${taken} ${OF} ${total} ${t.floor[2]} · ${L(`целиком ${keysOf(s, cfg)} из ${keysNeeded(s, cfg)} — ключи к следующему экрану`, `${keysOf(s, cfg)} of ${keysNeeded(s, cfg)} whole — the keys to the next screen`)}`
+          : `${t.place}: ${taken} ${OF} ${total} ${t.floor[2]} · ${this.stage >= STREET ? L('людей без работы', 'people out of work') : REPLACED}: ${short(replacedOf(s, cfg))}`,
     });
   }
 

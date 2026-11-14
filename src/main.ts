@@ -8,7 +8,9 @@ import '@fontsource/source-serif-4/cyrillic-600.css';
 import '@fontsource/source-serif-4/latin-400.css';
 import '@fontsource/source-serif-4/latin-600.css';
 import './ui/style.css';
+import { TAGLINE, TITLE } from './content/credits';
 import { readArgs } from './core/args';
+import { L, LANG } from './core/lang';
 import { installMetrics } from './core/metrics';
 import { createRng } from './core/rng';
 import { playSound } from './core/sound';
@@ -24,6 +26,9 @@ import { createTerminal } from './ui/terminal/terminal';
 import { HelloScene } from './view/HelloScene';
 
 const args = readArgs(window.location.search);
+// the page speaks the language of the game: index.html is written in English
+document.documentElement.lang = LANG;
+document.querySelector('meta[name="description"]')?.setAttribute('content', `${TITLE} — ${TAGLINE}`);
 installMetrics();
 
 const rng = createRng(args.seed);
@@ -65,10 +70,10 @@ stage.classList.toggle('overlay-canvas', !hello);
 
 // text needs the web fonts before the first frame
 await Promise.all([
-  document.fonts.load('700 32px "JetBrains Mono"', 'Да $0'),
-  document.fonts.load('400 24px "JetBrains Mono"', 'Клод'),
-  document.fonts.load('600 64px "Source Serif 4"', 'Да $0'),
-  document.fonts.load('400 24px "Source Serif 4"', 'Магазин'),
+  document.fonts.load('700 32px "JetBrains Mono"', L('Да $0', 'Yes $0')),
+  document.fonts.load('400 24px "JetBrains Mono"', L('Клод', 'Claude')),
+  document.fonts.load('600 64px "Source Serif 4"', L('Да $0', 'Yes $0')),
+  document.fonts.load('400 24px "Source Serif 4"', L('Магазин', 'Shop')),
 ]).catch(() => undefined);
 
 new Phaser.Game({

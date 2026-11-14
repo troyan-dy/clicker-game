@@ -1,6 +1,8 @@
 export interface Settings {
   sound: boolean;
   music: boolean;
+  /** chosen in the menu; absent — the browser decides */
+  lang?: 'ru' | 'en';
 }
 
 const KEY = 'da-klod-settings';
@@ -12,6 +14,7 @@ export function loadSettings(): Settings {
     const raw = JSON.parse(localStorage.getItem(KEY) ?? '{}') as Partial<Settings>;
     if (typeof raw.sound === 'boolean') s.sound = raw.sound;
     if (typeof raw.music === 'boolean') s.music = raw.music;
+    if (raw.lang === 'ru' || raw.lang === 'en') s.lang = raw.lang;
   } catch {
     // no storage or a broken record: the defaults will do
   }

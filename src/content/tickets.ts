@@ -1,3 +1,6 @@
+import { L } from '../core/lang';
+import { TICKETS_EN } from './tickets.en';
+
 export interface Ticket {
   id: string;
   title: string;
@@ -7,8 +10,8 @@ export interface Ticket {
   asks: readonly string[];
 }
 
-/** Tasks the freelance exchange throws at the player. Content, not code: add freely. */
-export const TICKETS: readonly Ticket[] = [
+/** Tasks the freelance exchange throws at the player. Content, not code: add freely — and to tickets.en.ts as well. */
+const TICKETS_RU: readonly Ticket[] = [
   {
     id: 'FRL-204',
     title: 'Перекрасить кнопку в более синий',
@@ -202,6 +205,8 @@ export const TICKETS: readonly Ticket[] = [
     ],
   },
 ];
+
+export const TICKETS = L(TICKETS_RU, TICKETS_EN);
 
 export interface Prompt {
   id: string;

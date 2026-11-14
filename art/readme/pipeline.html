@@ -1,0 +1,95 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <title>README: how it works</title>
+    <link rel="stylesheet" href="../concepts/fonts.css" />
+    <link rel="stylesheet" href="readme.css" />
+    <style>
+      /* the conveyor: five stations on one line */
+      .flow { display: grid; grid-template-columns: repeat(5, 1fr); margin-top: 44px; position: relative; }
+      .flow::before { content: ''; position: absolute; left: 150px; right: 150px; top: 96px; border-top: 2px solid var(--ink); }
+      .st { position: relative; text-align: center; padding: 0 14px; }
+      .st .pic { position: relative; height: 190px; display: flex; align-items: center; justify-content: center; }
+      .st .pic img { max-height: 176px; max-width: 200px; }
+      .st .pad { position: absolute; left: 50%; top: 20px; width: 196px; height: 152px; margin-left: -98px; background: var(--paper); }
+      .st b { display: block; margin-top: 10px; font: 700 23px 'JetBrains Mono', monospace; letter-spacing: 0.06em; }
+      .st > span { display: block; margin-top: 6px; font-size: 23px; line-height: 1.3; color: var(--dim); }
+      .keycap { padding: 12px 22px 14px; border: 2px solid var(--ink); border-bottom-width: 7px; border-radius: 12px; background: #fff; font: 700 28px 'JetBrains Mono', monospace; white-space: nowrap; }
+      .cash { padding: 0 10px; font: 600 108px/1 'Source Serif 4', serif; color: var(--money); }
+      .dot { position: absolute; top: 88px; width: 16px; height: 16px; background: var(--coral); }
+      .dot.g { background: var(--money); }
+      /* what slows the conveyor down, and what cures it */
+      .necks { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; margin-top: 46px; }
+      .neck { padding: 22px 28px 24px; }
+      .neck .kicker { color: var(--coral); }
+      .neck h3 { margin: 6px 0 8px; font-size: 32px; font-weight: 600; line-height: 1.15; }
+      .neck p { margin: 0; font-size: 23px; line-height: 1.35; color: #4a4946; }
+    </style>
+  </head>
+  <body>
+    <div class="sheet">
+      <div class="kicker" data-en="How it works" data-ru="Как это работает"></div>
+      <h1 data-en="One conveyor. The slowest part of it is you." data-ru="Один конвейер. Самое медленное в нём — вы."></h1>
+
+      <div class="flow">
+        <div class="st">
+          <div class="pad"></div>
+          <div class="pic"><img src="../../public/assets/img/nodes/office.webp" /></div>
+          <b data-en="JOBS" data-ru="РАБОТЫ"></b>
+          <span data-en="every job sends tasks; nobody counts your jobs" data-ru="каждая работа шлёт задачи; работ никто не считает"></span>
+        </div>
+        <div class="st">
+          <div class="pad"></div>
+          <div class="pic"><img src="../../public/assets/img/nodes/tray.webp" /></div>
+          <b data-en="BACKLOG" data-ru="БЭКЛОГ"></b>
+          <span data-en="tasks wait here until a session is free" data-ru="задачи ждут здесь, пока освободится сессия"></span>
+        </div>
+        <div class="st">
+          <div class="pad"></div>
+          <div class="pic"><img src="../../public/assets/img/nodes/laptop.webp" /></div>
+          <b data-en="CLAUDE" data-ru="КЛОД"></b>
+          <span data-en="does the work and asks for permission" data-ru="делает работу и спрашивает разрешения"></span>
+        </div>
+        <div class="st">
+          <div class="pad"></div>
+          <div class="pic"><span class="keycap" data-en="Enter — Yes" data-ru="Enter — Да"></span></div>
+          <b data-en="YOU" data-ru="ВЫ"></b>
+          <span data-en="any key means “Yes”; there is no other answer" data-ru="любая клавиша — «Да»; другого ответа нет"></span>
+        </div>
+        <div class="st">
+          <div class="pad"></div>
+          <div class="pic"><span class="cash">$</span></div>
+          <b data-en="MONEY" data-ru="ДЕНЬГИ"></b>
+          <span data-en="buys more jobs, more Claude and less of you" data-ru="на них покупается больше работ, больше Клода и меньше вас"></span>
+        </div>
+        <i class="dot" style="left: 262px"></i>
+        <i class="dot" style="left: 300px"></i>
+        <i class="dot" style="left: 574px"></i>
+        <i class="dot" style="left: 842px"></i>
+        <i class="dot" style="left: 876px"></i>
+        <i class="dot g" style="left: 1184px"></i>
+        <i class="dot g" style="left: 1222px"></i>
+      </div>
+
+      <div class="necks">
+        <div class="neck cardbox">
+          <div class="kicker" data-en="bottleneck: tasks" data-ru="узкое место: задачи"></div>
+          <h3 data-en="Claude is done and idle" data-ru="Клод всё сделал и простаивает"></h3>
+          <p data-en="Take another job. Then a company, an agency, an industry." data-ru="Возьмите ещё одну работу. Потом компанию, ведомство, отрасль."></p>
+        </div>
+        <div class="neck cardbox">
+          <div class="kicker" data-en="bottleneck: Claude" data-ru="узкое место: Клод"></div>
+          <h3 data-en="Tasks pile up" data-ru="Задачи копятся"></h3>
+          <p data-en="A pricier plan, subagents, server racks, a data center in orbit." data-ru="Тариф дороже, сабагенты, серверные стойки, датацентр на орбите."></p>
+        </div>
+        <div class="neck cardbox">
+          <div class="kicker" data-en="bottleneck: you" data-ru="узкое место: вы"></div>
+          <h3 data-en="Claude waits for “Yes”" data-ru="Клод ждёт вашего «Да»"></h3>
+          <p data-en="“Yes, and don’t ask again.” The camera pulls back." data-ru="«Да, и больше не спрашивай». Камера отъезжает."></p>
+        </div>
+      </div>
+    </div>
+    <script src="readme.js"></script>
+  </body>
+</html>

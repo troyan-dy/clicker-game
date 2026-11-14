@@ -1,0 +1,74 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <title>README: hero</title>
+    <link rel="stylesheet" href="../concepts/fonts.css" />
+    <link rel="stylesheet" href="readme.css" />
+    <style>
+      body { height: 600px; overflow: hidden; background: var(--dark); color: var(--paper); font-family: 'JetBrains Mono', monospace; }
+      .bar { display: flex; align-items: center; gap: 22px; height: 64px; padding: 0 34px; border-bottom: 1.5px solid var(--frame); font-size: 20px; color: var(--dim); }
+      .dots { display: flex; gap: 10px; }
+      .dots i { width: 14px; height: 14px; border: 1.5px solid var(--dim); border-radius: 50%; }
+      .bar .r { margin-left: auto; }
+      .left { position: absolute; left: 64px; top: 124px; width: 700px; }
+      .left h1 { font: 600 88px/1.02 'Source Serif 4', serif; color: var(--paper); letter-spacing: -0.02em; }
+      .left p { margin: 30px 0 0; font-size: 25px; line-height: 1.5; color: #c9c5b8; }
+      .left p b { color: var(--paper); font-weight: 700; }
+      .money { margin-top: 34px; font: 700 26px 'JetBrains Mono', monospace; color: var(--money-dark); }
+      .money span { color: var(--dim); font-weight: 400; }
+      .ask { position: absolute; right: 64px; top: 124px; width: 720px; padding: 34px 38px 32px; background: var(--panel); border: 1.5px solid var(--coral); border-radius: 14px; }
+      .ask .task { display: flex; align-items: center; gap: 14px; font-size: 20px; color: var(--dim); }
+      .ask h3 { margin: 16px 0 22px; font-size: 28px; font-weight: 700; line-height: 1.3; }
+      .opt { display: flex; align-items: baseline; padding: 5px 0; font-size: 25px; color: #c9c5b8; }
+      .opt .n { width: 44px; color: var(--coral); }
+      .opt.sel { color: var(--coral); }
+      .opt.off { color: #6b6964; }
+      .opt .note { margin-left: auto; font-size: 20px; color: #6b6964; }
+      .foot { display: flex; align-items: center; margin-top: 24px; }
+      .foot .pay { font-size: 22px; color: var(--money-dark); }
+      .key { margin-left: auto; padding: 8px 24px 10px; border: 1.5px solid var(--paper); border-bottom-width: 5px; border-radius: 10px; font-weight: 700; font-size: 24px; }
+      .fly { position: absolute; background: var(--coral); }
+    </style>
+  </head>
+  <body>
+    <div class="bar">
+      <span class="dots"><i></i><i></i><i></i></span>
+      <span data-en="claude — ~/work/all-at-once" data-ru="claude — ~/работа/все-сразу"></span>
+      <span class="r" data-en="auto-yes: off" data-ru="автосогласие: выкл"></span>
+    </div>
+
+    <div class="left">
+      <h1>Yes-Driven Development</h1>
+      <p
+        data-en="A development methodology that leaves the human one decision: <b>“Yes.”</b><br>Claude does the rest."
+        data-ru="Методология разработки, в которой человек принимает одно решение: <b>«Да»</b>.<br>Остальное делает Клод."
+      ></p>
+      <div class="money">
+        +$2 <span data-en="per task · it is a clicker" data-ru="за задачу · это кликер"></span>
+      </div>
+    </div>
+
+    <div class="ask">
+      <div class="task"><span class="sq"></span><span data-en="Task FRL-204 · “Make the button a bit more blue”" data-ru="Задача FRL-204 · «Перекрасить кнопку в более синий»"></span></div>
+      <h3 data-en="Deploy to prod on Friday evening?" data-ru="Задеплоить в прод в пятницу вечером?"></h3>
+      <div class="opt sel"><span class="n">❯</span><span data-en="1. Yes" data-ru="1. Да"></span></div>
+      <div class="opt"><span class="n"></span><span data-en="2. Yes, and don’t ask again" data-ru="2. Да, и больше не спрашивай"></span></div>
+      <div class="opt off">
+        <span class="n"></span><span data-en="3. No" data-ru="3. Нет"></span><span class="note" data-en="not available on your plan" data-ru="недоступно в вашем тарифе"></span>
+      </div>
+      <div class="foot">
+        <span class="pay" data-en="per task +$2" data-ru="за задачу +$2"></span>
+        <span class="key" data-en="Enter — Yes" data-ru="Enter — Да"></span>
+      </div>
+    </div>
+
+    <!-- the squares of closed tasks on their way to the money -->
+    <i class="fly" style="left: 818px; top: 96px; width: 14px; height: 14px"></i>
+    <i class="fly" style="left: 772px; top: 150px; width: 12px; height: 12px"></i>
+    <i class="fly" style="left: 800px; top: 236px; width: 16px; height: 16px"></i>
+    <i class="fly" style="left: 760px; top: 330px; width: 12px; height: 12px"></i>
+    <i class="fly" style="left: 792px; top: 430px; width: 14px; height: 14px"></i>
+    <script src="readme.js"></script>
+  </body>
+</html>

@@ -1,5 +1,6 @@
 import './blueprint.css';
-import { steady } from '../format';
+import { L } from '../../core/lang';
+import { LOCALE, steady } from '../format';
 import type { ShopShelf } from '../terminal/terminal';
 
 export interface BlueprintTag {
@@ -90,9 +91,9 @@ export interface BlueprintUi {
   extra: HTMLElement;
 }
 
-const fmt = new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 0 });
+const fmt = new Intl.NumberFormat(LOCALE, { maximumFractionDigits: 0 });
 // one digit after the comma, always: the income line is centred, a dropped «,0» would move it
-const fmt1 = new Intl.NumberFormat('ru-RU', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+const fmt1 = new Intl.NumberFormat(LOCALE, { minimumFractionDigits: 1, maximumFractionDigits: 1 });
 const esc = (s: string): string => s.replace(/&/g, '&amp;').replace(/</g, '&lt;');
 
 /**
@@ -108,7 +109,7 @@ export function createBlueprint(layer: HTMLElement, over: HTMLElement): Blueprin
     <div class="bl-meter"></div>
     <div class="bl-quip"><i></i><span></span><div class="bl-ask"><b></b><u><s></s></u></div></div>
     <aside class="bl-shop"><div class="bl-manager"></div><div class="bl-shelves"></div><div class="bl-extra"></div></aside>
-    <div class="bl-news" data-row="news" title="история новостей"><i>НОВОСТИ ▸</i><span></span><em></em></div>
+    <div class="bl-news" data-row="news" title="${L('история новостей', 'news history')}"><i>${L('НОВОСТИ', 'NEWS')} ▸</i><span></span><em></em></div>
   </div></div>`,
   );
   const root = layer.lastElementChild as HTMLElement;
@@ -181,7 +182,7 @@ export function createBlueprint(layer: HTMLElement, over: HTMLElement): Blueprin
         money.classList.add('pop');
       }
       const income = m.income >= 1e5 ? steady(Math.round(m.income / 1000) * 1000) : fmt1.format(m.income);
-      set('summary', `+$${income} в секунду · ${esc(m.summary)}`);
+      set('summary', `+$${income} ${L('в секунду', 'per second')} · ${esc(m.summary)}`);
       set(
         'meter',
         m.meter
@@ -197,7 +198,7 @@ export function createBlueprint(layer: HTMLElement, over: HTMLElement): Blueprin
       if (said) set('quip', esc(said), quipText);
       if (m.ask) {
         // the pile is taken whole: until then it only says what it will pay
-        set('askWorth', m.ask.fill >= 1 ? `Enter — Да всем · +$${esc(m.ask.worth)}` : `вопросы копятся · +$${esc(m.ask.worth)}`, askWorth);
+        set('askWorth', `${m.ask.fill >= 1 ? L('Enter — Да всем', 'Enter — Yes to all') : L('вопросы копятся', 'questions pile up')} · +$${esc(m.ask.worth)}`, askWorth);
         askBar.style.width = `${Math.round(m.ask.fill * 100)}%`;
       }
       quip.className = `bl-quip ${m.quipAt}${said ? ' on' : ''}${m.ask ? ' ask' : ''}${m.ask?.legend ? ' legend' : ''}`;
@@ -211,7 +212,7 @@ export function createBlueprint(layer: HTMLElement, over: HTMLElement): Blueprin
           )
           .join(''),
       );
-      const heads = m.shelves.map((shelf) => `<h2 class="${shelf.hot ? 'hot' : ''}">${esc(shelf.title)}${shelf.bonus ? `<b>${esc(shelf.bonus)}</b>` : ''}${shelf.hot ? '<em>сейчас нужно</em>' : ''}</h2>`);
+      const heads = m.shelves.map((shelf) => `<h2 class="${shelf.hot ? 'hot' : ''}">${esc(shelf.title)}${shelf.bonus ? `<b>${esc(shelf.bonus)}</b>` : ''}${shelf.hot ? `<em>${L('сейчас нужно', 'needed now')}</em>` : ''}</h2>`);
       const nextShape = m.shelves.map((shelf, i) => `${heads[i]}${shelf.rows.map((r) => r.buy).join(',')}`).join(';');
       if (nextShape !== shape) {
         shape = nextShape;

@@ -1,4 +1,5 @@
 import './credits.css';
+import { L } from '../../core/lang';
 
 export interface CreditsSpec {
   title: string;
@@ -37,7 +38,7 @@ const esc = (s: string): string => s.replace(/&/g, '&amp;').replace(/</g, '&lt;'
 
 /** Adds the credits to a 1920×1080 layer that sits above the canvas. */
 export function createCredits(layer: HTMLElement): CreditsUi {
-  layer.insertAdjacentHTML('beforeend', '<div class="cr"><div class="cr-win"><div class="cr-roll"></div></div><div class="cr-hint">держите любую клавишу — быстрее · Esc — пропустить</div></div>');
+  layer.insertAdjacentHTML('beforeend', `<div class="cr"><div class="cr-win"><div class="cr-roll"></div></div><div class="cr-hint">${L('держите любую клавишу — быстрее · Esc — пропустить', 'hold any key — faster · Esc — skip')}</div></div>`);
   const root = layer.lastElementChild as HTMLElement;
   const win = root.querySelector<HTMLElement>('.cr-win')!;
   const roll = root.querySelector<HTMLElement>('.cr-roll')!;

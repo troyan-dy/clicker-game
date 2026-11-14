@@ -1,0 +1,105 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <title>README: the game in numbers</title>
+    <link rel="stylesheet" href="../concepts/fonts.css" />
+    <link rel="stylesheet" href="readme.css" />
+    <style>
+      /* six screens, each one a node in the middle of the next */
+      .steps { display: grid; grid-template-columns: repeat(6, 1fr); margin-top: 34px; }
+      .step { text-align: center; }
+      .step .pic { height: 178px; display: flex; align-items: flex-end; justify-content: center; }
+      .step .pic img { max-height: 170px; max-width: 190px; }
+      .step i { display: block; margin-top: 14px; font: 400 19px 'JetBrains Mono', monospace; color: var(--coral); font-style: normal; letter-spacing: 0.1em; }
+      .step b { display: block; font-size: 32px; font-weight: 600; line-height: 1.2; }
+      .step span { display: block; margin-top: 2px; font-size: 22px; color: var(--dim); }
+      /* the price of each step up, on the border between two screens */
+      .ups { position: relative; height: 112px; margin-top: 26px; border-top: 2px solid var(--ink); }
+      .up { position: absolute; top: -19px; width: 236px; margin-left: -118px; text-align: center; }
+      .up b { display: inline-block; padding: 3px 14px 5px; background: var(--card); border: 1.5px solid var(--ink); border-radius: 9px; font: 700 22px 'JetBrains Mono', monospace; color: var(--money); }
+      .up span { display: block; margin-top: 8px; font-size: 20px; line-height: 1.25; color: #4a4946; }
+      /* how long each screen lasts: one bar, direct labels */
+      .time { margin-top: 20px; }
+      .time .head { display: flex; align-items: baseline; gap: 16px; }
+      .time .head b { font-size: 30px; font-weight: 600; }
+      .bar { display: flex; gap: 3px; height: 46px; margin-top: 12px; }
+      .bar div { display: flex; align-items: center; justify-content: center; background: #dcd8cb; font: 400 19px 'JetBrains Mono', monospace; color: var(--ink); white-space: nowrap; }
+      .bar div:first-child { border-radius: 6px 0 0 6px; }
+      .bar div:last-child { border-radius: 0 6px 6px 0; background: var(--coral); color: #fff; font-weight: 700; }
+      /* the game in a row of numbers */
+      .tiles { display: grid; grid-template-columns: repeat(7, 1fr); gap: 16px; margin-top: 40px; }
+      .tile { padding: 16px 12px 18px; text-align: center; }
+      .tile b { display: block; font-size: 58px; font-weight: 600; line-height: 1.05; letter-spacing: -0.02em; }
+      .tile.m b { color: var(--money); }
+      .tile span { display: block; margin-top: 4px; font: 400 17px/1.3 'JetBrains Mono', monospace; color: var(--dim); }
+    </style>
+  </head>
+  <body>
+    <div class="sheet">
+      <div class="kicker" data-en="The game in numbers" data-ru="Игра в цифрах"></div>
+      <h1 data-en="Each step up, the camera pulls back." data-ru="С каждым шагом камера отъезжает."></h1>
+
+      <div class="steps">
+        <div class="step">
+          <div class="pic"><img src="../../public/assets/img/nodes/laptop.webp" /></div>
+          <i>01</i><b data-en="Terminal" data-ru="Терминал"></b><span data-en="a job and freelance" data-ru="работа и фриланс"></span>
+        </div>
+        <div class="step">
+          <div class="pic"><img src="../../public/assets/img/nodes/desk.webp" /></div>
+          <i>02</i><b data-en="Desk" data-ru="Стол"></b><span data-en="more jobs, subagents" data-ru="работы, сабагенты"></span>
+        </div>
+        <div class="step">
+          <div class="pic"><img src="../../public/assets/img/nodes/cityblock.webp" /></div>
+          <i>03</i><b data-en="City" data-ru="Город"></b><span data-en="12 companies" data-ru="12 компаний"></span>
+        </div>
+        <div class="step">
+          <div class="pic"><img src="../../public/assets/img/nodes/parliament.webp" /></div>
+          <i>04</i><b data-en="State" data-ru="Государство"></b><span data-en="8 agencies" data-ru="8 ведомств"></span>
+        </div>
+        <div class="step">
+          <div class="pic"><img src="../../public/assets/img/nodes/globe.webp" /></div>
+          <i>05</i><b data-en="Planet" data-ru="Планета"></b><span data-en="8 global operations" data-ru="8 мировых операций"></span>
+        </div>
+        <div class="step">
+          <div class="pic"><img src="../../public/assets/img/nodes/robofactory.webp" /></div>
+          <i>06</i><b data-en="Planet-factory" data-ru="Планета-цех"></b><span data-en="10 industries, by hand" data-ru="10 отраслей, руками"></span>
+        </div>
+      </div>
+
+      <div class="ups">
+        <div class="up" style="left: 16.667%"><b>$500</b><span data-en="“Yes, and don’t ask again”" data-ru="«Да, и больше не спрашивай»"></span></div>
+        <div class="up" style="left: 33.333%"><b data-en="$260,000" data-ru="$260 000"></b><span data-en="register an LLC" data-ru="открыть ООО"></span></div>
+        <div class="up" style="left: 50%"><b data-en="$540M" data-ru="$540 млн"></b><span data-en="win a government contract" data-ru="выиграть госконтракт"></span></div>
+        <div class="up" style="left: 66.667%"><b data-en="$120B" data-ru="$120 млрд"></b><span data-en="a deal with Anthropic" data-ru="договор с Anthropic"></span></div>
+        <div class="up" style="left: 83.333%"><b data-en="$54T" data-ru="$54 трлн"></b><span data-en="buy Boston Mechanics" data-ru="купить «Бостон Механикс»"></span></div>
+      </div>
+
+      <div class="time">
+        <div class="head">
+          <b data-en="About 50 minutes to the ending" data-ru="Около 50 минут до финала"></b>
+          <span class="mono dim" style="font-size: 19px" data-en="minutes on each screen" data-ru="минут на каждом экране"></span>
+        </div>
+        <div class="bar">
+          <div style="flex: 2">01</div>
+          <div style="flex: 6" data-en="02 · 6 min" data-ru="02 · 6 мин"></div>
+          <div style="flex: 10" data-en="03 · 10 min" data-ru="03 · 10 мин"></div>
+          <div style="flex: 10" data-en="04 · 10 min" data-ru="04 · 10 мин"></div>
+          <div style="flex: 10" data-en="05 · 10 min" data-ru="05 · 10 мин"></div>
+          <div style="flex: 10" data-en="06 · 10 min · the ending" data-ru="06 · 10 мин · финал"></div>
+        </div>
+      </div>
+
+      <div class="tiles">
+        <div class="tile cardbox"><b>1</b><span data-en="key:<br>“Yes”" data-ru="клавиша:<br>«Да»"></span></div>
+        <div class="tile cardbox"><b>6</b><span data-en="screens, one<br>inside another" data-ru="экранов, один<br>внутри другого"></span></div>
+        <div class="tile cardbox"><b>42</b><span data-en="employers<br>to take over" data-ru="работодателя,<br>и все ваши"></span></div>
+        <div class="tile cardbox"><b>45</b><span data-en="dry<br>awards" data-ru="сухих<br>грамот"></span></div>
+        <div class="tile cardbox"><b>15</b><span data-en="legendary<br>tickets" data-ru="легендарных<br>тикетов"></span></div>
+        <div class="tile cardbox"><b>80</b><span data-en="news<br>headlines" data-ru="заголовков<br>новостей"></span></div>
+        <div class="tile cardbox m"><b data-en="3.43B" data-ru="3,43"></b><span data-en="people freed<br>from work" data-ru="млрд человек<br>без работы"></span></div>
+      </div>
+    </div>
+    <script src="readme.js"></script>
+  </body>
+</html>

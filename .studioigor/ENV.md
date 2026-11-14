@@ -32,6 +32,8 @@ VERIFIED: yes
 - редактора у веб-стека нет: весь проект — код в репозитории
 - гимы: `http://localhost:5173/?gym=<имя>` (agree — M01, hello — проверка окружения); `&debug=1` включает оверлей; клавиша P пишет настройки в `.studioigor/captures/tuning/` через dev-сервер
 - эскизы интерфейса: `node tools/shot.mjs <файл.html> <out.png>`
+- язык: `&lang=en|ru` в адресе (работает и в релизе); без него — выбор из меню, иначе язык браузера; английские тексты — файлы `*.en.json` рядом с русскими, `src/data/balance/names.en.json`, пары `L('рус', 'eng')` в коде
+- картинки README на обоих языках: `npm run build:gym && node tools/readme.mjs` (`art` — только инфографика из `art/readme/*.html`, `shots` — только кадры игры по `tools/inputs/tour.json`) → `docs/img/<lang>/*.webp`
 - две сборки: `npm run build` → `dist/` — релиз, без гимов, быстрых стартов, клавиши M и `window.__gym`; `npm run build:gym` → `dist-gym/` — то же плюс гимы, для съёмки (`tools/capture.mjs --dir dist-gym`)
 - быстрый старт гима с большого экрана: `http://localhost:5173/?gym=agree&state=city|gov|planet|street|finale` (finale — сразу карточка итогов и эпилог) — всё прежнее куплено, деньги на первые покупки; клавиша M — полминуты дохода
 

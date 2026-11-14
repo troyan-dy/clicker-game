@@ -1,0 +1,29 @@
+/* The pictures of the README: the palette and the two fonts of the game (ART_BIBLE.md). Laid out 1600 px wide. */
+:root {
+  --paper: #f0eee6;
+  --card: #faf9f5;
+  --ink: #262624;
+  --dim: #87867f;
+  --line: #c9c5b8;
+  --coral: #d97757;
+  --money: #3f7d58;
+  --dark: #1f1e1d;
+  --panel: #262624;
+  --frame: #3d3a36;
+  --money-dark: #7cc68d;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body {
+  width: 1600px;
+  background: var(--paper);
+  color: var(--ink);
+  font: 400 26px/1.4 'Source Serif 4', serif;
+}
+.mono { font-family: 'JetBrains Mono', monospace; }
+.dim { color: var(--dim); }
+.kicker { font: 400 20px 'JetBrains Mono', monospace; color: var(--dim); letter-spacing: 0.1em; text-transform: uppercase; }
+h1 { margin: 6px 0 0; font-size: 58px; font-weight: 600; line-height: 1.1; letter-spacing: -0.01em; }
+.sq { display: inline-block; width: 16px; height: 16px; background: var(--coral); }
+.sheet { padding: 56px 64px 60px; background-image: radial-gradient(var(--line) 1.2px, transparent 1.3px); background-size: 40px 40px; }
+.cardbox { background: var(--card); border: 1.5px solid var(--ink); border-radius: 14px; }

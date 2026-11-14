@@ -1,0 +1,17 @@
+{
+  "rust": {"title": "Rewrite everything in Rust by Monday", "ask": "Rewrite everything in Rust by Monday?"},
+  "button": {"title": "A button that does everything", "ask": "Make one button that does everything?"},
+  "nobugs": {"title": "Remove the bugs. All of them", "ask": "Remove the bugs? All of them. Forever."},
+  "chain": {"title": "Blockchain, but without the blockchain", "ask": "Add blockchain, but so that it isn’t there?"},
+  "unique": {"title": "Like everyone’s, but like no one’s", "ask": "Make it like everyone else’s, but so that nobody else has it?"},
+  "intern": {"title": "Prod on the intern’s laptop", "ask": "Move prod to the intern’s laptop?"},
+  "loop": {"title": "Optimizing a three-step loop", "ask": "Optimize the loop from three iterations down to two?"},
+  "calc": {"title": "A neural network in the calculator", "ask": "Build artificial intelligence into the calculator?"},
+  "deadline": {"title": "Deadline to the left", "ask": "Move the deadline left, to last Friday?"},
+  "ie6": {"title": "Support for a 2001 browser", "ask": "Support a browser released in 2001?"},
+  "regex": {"title": "A regex for HTML", "ask": "Parse HTML with a single regular expression?"},
+  "paper": {"title": "Dark theme for a paper report", "ask": "Make a dark theme for the paper report?"},
+  "noerr": {"title": "So that users make no mistakes", "ask": "Make it so users never make mistakes again?"},
+  "flash": {"title": "The internet on a flash drive", "ask": "Archive the internet onto the client’s flash drive?"},
+  "printer": {"title": "Teach the printer to print", "ask": "Teach the office printer to print on the first try?"}
+}

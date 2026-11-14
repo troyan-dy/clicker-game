@@ -1,0 +1,35 @@
+[
+  {"t": 1.2, "key": "Enter", "hold": 0.05},
+  {"t": 2.0, "key": "Enter", "hold": 0.05},
+  {"t": 2.6, "key": "Enter", "hold": 0.05},
+  {"t": 3.2, "key": "Enter", "hold": 0.05},
+  {"t": 3.8, "key": "Enter", "hold": 0.05},
+  {"t": 4.4, "key": "Enter", "hold": 0.05},
+  {"t": 5.0, "eval": "window.__gym.gift(160); window.__gym.buy('src:freelance'); window.__gym.buy('src:freelance'); window.__gym.buy('plan')"},
+  {"t": 5.6, "key": "Enter", "hold": 0.05},
+  {"t": 6.2, "key": "Enter", "hold": 0.05},
+  {"t": 6.8, "key": "Enter", "hold": 0.05},
+  {"t": 7.4, "key": "Enter", "hold": 0.05},
+  {"t": 8.0, "key": "Enter", "hold": 0.05},
+  {"t": 8.6, "key": "Enter", "hold": 0.05},
+  {"t": 9.2, "key": "Enter", "hold": 0.05},
+
+  {"t": 11.0, "eval": "window.__gym.gift(900); window.__gym.buy('plan'); window.__gym.buy('noask')"},
+  {"t": 12.5, "eval": "window.__gym.gift(9000); window.__gym.buy('sub'); window.__gym.buy('sub'); window.__gym.buy('sub'); window.__gym.buy('sub'); window.__gym.buy('src:job'); window.__gym.buy('src:freelance'); window.__gym.buy('src:referral'); window.__gym.buy('src:studio'); window.__gym.buy('grade'); window.__gym.buy('grade')"},
+  {"t": 16.0, "eval": "window.__gym.call()"},
+
+  {"t": 24.0, "eval": "window.__gym.gift(3e6); window.__gym.buy('grade'); window.__gym.buy('grade'); window.__gym.buy('grade'); window.__gym.buy('plan'); window.__gym.buy('scale')"},
+  {"t": 25.5, "eval": "window.__gym.gift(1.5e8); window.__gym.buy('src:vector'); window.__gym.buy('src:vector'); window.__gym.buy('src:vector'); window.__gym.buy('src:vector'); window.__gym.buy('src:cats'); window.__gym.buy('src:cats'); window.__gym.buy('src:creative'); window.__gym.buy('src:market'); window.__gym.buy('src:market'); window.__gym.buy('src:logistics'); window.__gym.buy('src:bank'); window.__gym.buy('src:telecom'); window.__gym.buy('src:factory'); window.__gym.buy('src:gov'); window.__gym.buy('src:everyone'); window.__gym.buy('src:consult'); window.__gym.buy('src:cloud'); window.__gym.buy('farm:rack'); window.__gym.buy('farm:rack'); window.__gym.buy('farm:rack'); window.__gym.buy('farm:hall'); window.__gym.buy('grade')"},
+  {"t": 29.0, "eval": "window.__gym.click('ubi'); window.__gym.call()"},
+
+  {"t": 38.0, "eval": "window.__gym.gift(6e9); window.__gym.take('vector'); window.__gym.take('cats'); window.__gym.take('creative'); window.__gym.take('market'); window.__gym.take('logistics'); window.__gym.take('factory'); window.__gym.buy('grade'); window.__gym.buy('grade'); window.__gym.buy('scale')"},
+  {"t": 39.5, "eval": "window.__gym.gift(9e10); window.__gym.buy('src:pension'); window.__gym.buy('src:pension'); window.__gym.buy('src:pension'); window.__gym.buy('src:pension'); window.__gym.buy('src:customs'); window.__gym.buy('src:customs'); window.__gym.buy('src:tax'); window.__gym.buy('src:tax'); window.__gym.buy('src:digital'); window.__gym.buy('src:central'); window.__gym.buy('src:parliament'); window.__gym.buy('src:space'); window.__gym.buy('src:defence'); window.__gym.buy('farm:gpu'); window.__gym.buy('farm:gpu'); window.__gym.buy('farm:campus'); window.__gym.buy('grade'); window.__gym.buy('plan')"},
+  {"t": 43.0, "eval": "window.__gym.click('ubi'); window.__gym.call()"},
+
+  {"t": 52.0, "eval": "window.__gym.gift(1e12); window.__gym.take('pension'); window.__gym.take('customs'); window.__gym.take('tax'); window.__gym.take('digital'); window.__gym.buy('grade'); window.__gym.buy('grade'); window.__gym.buy('scale')"},
+  {"t": 53.5, "eval": "window.__gym.gift(2.5e13); window.__gym.buy('farm:orbit'); window.__gym.buy('farm:quota'); window.__gym.buy('farm:quota'); window.__gym.buy('farm:quota'); window.__gym.buy('bribe:exchange'); window.__gym.buy('bribe:shipping'); window.__gym.buy('bribe:satnet'); window.__gym.buy('bribe:games'); window.__gym.buy('bribe:station'); window.__gym.buy('bribe:standards'); window.__gym.buy('bribe:peace'); window.__gym.buy('bribe:nations'); window.__gym.buy('src:exchange'); window.__gym.buy('src:shipping'); window.__gym.buy('src:satnet'); window.__gym.buy('src:games'); window.__gym.buy('src:station'); window.__gym.buy('grade')"},
+  {"t": 57.0, "eval": "window.__gym.click('ubi'); window.__gym.call()"},
+
+  {"t": 68.0, "eval": "window.__gym.gift(1e17); window.__gym.take('exchange'); window.__gym.take('shipping'); window.__gym.take('satnet'); window.__gym.take('games'); window.__gym.buy('grade'); window.__gym.buy('grade'); window.__gym.buy('scale')"},
+  {"t": 69.5, "eval": "window.__gym.gift(6e16); window.__gym.buy('line:android'); window.__gym.buy('line:android'); window.__gym.buy('line:android'); window.__gym.buy('line:android'); window.__gym.buy('line:dogs'); window.__gym.buy('line:dogs'); window.__gym.buy('line:dogs'); window.__gym.buy('line:dogs'); window.__gym.buy('farm:chips'); window.__gym.buy('police'); window.__gym.click('ubi'); window.__gym.fleet(30); window.__gym.take('checkout'); window.__gym.take('courier')"}
+]
