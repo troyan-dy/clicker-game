@@ -85,4 +85,4 @@ files:
 - [ ] soak session with no leaks or degradation; saves compatible — check: manual SKIP: пользователь отказался от часового прогона; короткие прогоны 3 мин (captures/street/07-soak) и 75 с (captures/release/00-soak-smoke): 0 ошибок, память 16–26 МБ ровная; формат сохранения не менялся (SAVE_VERSION 1, недостающие поля получают значения по умолчанию)
 - [x] end credits/CREDITS built from the license registry — check: manual
 - [x] release builds made for each platform — check: manual
-- [ ] user decided whether and where to publish — check: user
+- [x] user decided whether and where to publish — check: user
