@@ -52,7 +52,9 @@ function pickScene(): Phaser.Scene {
     // a gym saves and shows the menu only when asked; a capture never touches the player's save
     const save = !args.capture && (gym ? args.save : true);
     const menu = args.menu || (!gym && !args.capture);
-    return new GameScene(rng, createTerminal(layer), paper, card, { overlay: args.debug, save, gym, menu });
+    // a tuning session may open on a later screen: ?gym=agree&state=city|gov|planet
+    const start = gym ? ({ city: 3, gov: 4, planet: 5 }[args.state] ?? 0) : 0;
+    return new GameScene(rng, createTerminal(layer), paper, card, { overlay: args.debug, save, gym, menu, start });
   }
 }
 const hello = args.gym === 'hello';

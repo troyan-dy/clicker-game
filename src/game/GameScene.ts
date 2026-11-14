@@ -89,6 +89,8 @@ const MONEY_ON_PAPER = 0x3f7d58;
 const SMOOTH = 1.5; // seconds: how slowly the bottleneck reading and the income follow the moment
 const GYM_KEYS = new Set(['KeyR', 'Tab', 'KeyO', 'KeyP', 'KeyT', 'KeyM']);
 const GYM_GIFT = 100;
+/** sessions a player brings from the blueprint when a tuning session starts on a later screen */
+const GYM_SUBAGENTS = 10;
 const FEED: FeedContent = { news: NEWS, quips: QUIPS };
 /** approvals after which Claude says something nice about the player's judgement */
 const YES_MILESTONES = [3, 15, 40, 90, 160, 260];
@@ -155,6 +157,8 @@ export class GameScene extends Phaser.Scene {
   private readonly gym: boolean;
   /** the title card is shown at launch */
   private readonly withMenu: boolean;
+  /** a tuning session may start on a later screen: 3 city, 4 state, 5 planet; 0 — from the beginning */
+  private readonly startAt: number;
   private readonly settings = loadSettings();
   // own copies of the data: the tuning panel edits them live, the mechanic reads them every step
   private readonly cfg: PipeConfig = {
@@ -228,7 +232,7 @@ export class GameScene extends Phaser.Scene {
     term: TerminalUi,
     paper: BlueprintUi,
     card: CardUi,
-    opts: { overlay: boolean; save: boolean; gym: boolean; menu: boolean },
+    opts: { overlay: boolean; save: boolean; gym: boolean; menu: boolean; start: number },
   ) {
     super('game');
     this.rng = rng;
@@ -239,6 +243,7 @@ export class GameScene extends Phaser.Scene {
     this.saving = opts.save;
     this.gym = opts.gym;
     this.withMenu = opts.menu;
+    this.startAt = opts.start;
   }
 
   preload(): void {
@@ -271,6 +276,7 @@ export class GameScene extends Phaser.Scene {
     ]);
     this.state = createPipe(this.cfg);
     this.resumed = this.loadGame();
+    if (!this.resumed && this.startAt >= 3) this.skipTo(this.startAt);
     this.lastMoney = this.state.money;
     if (this.withMenu) this.openTitle();
     else this.resume();
@@ -347,6 +353,13 @@ export class GameScene extends Phaser.Scene {
     this.selfPlay = file.meta.auto;
     this.won = file.won;
     this.seconds = file.seconds;
+    this.openStage();
+    this.pendingReport = offlineReport(this.state, this.cfg, saveData, (Date.now() - file.at) / 1000);
+    return true;
+  }
+
+  /** Shows the screen the game is on at once, without the camera move. */
+  private openStage(): void {
     this.stage = screenOf(this.state);
     if (this.stage >= 2) {
       this.term.root.classList.add('gone');
@@ -360,8 +373,44 @@ export class GameScene extends Phaser.Scene {
       hub.sync(this.hubTopology());
       hub.show(0);
     }
-    this.pendingReport = offlineReport(this.state, this.cfg, saveData, (Date.now() - file.at) / 1000);
-    return true;
+  }
+
+  /**
+   * Tuning only (`?state=city|gov|planet`): the game opens on a later screen as a player would
+   * arrive there — everything before it is taken, sessions keep up with the tasks, and there is
+   * money for the first purchases.
+   */
+  private skipTo(screen: number): void {
+    const s = this.state;
+    const cfg = this.cfg;
+    const free = (buy: () => boolean): boolean => {
+      s.money = Number.MAX_VALUE;
+      return buy();
+    };
+    free(() => buyNoAsk(s, cfg));
+    for (let i = 0; i < GYM_SUBAGENTS; i++) free(() => buySubagent(s, cfg));
+    while ((cfg.plans[s.plan.index + 1]?.screen ?? 1) < screen && free(() => buyPlan(s, cfg)));
+    // jobs of the terminal and the blueprint — as many as Claude keeps up with; earlier cities and states — entirely
+    const early = cfg.sources.filter((x) => x.screen <= 2);
+    for (let i = 0; i < 400 && inflowOf(s, cfg) < claudeRate(s, cfg) + subagentRate(s, cfg); i++) {
+      const best = early.reduce((a, b) => (sourcePrice(a, s.owned[a.id] ?? 0) / a.inflow <= sourcePrice(b, s.owned[b.id] ?? 0) / b.inflow ? a : b));
+      if (!free(() => buySource(s, cfg, best.id))) break;
+    }
+    for (const src of cfg.sources) if (src.screen >= 3 && src.screen < screen) while (free(() => buySource(s, cfg, src.id)));
+    while (screenOf(s) < screen && free(() => buyScale(s, cfg)));
+    // promotions cheaper than the step that brought the player here
+    const step = cfg.scales[s.scale - 1].price;
+    while ((cfg.grades[s.grade + 1]?.price ?? Infinity) <= step && free(() => buyGrade(s, cfg)));
+    // servers of the earlier screens, the cheapest per session first, until Claude keeps up
+    const farms = cfg.farms.filter((f) => f.screen < screen && f.max === undefined);
+    for (let i = 0; i < 400 && farms.length && claudeRate(s, cfg) + subagentRate(s, cfg) < inflowOf(s, cfg); i++) {
+      const best = farms.reduce((a, b) => (farmPrice(a, s.farms[a.id] ?? 0) / a.sessions <= farmPrice(b, s.farms[b.id] ?? 0) / b.sessions ? a : b));
+      free(() => buyFarm(s, cfg, best.id));
+    }
+    s.surge = {};
+    const first = cfg.sources.filter((x) => x.screen === screen).map((x) => sourcePrice(x, 0));
+    s.money = Math.min(...first) * 3;
+    this.openStage();
   }
 
   /** The game goes on: after the title card, a pause, or straight away when there is no menu. */
