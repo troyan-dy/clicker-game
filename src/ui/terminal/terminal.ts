@@ -263,11 +263,11 @@ export function createTerminal(layer: HTMLElement): TerminalUi {
 
       let html = '';
       for (const shelf of v.shelves) {
-        html += `<h2 class="${shelf.hot ? 'hot' : ''}">${esc(shelf.title)}${shelf.hot ? '<em>← сейчас поможет</em>' : ''}</h2>`;
+        html += `<h2 class="${shelf.hot ? 'hot' : ''}">${esc(shelf.title)}${shelf.hot ? '<em>сейчас нужно</em>' : ''}</h2>`;
         for (const r of shelf.rows) {
           html += `<div class="tm-item ${r.state}" data-row="${r.buy}"${r.state === 'can' && r.buy ? ` data-buy="${r.buy}"` : ''}>
-            <b>${esc(r.title)}</b><span class="cnt">${esc(r.count)}</span>
-            <small>${esc(r.sub)}</small><span class="price">${esc(r.price)}</span></div>`;
+            <b>${esc(r.title)}${r.count ? `<i>${esc(r.count)}</i>` : ''}</b><span class="price">${esc(r.price)}</span>
+            <small>${esc(r.sub)}</small></div>`;
         }
       }
       set('shop', html, shop);

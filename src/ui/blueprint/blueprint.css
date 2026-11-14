@@ -80,18 +80,73 @@
   border-top: 1.5px solid var(--ink);
   font-size: 24px;
 }
-.bl-neck {
+/* the conveyor at a glance: a small table with bars, the line that runs short is coral */
+.bl-meter {
   position: absolute;
-  left: 360px;
-  width: 980px;
-  top: 216px;
-  text-align: center;
-  font: 400 18px/1.55 'JetBrains Mono', monospace;
+  left: 398px;
+  top: 200px;
+  width: 904px;
+  padding: 7px 18px;
+  display: grid;
+  gap: 3px;
+  box-sizing: border-box;
+  border: 1.5px solid var(--rule);
+  border-radius: 10px;
+  background: var(--card);
+  font: 400 15px/1 'JetBrains Mono', monospace;
   color: var(--dim);
 }
-.bl-neck b {
-  color: var(--ink);
+.bl-meter:empty {
+  display: none;
+}
+.bl-mrow {
+  display: grid;
+  grid-template-columns: 96px 250px 150px minmax(0, 1fr);
+  align-items: center;
+  gap: 0 14px;
+  height: 24px;
+  white-space: nowrap;
+}
+.bl-mrow i {
+  font-style: normal;
+  letter-spacing: 0.12em;
+}
+.bl-mrow u {
+  height: 11px;
+  border-radius: 2px;
+  background: #e2ded0;
+  overflow: hidden;
+}
+.bl-mrow s {
+  display: block;
+  height: 100%;
+  background: var(--ink);
+  transition: width 0.3s ease-out;
+}
+.bl-mrow b {
+  font-size: 19px;
   font-weight: 700;
+  color: var(--ink);
+}
+.bl-mrow em {
+  font-style: normal;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.bl-mrow.hot i,
+.bl-mrow.hot b,
+.bl-mrow.hot em {
+  color: var(--coral);
+}
+.bl-mrow.hot em {
+  font-weight: 700;
+}
+.bl-mrow.hot s {
+  background: var(--coral);
+}
+.bl-mrow.act {
+  pointer-events: auto;
+  cursor: pointer;
 }
 
 /* every node on the diagram is signed */
@@ -365,25 +420,29 @@
 .bl-shop h2 {
   display: flex;
   align-items: baseline;
-  margin: 12px 0 8px;
+  margin: 10px 0 6px;
   font: 400 16px 'JetBrains Mono', monospace;
   letter-spacing: 0.12em;
   color: var(--dim);
 }
 .bl-shop h2.hot {
-  color: var(--ink);
+  color: var(--coral);
 }
 .bl-shop h2 em {
   margin-left: auto;
+  padding: 2px 10px 3px;
+  border-radius: 10px;
+  background: var(--coral);
   font-style: normal;
+  font-size: 14px;
   letter-spacing: 0;
-  color: var(--money);
+  color: #fff;
 }
 .bl-item {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 0 16px;
-  margin-bottom: 8px;
+  margin-bottom: 7px;
   padding: 8px 20px 10px;
   background: var(--card);
   border: 1.5px solid var(--rule);
@@ -397,30 +456,20 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
-/* a row without a counter gives its whole width to the title */
-.bl-item.wide b {
-  grid-column: 1 / -1;
-}
-.bl-item.wide .cnt {
-  display: none;
-}
-.bl-item .cnt,
-.bl-item .price {
-  white-space: nowrap;
-}
-.bl-item .cnt {
+/* how many are owned: right after the title */
+.bl-item b i {
+  margin-left: 12px;
   font: 400 20px 'JetBrains Mono', monospace;
   color: var(--dim);
-  text-align: right;
 }
+/* the note has the whole width of the row and is never cut off: a long one takes a second line */
 .bl-item small {
+  grid-column: 1 / -1;
   font-size: 18px;
   color: var(--dim);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 .bl-item .price {
+  white-space: nowrap;
   font-size: 26px;
   font-weight: 600;
   color: var(--dim);
@@ -436,7 +485,7 @@
 .bl-item.can:hover {
   background: #fff;
 }
-.bl-item.owned .cnt {
+.bl-item.owned b i {
   color: var(--coral);
 }
 /* the row answers a click: a purchase swells, a refusal shakes its head */

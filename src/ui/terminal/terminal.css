@@ -372,11 +372,18 @@
 .tm-side h2.hot {
   color: var(--text);
 }
+.tm-side h2.hot {
+  color: var(--coral);
+}
 .tm-side h2 em {
   margin-left: auto;
+  padding: 1px 10px 2px;
+  border-radius: 10px;
+  background: var(--coral);
   font-style: normal;
+  font-size: 14px;
   letter-spacing: 0;
-  color: var(--money);
+  color: #1f1e1d;
 }
 .tm-item {
   display: grid;
@@ -394,19 +401,21 @@
   font-size: 22px;
   white-space: nowrap;
 }
-.tm-item .cnt {
+.tm-item b i {
+  margin-left: 12px;
   color: var(--dim);
   font-size: 20px;
-  text-align: right;
+  font-style: normal;
+  font-weight: 400;
 }
+/* the note has the whole width of the row and is never cut off */
 .tm-item small {
+  grid-column: 1 / -1;
   color: var(--dim);
   font-size: 17px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 .tm-item .price {
+  white-space: nowrap;
   text-align: right;
   font-weight: 700;
   font-size: 22px;
@@ -422,7 +431,7 @@
 .tm-item.can:hover {
   background: #2e2d2a;
 }
-.tm-item.owned .cnt {
+.tm-item.owned b i {
   color: var(--coral);
 }
 /* the row answers a click: a purchase swells, a refusal shakes its head */

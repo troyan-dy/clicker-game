@@ -67,7 +67,7 @@ import {
 } from '../systems/pipeline/pipeline';
 import { applyOffline, freshMeta, offlineReport, packSave, unpackSave, type OfflineReport } from '../systems/save/save';
 import { createStack, stackWorth, stepStack, takeStack } from '../systems/stack/stack';
-import type { BlueprintTag, BlueprintUi, ManagerStrip } from '../ui/blueprint/blueprint';
+import type { BlueprintTag, BlueprintUi, ManagerStrip, MeterRow } from '../ui/blueprint/blueprint';
 import type { CardUi } from '../ui/card/card';
 import { plural, short } from '../ui/format';
 import {
@@ -97,7 +97,6 @@ const YES_MILESTONES = [3, 15, 40, 90, 160, 260];
 /** semitones of the purchase sound by what was bought: work is the base note, capacity is lower, promotions are higher */
 const BUY_PITCH: Record<string, number> = { src: 0, sub: 2, farm: -5, plan: 4, noask: 5, grade: 7, scale: -12 };
 const EVENTS: EventsTuning = { ...eventsData, every: [eventsData.every[0], eventsData.every[1]] };
-const LIMIT_NECK = 'узкое место: <b>лимит</b> — все сессии стоят до сброса';
 const IDLE_AFTER = 12; // seconds without a «Да» while requests wait
 const NECK_AFTER = 14; // seconds the same bottleneck lasts before Claude mentions it
 const SESSION_FORMS = ['сессия', 'сессии', 'сессий'] as const;
@@ -114,6 +113,11 @@ const fmt1 = new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 1 });
 /** «3,75 задачи», «26 задач», «34 600 задач», «1,2 млн задач» */
 function flowText(perSec: number): string {
   return perSec < 1000 ? tasksPhrase(Math.round(perSec * 100) / 100) : `${short(Math.round(perSec))} задач`;
+}
+
+/** «3,8/с», «3 913/с», «1,2 млн/с» */
+function perSecond(n: number): string {
+  return `${n < 1000 ? fmt1.format(n) : short(Math.round(n))}/с`;
 }
 
 declare global {
@@ -1045,6 +1049,36 @@ export class GameScene extends Phaser.Scene {
     return 'none';
   }
 
+  /**
+   * The conveyor at a glance: tasks coming in against what the sessions manage. The line that
+   * runs short is marked and says what to buy; `done` — there is nothing left to take here.
+   */
+  private meter(neck: Neck, needTasks: string, needSessions: string, done = false): MeterRow[] {
+    const s = this.state;
+    const cfg = this.cfg;
+    const inflow = inflowOf(s, cfg);
+    const capacity = claudeRate(s, cfg) + subagentRate(s, cfg); // nothing while the limit is hit
+    const top = Math.max(inflow, capacity, 1e-9);
+    const limited = s.limited > 0;
+    const short_ = limited || neck === 'claude';
+    return [
+      {
+        label: 'ЗАДАЧИ',
+        value: perSecond(inflow),
+        fill: inflow / top,
+        hot: neck === 'tasks' && !done,
+        note: done ? 'здесь взято всё' : neck === 'tasks' ? `мало — ${needTasks}` : short_ ? '' : 'поровну — можно просить повышение',
+      },
+      {
+        label: 'СЕССИИ',
+        value: perSecond(capacity),
+        fill: capacity / top,
+        hot: short_,
+        note: limited ? `лимит · сброс через ${this.limitClock()}` : neck === 'claude' ? `мало — ${needSessions}` : this.count(sessionsOf(s, cfg) + 1, SESSION_FORMS),
+      },
+    ];
+  }
+
   private row(title: string, sub: string, count: string, buy: string, cost: number): ShopRow {
     return { title, sub, count, buy, price: `$${short(cost)}`, state: this.state.money >= cost ? 'can' : 'poor' };
   }
@@ -1092,7 +1126,7 @@ export class GameScene extends Phaser.Scene {
       const last = owned + 1 === src.max && src.full ? ` · целиком: ×${fmt1.format(src.full)}` : '';
       // a long name does not fit next to the counter: the short one from the map stands in
       const title = src.name.length > 22 ? src.tag : src.name;
-      return this.row(title, `+${flowText(src.inflow)}/с · ${t.floor[0]} ${owned + 1} из ${src.max}${last}`, owned ? `${owned}/${src.max}` : '', `src:${src.id}`, sourcePrice(src, owned));
+      return this.row(title, `+${flowText(src.inflow)}/с · ${t.floor[0]} ${owned + 1} из ${src.max}${last}`, '', `src:${src.id}`, sourcePrice(src, owned));
     });
   }
 
@@ -1101,12 +1135,14 @@ export class GameScene extends Phaser.Scene {
     const perSession = planRate(s, this.cfg) * this.cfg.auto.subagent.share;
     return this.cfg.farms.filter((f) => f.screen === this.stage).map((f) => {
       const owned = s.farms[f.id] ?? 0;
-      const count = owned ? (f.max ? `×${owned} из ${f.max}` : `×${owned}`) : '';
-      if (owned >= (f.max ?? Infinity)) return { buy: '', title: f.name, sub: 'выкуплено всё', count, price: '', state: 'owned' };
+      // a farm with a ceiling says how much of it is taken in the note
+      const count = owned && !f.max ? `×${owned}` : '';
+      const of = f.max ? `${owned} из ${f.max} · ` : '';
+      if (owned >= (f.max ?? Infinity)) return { buy: '', title: f.name, sub: 'выкуплено всё', count: `×${owned}`, price: '', state: 'owned' };
       const surge = s.surge[f.id] ?? 1;
       // a shortage is said in the row itself: the price has gone up and will come down
       const note = surge > 1.02 ? `дефицит: +${Math.round((surge - 1) * 100)}% к цене, остывает` : f.note;
-      return this.row(f.name, `+${flowText(f.sessions * perSession)}/с · ${note}`, count, `farm:${f.id}`, farmPrice(f, owned, surge));
+      return this.row(f.name, `+${flowText(f.sessions * perSession)}/с · ${of}${note}`, count, `farm:${f.id}`, farmPrice(f, owned, surge));
     });
   }
 
@@ -1314,20 +1350,11 @@ export class GameScene extends Phaser.Scene {
     }
     if (s.subagents > shown) tags.push({ x: BP.more.x - 70, y: BP.more.y + 4, html: `и ещё ${s.subagents - shown} в коробке`, small: true });
 
-    const capacity = rate + subagentRate(s, cfg);
     this.paper.render({
       money: s.money,
       income: Math.max(0, this.income),
       summary: this.payLine(),
-      neck:
-        `приходит ${flowText(inflowOf(s, cfg))}/с, сессии успевают ${flowText(capacity)}/с<br>` +
-        (s.limited > 0
-          ? LIMIT_NECK
-          : neck === 'tasks'
-          ? 'узкое место: <b>задачи</b> — сессии простаивают, нужны ещё работы'
-          : neck === 'claude'
-            ? 'узкое место: <b>сессии</b> — нужны сабагенты или тариф быстрее'
-            : 'узких мест нет — можно просить повышение'),
+      meter: this.meter(neck, 'нужны ещё работы', 'нужен сабагент или тариф'),
       tags: [...tags, ...this.bubbles()],
       manager: this.managerStrip(),
       shelves: this.blueprintShelves(neck),
@@ -1346,7 +1373,6 @@ export class GameScene extends Phaser.Scene {
     const layout = HUBS[this.stage];
     const t = HUB_TEXT[this.stage];
     const neck = this.state.limited > 0 ? 'none' : this.neck();
-    const capacity = claudeRate(s, cfg) + subagentRate(s, cfg);
     this.hubs.get(this.stage)!.sync(this.hubTopology());
 
     // the numbers of the middle live in the line under the money: connectors arrive at it from every side
@@ -1381,25 +1407,13 @@ export class GameScene extends Phaser.Scene {
       tags.push({ x: node.x, y, mid: true, small: true, html: `${what}<br><b>${this.count(n, SESSION_FORMS)}</b>` });
     }
 
-    const sessions = sessionsOf(s, cfg) + 1; // and the player's own
     const all = taken === total;
     this.paper.render({
       money: s.money,
       income: Math.max(0, this.income),
-      summary: this.payLine(),
-      neck:
-        `приходит ${flowText(inflowOf(s, cfg))}/с · ${this.count(sessions, SESSION_FORMS)} Клода успевают ${flowText(capacity)}/с<br>` +
-        (s.limited > 0
-          ? LIMIT_NECK
-          : this.won
-          ? FINALE
-          : neck === 'claude'
-            ? `узкое место: <b>сессии</b> — ${t.needFarms}`
-            : all
-              ? t.done
-              : neck === 'tasks'
-                ? `узкое место: <b>задачи</b> — сессии простаивают, ${t.needEmployers}`
-                : 'узких мест нет — можно просить повышение'),
+      // the game is over: the last line of it takes the place of the pay
+      summary: this.won ? FINALE : this.payLine(),
+      meter: this.meter(neck, t.needEmployers, t.needFarms, all),
       tags: [...tags, ...this.bubbles()],
       manager: this.managerStrip(),
       shelves: this.hubShelves(neck, taken, total),

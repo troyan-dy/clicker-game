@@ -29,6 +29,21 @@ export interface ManagerStrip {
   state: 'can' | 'poor' | 'on' | 'off';
 }
 
+/** One line of the conveyor table: what flows, how much, and whether it is what runs short. */
+export interface MeterRow {
+  label: string;
+  /** «3 913/с» */
+  value: string;
+  /** the length of the bar, 0…1 */
+  fill: number;
+  /** this is what is short now */
+  hot: boolean;
+  /** what to do about it, or a detail of the line; may be empty */
+  note: string;
+  /** a line that answers a click */
+  row?: string;
+}
+
 /** Everything the blueprint's HTML layer shows. The UI reads it and decides nothing. */
 export interface BlueprintModel {
   money: number;
@@ -36,8 +51,8 @@ export interface BlueprintModel {
   income: number;
   /** the line under the money: where the flow stands */
   summary: string;
-  /** the bottleneck in words; may contain <b>; empty when nothing is slow */
-  neck: string;
+  /** the conveyor at a glance: tasks against sessions, the short one is marked */
+  meter: MeterRow[];
   tags: BlueprintTag[];
   shelves: ShopShelf[];
   news: string;
@@ -76,7 +91,7 @@ export function createBlueprint(layer: HTMLElement, over: HTMLElement): Blueprin
     `
   <div class="bl"><div class="bl-hud">
     <div class="bl-money"><b>$0</b><span></span></div>
-    <div class="bl-neck"></div>
+    <div class="bl-meter"></div>
     <div class="bl-quip"><i></i><span></span><div class="bl-ask"><b></b><u><s></s></u></div></div>
     <aside class="bl-shop"><div class="bl-manager"></div><div class="bl-shelves"></div><div class="bl-extra"></div></aside>
     <div class="bl-news"><i>НОВОСТИ</i><span></span><em></em></div>
@@ -93,7 +108,7 @@ export function createBlueprint(layer: HTMLElement, over: HTMLElement): Blueprin
   const askBar = q('.bl-ask s');
   const parts: Record<string, HTMLElement> = {
     summary: q('.bl-money span'),
-    neck: q('.bl-neck'),
+    meter: q('.bl-meter'),
     tags: overRoot.querySelector<HTMLElement>('.bl-tags')!,
     shelves: q('.bl-shelves'),
     manager: q('.bl-manager'),
@@ -144,7 +159,15 @@ export function createBlueprint(layer: HTMLElement, over: HTMLElement): Blueprin
       }
       const income = m.income >= 1e5 ? short(Math.round(m.income / 1000) * 1000) : fmt1.format(m.income);
       set('summary', `+$${income} в секунду · ${esc(m.summary)}`);
-      set('neck', m.neck);
+      set(
+        'meter',
+        m.meter
+          .map(
+            (r) =>
+              `<div class="bl-mrow${r.hot ? ' hot' : ''}${r.row ? ' act' : ''}"${r.row ? ` data-row="${r.row}"` : ''}><i>${esc(r.label)}</i><u><s style="width:${Math.round(Math.max(0, Math.min(1, r.fill)) * 100)}%"></s></u><b>${esc(r.value)}</b><em>${esc(r.note)}</em></div>`,
+          )
+          .join(''),
+      );
       set('news', esc(m.news));
       // the last remark stays in place while it fades out
       const said = m.ask?.text ?? m.quip;
@@ -166,11 +189,11 @@ export function createBlueprint(layer: HTMLElement, over: HTMLElement): Blueprin
       );
       let html = '';
       for (const shelf of m.shelves) {
-        html += `<h2 class="${shelf.hot ? 'hot' : ''}">${esc(shelf.title)}${shelf.hot ? '<em>← сейчас поможет</em>' : ''}</h2>`;
+        html += `<h2 class="${shelf.hot ? 'hot' : ''}">${esc(shelf.title)}${shelf.hot ? '<em>сейчас нужно</em>' : ''}</h2>`;
         for (const r of shelf.rows) {
-          html += `<div class="bl-item ${r.state}${r.count ? '' : ' wide'}" data-row="${r.buy}"${r.state === 'can' && r.buy ? ` data-buy="${r.buy}"` : ''}>
-            <b>${esc(r.title)}</b><span class="cnt">${esc(r.count)}</span>
-            <small>${esc(r.sub)}</small><span class="price">${esc(r.price)}</span></div>`;
+          html += `<div class="bl-item ${r.state}" data-row="${r.buy}"${r.state === 'can' && r.buy ? ` data-buy="${r.buy}"` : ''}>
+            <b>${esc(r.title)}${r.count ? `<i>${esc(r.count)}</i>` : ''}</b><span class="price">${esc(r.price)}</span>
+            <small>${esc(r.sub)}</small></div>`;
         }
       }
       set('shelves', html);

@@ -51,7 +51,7 @@ export const HUB_TEXT: Record<number, HubText> = {
     home: 'твоя страна',
     employers: 'ОПЕРАЦИИ',
     farms: 'ANTHROPIC · больше сессий',
-    needEmployers: 'нужны ещё международные операции',
+    needEmployers: 'нужны ещё операции',
     needFarms: 'нужна ещё доля мощностей',
     done: 'планета твоя: все операции планирует Клод',
     doneTitle: 'Планета твоя',
