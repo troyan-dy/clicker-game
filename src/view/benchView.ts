@@ -13,7 +13,6 @@ const CRUMB = 0xf3e6cf;
 const SLICE = 'slice';
 /** the same slice lying flat on the grass: a square seen at the angle of the whole picture, with its thickness */
 const SLICE_FLAT = 'slice_flat';
-const CRUST_SIDE = 0xb98a63;
 /** the bench with the player on it: where it stands and how tall it is drawn, px */
 const BENCH = { x: 905, y: 546, h: 390 };
 /** the hand with the slice, as a part of the picture's width and height from its top left corner */
@@ -102,9 +101,10 @@ export class BenchView {
     if (!scene.textures.exists(SLICE)) {
       // a whole slice of toast bread: a square, of course
       const g = scene.make.graphics({}, false);
+      // drawn like everything else here: flat fills and one thin line, no shading
       g.fillStyle(CRUST, 1).fillRect(0, 0, 30, 30);
-      g.fillStyle(CRUMB, 1).fillRect(4, 4, 22, 22);
-      g.lineStyle(2, INK, 1).strokeRect(1, 1, 28, 28);
+      g.fillStyle(CRUMB, 1).fillRect(3, 3, 24, 24);
+      g.lineStyle(1, INK, 0.8).strokeRect(0.5, 0.5, 29, 29);
       g.generateTexture(SLICE, 30, 30);
       g.destroy();
       // lying down: a rhombus two to one, the crust showing as a thin side below it
@@ -121,16 +121,16 @@ export class BenchView {
         [22, 12 + h],
         [22 - w, 12],
       ];
-      path([[2, 12], [22, 22], [42, 12], [42, 16], [22, 26], [2, 16]], true);
-      f.fillStyle(CRUST_SIDE, 1).fillPath();
-      path([[2, 12], [2, 16], [22, 26], [42, 16], [42, 12]], false);
-      f.lineStyle(2, INK, 1).strokePath();
-      path(rhomb(20, 10), true);
+      // the whole slice with its thin edge is one flat shape of crust; the crumb lies on top of it
+      path([[2, 12], [22, 2], [42, 12], [42, 14], [22, 24], [2, 14]], true);
       f.fillStyle(CRUST, 1).fillPath();
-      path(rhomb(14, 7), true);
+      path(rhomb(15, 7.5), true);
       f.fillStyle(CRUMB, 1).fillPath();
-      path(rhomb(20, 10), true);
-      f.lineStyle(2, INK, 1).strokePath();
+      path([[2, 12], [22, 2], [42, 12], [42, 14], [22, 24], [2, 14]], true);
+      f.lineStyle(1, INK, 0.8).strokePath();
+      // the lower edge of the top face: barely there, just enough to read as thickness
+      path([[2, 12], [22, 22], [42, 12]], false);
+      f.lineStyle(1, INK, 0.3).strokePath();
       f.generateTexture(SLICE_FLAT, 44, 28);
       f.destroy();
     }
