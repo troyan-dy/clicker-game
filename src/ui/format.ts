@@ -17,6 +17,15 @@ export function short(n: number, digits = 2): string {
   return int.format(n);
 }
 
+/** Like `short`, but always with `digits` after the comma: a counter that runs every frame keeps its width («22,730 трлн») */
+export function steady(n: number, digits = 2): string {
+  const a = Math.abs(n);
+  for (const [size, word] of UNITS) {
+    if (a >= size) return `${(n / size).toLocaleString('ru-RU', { minimumFractionDigits: digits, maximumFractionDigits: digits })} ${word}`;
+  }
+  return int.format(n);
+}
+
 /** Russian plural: plural(3, ['сессия', 'сессии', 'сессий']) → «сессии» */
 export function plural(n: number, forms: readonly [string, string, string]): string {
   const k = Math.abs(Math.round(n));

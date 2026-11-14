@@ -157,6 +157,8 @@ const MONEY_SPOT: Rect = { x: BP.money.x - 80, y: BP.money.y - 20, w: 160, h: 40
 /** a big screen shrinks to this share of its size when it becomes a node of the next one */
 const HUB_SHRINK = 0.14;
 const fmt1 = new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 1 });
+/** the pay for a task: whole dollars from a hundred up — it drifts with unemployment, and «879,9 → 880» would change the width of the line */
+const payText = (n: number): string => (n >= 100 ? short(Math.round(n)) : fmt1.format(n));
 
 /** «3,75 задачи», «26 задач», «34 600 задач», «1,2 млн задач» */
 function flowText(perSec: number): string {
@@ -1667,9 +1669,10 @@ export class GameScene extends Phaser.Scene {
       if (!src) continue;
       const owned = s.owned[src.id] ?? 0;
       const left = (src.max - owned) * (src.staff ?? 0);
-      const perk = src.perk ? ` · ★ ${src.perk.text}` : '';
+      // the count runs every frame: it has a line of its own, so the row never changes its height
+      const perk = src.perk ? `\n★ ${src.perk.text}` : '';
       const who = ROBOT_WORDS[kind].many;
-      rows.push({ buy: '', title: `${who[0].toUpperCase()}${who.slice(1)} → ${src.tag} · ${Math.floor((owned / src.max) * 100)}%`, sub: `ещё ${short(left)} человек${perk}`, count: '', price: '', state: 'owned' });
+      rows.push({ buy: '', title: `${who[0].toUpperCase()}${who.slice(1)} → ${src.tag} · ${Math.floor((owned / src.max) * 100)}%`, sub: `ещё ${short(left, 1)} человек${perk}`, count: '', price: '', state: 'owned' });
     }
     const t = HUB_TEXT[this.stage];
     return rows.length ? rows : [{ buy: '', title: t.doneTitle, sub: t.doneSub, count: '', price: '', state: 'owned' }];
@@ -1707,7 +1710,7 @@ export class GameScene extends Phaser.Scene {
     const cur = this.cfg.grades[this.state.grade];
     const next = this.cfg.grades[this.state.grade + 1];
     if (!next) return [{ buy: '', title: cur.name, sub: 'выше некуда', count: 'максимум', price: '', state: 'owned' }];
-    const pay = fmt1.format((payOf(this.state, this.cfg) / cur.mult) * next.mult);
+    const pay = payText((payOf(this.state, this.cfg) / cur.mult) * next.mult);
     // long titles of the late grades do not fit after «Повышение:»
     const title = next.name.length > 12 ? next.name : `Повышение: ${next.name.toLowerCase()}`;
     return [this.row(title, `$${pay} за задачу · ${next.note}`, '', 'grade', gradeCost(this.state, this.cfg))];
@@ -1903,7 +1906,7 @@ export class GameScene extends Phaser.Scene {
   private payLine(): string {
     const s = this.state;
     if (s.limited > 0) return `лимит исчерпан · сброс через ${this.limitClock()}`;
-    const pay = `$${fmt1.format(payOf(s, this.cfg))} за задачу`;
+    const pay = `$${payText(payOf(s, this.cfg))} за задачу`;
     const share = shareOf(s, this.cfg);
     // what moves the price besides the grade is said next to it: the perks of whole employers, unemployment, the allowance
     const perks = Math.round(bonus(s, this.cfg, 'pay') * 100);

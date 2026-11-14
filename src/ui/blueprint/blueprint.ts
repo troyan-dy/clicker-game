@@ -1,5 +1,5 @@
 import './blueprint.css';
-import { short } from '../format';
+import { steady } from '../format';
 import type { ShopShelf } from '../terminal/terminal';
 
 export interface BlueprintTag {
@@ -91,7 +91,8 @@ export interface BlueprintUi {
 }
 
 const fmt = new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 0 });
-const fmt1 = new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 1 });
+// one digit after the comma, always: the income line is centred, a dropped «,0» would move it
+const fmt1 = new Intl.NumberFormat('ru-RU', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
 const esc = (s: string): string => s.replace(/&/g, '&amp;').replace(/</g, '&lt;');
 
 /**
@@ -145,6 +146,12 @@ export function createBlueprint(layer: HTMLElement, over: HTMLElement): Blueprin
     } else els.forEach((el) => el.classList.add(cls));
   };
 
+  // the rows of the shop keep their elements while the list of goods is the same: a price that changes
+  // every frame rewrites the text inside, and the row neither restarts its answer to a click nor jumps
+  let shape = '';
+  let items: HTMLElement[] = [];
+  let itemLast: string[] = [];
+
   // write to the DOM only when a value actually changed
   const last: Record<string, string> = {};
   let lastPop = 0;
@@ -166,14 +173,14 @@ export function createBlueprint(layer: HTMLElement, over: HTMLElement): Blueprin
     render(m) {
       // the counter jumps a few times a second at most: restarting the animation forces a layout
       // the counter keeps every digit while it fits the page
-      const text = m.money < 1e10 ? fmt.format(Math.floor(m.money)) : short(m.money, 3);
+      const text = m.money < 1e10 ? fmt.format(Math.floor(m.money)) : steady(m.money, 3);
       if (set('money', `$${text}`, money) && performance.now() - lastPop > 150) {
         lastPop = performance.now();
         money.classList.remove('pop');
         void money.offsetWidth; // restart the CSS animation
         money.classList.add('pop');
       }
-      const income = m.income >= 1e5 ? short(Math.round(m.income / 1000) * 1000) : fmt1.format(m.income);
+      const income = m.income >= 1e5 ? steady(Math.round(m.income / 1000) * 1000) : fmt1.format(m.income);
       set('summary', `+$${income} в секунду · ${esc(m.summary)}`);
       set(
         'meter',
@@ -204,16 +211,31 @@ export function createBlueprint(layer: HTMLElement, over: HTMLElement): Blueprin
           )
           .join(''),
       );
-      let html = '';
-      for (const shelf of m.shelves) {
-        html += `<h2 class="${shelf.hot ? 'hot' : ''}">${esc(shelf.title)}${shelf.bonus ? `<b>${esc(shelf.bonus)}</b>` : ''}${shelf.hot ? '<em>сейчас нужно</em>' : ''}</h2>`;
-        for (const r of shelf.rows) {
-          html += `<div class="bl-item ${r.state}" data-row="${r.buy}"${r.state === 'can' && r.buy ? ` data-buy="${r.buy}"` : ''}>
-            <b>${esc(r.title)}${r.count ? `<i>${esc(r.count)}</i>` : ''}</b><span class="price">${esc(r.price)}</span>
-            <small>${esc(r.sub)}</small></div>`;
-        }
+      const heads = m.shelves.map((shelf) => `<h2 class="${shelf.hot ? 'hot' : ''}">${esc(shelf.title)}${shelf.bonus ? `<b>${esc(shelf.bonus)}</b>` : ''}${shelf.hot ? '<em>сейчас нужно</em>' : ''}</h2>`);
+      const nextShape = m.shelves.map((shelf, i) => `${heads[i]}${shelf.rows.map((r) => r.buy).join(',')}`).join(';');
+      if (nextShape !== shape) {
+        shape = nextShape;
+        parts.shelves.innerHTML = m.shelves.map((shelf, i) => heads[i] + shelf.rows.map((r) => `<div class="bl-item" data-row="${r.buy}"></div>`).join('')).join('');
+        items = [...parts.shelves.querySelectorAll<HTMLElement>('.bl-item')];
+        itemLast = [];
       }
-      set('shelves', html);
+      m.shelves
+        .flatMap((shelf) => shelf.rows)
+        .forEach((r, i) => {
+          const el = items[i];
+          const inner = `<b>${esc(r.title)}${r.count ? `<i>${esc(r.count)}</i>` : ''}</b><span class="price">${esc(r.price)}</span><small>${esc(r.sub)}</small>`;
+          if (itemLast[i] !== inner) {
+            itemLast[i] = inner;
+            el.innerHTML = inner;
+          }
+          if (el.dataset.state !== r.state) {
+            if (el.dataset.state) el.classList.remove(el.dataset.state);
+            el.classList.add(r.state);
+            el.dataset.state = r.state;
+          }
+          if (r.state === 'can' && r.buy) el.dataset.buy = r.buy;
+          else delete el.dataset.buy;
+        });
       const mg = m.manager;
       set('manager', mg ? `<div class="bl-mgr ${mg.state}" data-row="manager"><i></i><b>${esc(mg.title)}</b><small>${esc(mg.note)}</small><span>${esc(mg.right)}</span></div>` : '');
       showMark();

@@ -33,6 +33,8 @@
   background-size: 32px 32px;
   color: var(--ink);
   font: 400 22px/1.45 'Source Serif 4', serif;
+  /* digits of one width: a number that changes every frame must not move what stands next to it */
+  font-variant-numeric: tabular-nums;
 }
 .bl-hud {
   opacity: 0;
@@ -647,7 +649,9 @@
 
 .bl-shop h2 {
   display: flex;
-  align-items: baseline;
+  align-items: center;
+  /* one height with and without the «сейчас нужно» badge: the rows below must not move when it comes and goes */
+  height: 24px;
   margin: 10px 0 6px;
   font: 400 16px 'JetBrains Mono', monospace;
   letter-spacing: 0.12em;
@@ -702,6 +706,8 @@
   grid-column: 1 / -1;
   font-size: 18px;
   color: var(--dim);
+  /* a note may be two lines by design: the number that changes sits on a line of its own */
+  white-space: pre-line;
 }
 .bl-item .price {
   white-space: nowrap;
