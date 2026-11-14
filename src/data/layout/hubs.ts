@@ -32,8 +32,10 @@ export interface HubLayout {
   /**
    * The middle is a ziggurat (M28): coloured in tier by tier, the field darkens at night, a dial shows
    * the hour, power runs to the lots. `steps` — how much of the picture's height stands with one tier, two, …
+   * `rows` — where the people lie, tier by tier, in the picture's own pixels (`size`): the height of
+   * the terrace, where it starts and ends, and the middle of the staircase that crosses it.
    */
-  grid?: { steps: readonly number[] };
+  grid?: { steps: readonly number[]; size: readonly [number, number]; rows: readonly (readonly [number, number, number, number])[] };
   /** the node in the middle may be wider than the others */
   homeWidth?: number;
 }
@@ -167,6 +169,17 @@ export const HUBS: Record<number, HubLayout> = {
     },
     maxWidth: 185,
     fresh: true,
-    grid: { steps: [0.19, 0.32, 0.45, 0.575, 0.7, 0.815, 1] },
+    grid: {
+      steps: [0.19, 0.32, 0.45, 0.575, 0.7, 0.815, 1],
+      size: [758, 623],
+      rows: [
+        [513, 18, 600, 262],
+        [430, 66, 572, 283],
+        [350, 117, 546, 304],
+        [272, 165, 521, 325],
+        [195, 214, 498, 346],
+        [119, 264, 475, 366],
+      ],
+    },
   },
 };

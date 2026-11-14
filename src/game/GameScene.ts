@@ -2090,7 +2090,7 @@ export class GameScene extends Phaser.Scene {
     const into = night ? s.hour - g.day : s.hour;
     const cells: Record<string, number> = {};
     for (const m of this.cfg.modules) if (m.kind === 'cell') cells[m.id] = s.modules[m.id] ?? 0;
-    return { ...top, farms: { ...s.farms, ...cells }, picket: false, grid: { built, power: demandOf(s, this.cfg) > 0 ? s.power : 1, hour: night ? into / g.night : into / g.day, night } };
+    return { ...top, farms: { ...s.farms, ...cells }, picket: false, grid: { built, power: demandOf(s, this.cfg) > 0 ? s.power : 1, hour: night ? into / g.night : into / g.day, night, tiers, crew: s.crew } };
   }
 
   /** the employers of a big screen with something left to take, the cheapest next unit first */

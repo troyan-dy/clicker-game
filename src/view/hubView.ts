@@ -42,9 +42,10 @@ export interface HubTopology {
   guards: number;
   /**
    * The ziggurat of the screen (M28): `built` — the part of its tiers that stands, `power` — the part of
-   * the power asked for that is given, `hour` — how far the day or the night has gone, each 0..1.
+   * the power asked for that is given, `hour` — how far the day or the night has gone, each 0..1;
+   * `tiers` — how many of them stand, `crew` — the part of the baths that is taken, 0..1.
    */
-  grid?: { built: number; power: number; hour: number; night: boolean };
+  grid?: { built: number; power: number; hour: number; night: boolean; tiers: number; crew: number };
 }
 
 interface Route {
@@ -99,6 +100,10 @@ export class HubView {
   private readonly sparks: Dot[] = [];
   /** the ziggurat in the middle, coloured in tier by tier */
   private zig?: Lot;
+  /** the people in the baths: a dot for a head, tier by tier, in the order they lie down */
+  private heads?: Phaser.GameObjects.Graphics;
+  private readonly beds: { x: number; y: number; tier: number }[] = [];
+  private lying = '';
   private dial?: Phaser.GameObjects.Graphics;
   private resting = 0;
   private readonly rng: Rng;
@@ -165,7 +170,21 @@ export class HubView {
     }
     if (layout.grid) {
       this.dial = scene.add.graphics();
-      this.root.add(this.dial);
+      this.heads = scene.add.graphics();
+      this.root.add([this.dial, this.heads]);
+      // the baths stand in a row along every terrace, on both sides of the staircase
+      const zig = this.zig!.fill;
+      const k = zig.scaleX;
+      const left = layout.home.x - (layout.grid.size[0] * k) / 2;
+      const top = layout.home.y - layout.grid.size[1] * k;
+      layout.grid.rows.forEach(([y, x0, x1, stair], tier) => {
+        for (let x = x0 + 10; x <= x1 - 8; x += 13) if (Math.abs(x - stair) > 46) this.beds.push({ x: left + x * k, y: top + y * k, tier });
+      });
+      // people lie down where they like, not from left to right
+      for (let i = this.beds.length - 1; i > 0; i--) {
+        const j = rng.int(0, i);
+        [this.beds[i], this.beds[j]] = [this.beds[j], this.beds[i]];
+      }
     }
     this.walkers = new Walkers(scene, this.root, rng);
 
@@ -308,6 +327,16 @@ export class HubView {
         zig.shown = g.built;
         this.crop(zig);
       } else this.scene.tweens.add({ targets: [zig.ghost, zig.fill], scale: { from: zig.scale * 1.04, to: zig.scale }, duration: 320, ease: 'Back.Out' });
+    }
+    // the people in the baths: the tiers that stand are filled as far as the shift has lain down
+    const beds = this.beds.filter((b) => b.tier < g.tiers);
+    const taken = Math.round(beds.length * Math.max(0, Math.min(1, g.crew)));
+    const key = `${g.tiers}:${taken}`;
+    if (this.heads && key !== this.lying) {
+      this.lying = key;
+      this.heads.clear();
+      this.heads.fillStyle(INK, 1);
+      for (let i = 0; i < taken; i++) this.heads.fillCircle(beds[i].x, beds[i].y, 2.2);
     }
     // short of power, what the ziggurat feeds fades towards its outline
     const lit = 0.3 + 0.7 * g.power;

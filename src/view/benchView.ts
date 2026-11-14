@@ -209,18 +209,25 @@ export class BenchView {
     if (bird) this.leave(bird);
   }
 
-  /** The courier brings the next loaf: a robot dog runs to the bench in `seconds` and back. */
+  /** The courier brings the next loaf: a robot dog comes out at the edge of the lawn, is at the bench in `seconds`, and runs back. */
   courier(seconds: number): void {
     const img = this.courierDog;
+    // it never leaves the picture: beyond the lawn is the shop
+    const edge = GROUND.x + GROUND.w - 4;
+    const run = 1100;
+    const wait = Math.max(0, seconds * 1000 - run);
     this.scene.tweens.killTweensOf(img);
-    img.setPosition(1400, BENCH.y + 4).setFlipX(true).setAlpha(1).setVisible(true);
+    img.setPosition(edge, BENCH.y + 4).setFlipX(true).setAlpha(0).setVisible(true);
+    this.scene.tweens.add({ targets: img, alpha: 1, duration: 250, delay: wait });
     this.scene.tweens.add({
       targets: img,
-      x: BENCH.x + 262,
-      duration: seconds * 1000,
+      x: BENCH.x + 256,
+      duration: run,
+      delay: wait,
       onComplete: () => {
         img.setFlipX(false);
-        this.scene.tweens.add({ targets: img, x: 1400, duration: 1500, delay: 500, onComplete: () => img.setVisible(false) });
+        this.scene.tweens.add({ targets: img, x: edge, duration: run, delay: 500 });
+        this.scene.tweens.add({ targets: img, alpha: 0, duration: 250, delay: 500 + run - 250, onComplete: () => img.setVisible(false) });
       },
     });
   }
