@@ -40,6 +40,8 @@ export interface BlueprintUi {
   render(model: BlueprintModel): void;
   /** the pull-back has happened: captions, shop and money appear; `now` — at once, a saved game opens here */
   show(now?: boolean): void;
+  /** the shop row `row` answers a click: bought, or not enough money */
+  flash(row: string, kind: 'bought' | 'denied'): void;
   /** below the shop: a gym puts its help here */
   extra: HTMLElement;
 }
@@ -76,6 +78,17 @@ export function createBlueprint(layer: HTMLElement): BlueprintUi {
     shelves: q('.bl-shelves'),
     news: q('.bl-news span'),
     hint: q('.bl-news em'),
+  };
+
+  // the answer of a shop row to a click: it lives longer than the row's HTML, which is rebuilt on a purchase
+  let mark: { row: string; cls: string; until: number } | null = null;
+  const showMark = (): void => {
+    if (!mark) return;
+    const el = root.querySelector(`[data-row="${mark.row}"]`);
+    if (performance.now() > mark.until) {
+      el?.classList.remove(mark.cls);
+      mark = null;
+    } else el?.classList.add(mark.cls);
   };
 
   // write to the DOM only when a value actually changed
@@ -130,12 +143,17 @@ export function createBlueprint(layer: HTMLElement): BlueprintUi {
       for (const shelf of m.shelves) {
         html += `<h2 class="${shelf.hot ? 'hot' : ''}">${esc(shelf.title)}${shelf.hot ? '<em>← сейчас поможет</em>' : ''}</h2>`;
         for (const r of shelf.rows) {
-          html += `<div class="bl-item ${r.state}${r.count ? '' : ' wide'}"${r.state === 'can' && r.buy ? ` data-buy="${r.buy}"` : ''}>
+          html += `<div class="bl-item ${r.state}${r.count ? '' : ' wide'}" data-row="${r.buy}"${r.state === 'can' && r.buy ? ` data-buy="${r.buy}"` : ''}>
             <b>${esc(r.title)}</b><span class="cnt">${esc(r.count)}</span>
             <small>${esc(r.sub)}</small><span class="price">${esc(r.price)}</span></div>`;
         }
       }
       set('shelves', html);
+      showMark();
+    },
+    flash(row, kind) {
+      mark = { row, cls: kind, until: performance.now() + 260 };
+      showMark();
     },
   };
 }

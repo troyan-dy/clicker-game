@@ -300,6 +300,35 @@
 .bl-item.owned .cnt {
   color: var(--coral);
 }
+/* the row answers a click: a purchase swells, a refusal shakes its head */
+.bl-item.bought {
+  animation: bl-bought 0.26s ease-out;
+}
+.bl-item.denied {
+  animation: bl-denied 0.24s ease-in-out;
+}
+@keyframes bl-bought {
+  0% {
+    transform: scale(1.035);
+    filter: brightness(1.25);
+  }
+  100% {
+    transform: scale(1);
+    filter: none;
+  }
+}
+@keyframes bl-denied {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  25% {
+    transform: translateX(-7px);
+  }
+  75% {
+    transform: translateX(7px);
+  }
+}
 .bl-item.off {
   opacity: 0.5;
 }

@@ -254,8 +254,8 @@ export class GameScene extends Phaser.Scene {
     window.addEventListener('pointerdown', (e) => {
       const el = e.target as HTMLElement;
       if (el.closest('.lil-gui') || this.card.open) return;
-      const buy = el.closest<HTMLElement>('[data-buy]');
-      if (buy) this.buy(buy.dataset.buy ?? '');
+      const row = el.closest<HTMLElement>('[data-row]')?.dataset.row;
+      if (row) this.click(row);
       else if (!el.closest('.tm-side') && !el.closest('.bl-shop')) this.press();
     });
     window.addEventListener('pagehide', () => this.saveGame());
@@ -515,6 +515,18 @@ export class GameScene extends Phaser.Scene {
   private gift(dollars: number): void {
     this.state.money += dollars;
     this.lastMoney += dollars;
+  }
+
+  /** A click on a shop row: the row answers either way — bought, or not enough money. */
+  private click(row: string): void {
+    const shop = this.stage === 1 ? this.term : this.paper;
+    if (this.buy(row)) {
+      shop.flash(row, 'bought');
+      return;
+    }
+    this.wake();
+    shop.flash(row, 'denied');
+    playSound('waste');
   }
 
   /** what this screen sells: a big screen deals only in its own employers */

@@ -425,6 +425,35 @@
 .tm-item.owned .cnt {
   color: var(--coral);
 }
+/* the row answers a click: a purchase swells, a refusal shakes its head */
+.tm-item.bought {
+  animation: tm-bought 0.26s ease-out;
+}
+.tm-item.denied {
+  animation: tm-denied 0.24s ease-in-out;
+}
+@keyframes tm-bought {
+  0% {
+    transform: scale(1.035);
+    filter: brightness(1.25);
+  }
+  100% {
+    transform: scale(1);
+    filter: none;
+  }
+}
+@keyframes tm-denied {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  25% {
+    transform: translateX(-7px);
+  }
+  75% {
+    transform: translateX(7px);
+  }
+}
 .tm-item.off {
   opacity: 0.45;
 }

@@ -59,6 +59,8 @@ export interface TerminalUi {
   render(view: TerminalView): void;
   /** the visible answer to a «Да»: by hand or by the automation */
   hit(kind: 'approved' | 'buffered' | 'wasted' | 'auto'): void;
+  /** the shop row `row` answers a click: bought, or not enough money */
+  flash(row: string, kind: 'bought' | 'denied'): void;
   /** below the shop: a gym puts its help here */
   extra: HTMLElement;
   /** the whole terminal layer: the pull-back shrinks it into a laptop screen */
@@ -160,6 +162,17 @@ export function createTerminal(layer: HTMLElement): TerminalUi {
   const cells = Array.from(root.querySelectorAll<HTMLElement>('.tm-flow .cell'));
   let selected = opt1;
 
+  // the answer of a shop row to a click: it lives longer than the row's HTML, which is rebuilt on a purchase
+  let mark: { row: string; cls: string; until: number } | null = null;
+  const showMark = (): void => {
+    if (!mark) return;
+    const el = root.querySelector(`[data-row="${mark.row}"]`);
+    if (performance.now() > mark.until) {
+      el?.classList.remove(mark.cls);
+      mark = null;
+    } else el?.classList.add(mark.cls);
+  };
+
   // write to the DOM only when a value actually changed
   const last: Record<string, string> = {};
   const set = (name: string, html: string, el: HTMLElement = field[name]): boolean => {
@@ -252,12 +265,17 @@ export function createTerminal(layer: HTMLElement): TerminalUi {
       for (const shelf of v.shelves) {
         html += `<h2 class="${shelf.hot ? 'hot' : ''}">${esc(shelf.title)}${shelf.hot ? '<em>← сейчас поможет</em>' : ''}</h2>`;
         for (const r of shelf.rows) {
-          html += `<div class="tm-item ${r.state}"${r.state === 'can' && r.buy ? ` data-buy="${r.buy}"` : ''}>
+          html += `<div class="tm-item ${r.state}" data-row="${r.buy}"${r.state === 'can' && r.buy ? ` data-buy="${r.buy}"` : ''}>
             <b>${esc(r.title)}</b><span class="cnt">${esc(r.count)}</span>
             <small>${esc(r.sub)}</small><span class="price">${esc(r.price)}</span></div>`;
         }
       }
       set('shop', html, shop);
+      showMark();
+    },
+    flash(row, kind) {
+      mark = { row, cls: kind, until: performance.now() + 260 };
+      showMark();
     },
     hit(kind) {
       if (kind === 'wasted') {
