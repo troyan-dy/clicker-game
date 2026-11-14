@@ -66,7 +66,7 @@ files:
 
 ## Phase 8 — Content
 files: SCOPE.md
-- [ ] scope contract met — check: python3 {skill}/scripts/scope.py .
+- [x] scope contract met — check: python3 {skill}/scripts/scope.py .
 - [x] contact sheet of all units shown; neighbors differ on ≥2 axes — check: manual
 - [x] story played from start to finale (if story-driven) — check: manual
 - [x] user played the new content — check: user PROXY 2026-11-14

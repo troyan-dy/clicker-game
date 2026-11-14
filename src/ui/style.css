@@ -11,7 +11,8 @@ html,
 body {
   margin: 0;
   height: 100%;
-  background: var(--ink);
+  /* the colour of the terminal: the stage sits on it when the window is not 16:9 */
+  background: #1f1e1d;
   overflow: hidden;
   font-family: Rubik, 'Segoe UI', system-ui, sans-serif;
 }
