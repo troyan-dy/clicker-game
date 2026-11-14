@@ -1,0 +1,8 @@
+A sheet of three separate small line-drawn birds standing in one row, each seen from the side, with wide empty margins between them. No text, no letters, no numbers, no arrows, no ground, no frame.
+
+STYLE: a deadpan-serious technical infographic, like icons for an architecture diagram in an engineering report. Plain warm ivory paper background (#F0EEE6), completely empty between the objects. Thin precise charcoal lines (#262624) of one fine, even weight. Flat muted fills used sparingly: terracotta (#D97757) as the single strong accent, plus a little soft sage (#BCD1CA), dusty blue (#6A9BCC) and sand (#D4A27F). No thick outlines, no chunky cartoon shapes, no candy colours, no gradients, no shadows on the paper. All three are drawn with the same line weight, each about the same size.
+
+LEFT TO RIGHT, the same city pigeon three times, facing right, dusty-blue grey body with a sage patch on the neck and terracotta feet:
+1. The pigeon standing upright, looking forward attentively.
+2. The pigeon bent down, pecking at the ground with its beak.
+3. The pigeon flying to the right with its wings spread upward.

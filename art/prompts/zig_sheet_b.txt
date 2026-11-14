@@ -1,0 +1,8 @@
+A sheet of three separate isometric line-drawn objects standing in one row, with wide empty margins between them. No text, no letters, no numbers, no signs with writing, no arrows, no connecting lines between the objects, no frame, no people.
+
+STYLE: a deadpan-serious technical infographic, like icons for an architecture diagram in an engineering report. Plain warm ivory paper background (#F0EEE6), completely empty between the objects. Thin precise charcoal lines (#262624) of one fine, even weight. Flat muted fills used sparingly: terracotta (#D97757) as the single strong accent, plus a little soft sage (#BCD1CA), dusty blue (#6A9BCC) and sand (#D4A27F). No thick outlines, no chunky cartoon shapes, no candy colours, no gradients, no shadows on the paper. All three objects are drawn from the same isometric angle, with the same line weight, each about the same size.
+
+LEFT TO RIGHT:
+1. A windowless dark factory hall: a long low industrial box with a sawtooth roof and closed gates, its walls filled flat dark charcoal (#262624), with one small terracotta square lamp above the gate.
+2. A battery storage unit: a row of four tall identical cabinets on a concrete pad with thick cables between them and a small plain gauge panel on the side; flat dusty-blue fill on the cabinets.
+3. A large archive building: a heavy cube with rows of tiny drawers on its front face like a card catalogue, and a wide staircase to a small door.

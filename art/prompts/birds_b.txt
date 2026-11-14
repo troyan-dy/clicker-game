@@ -1,0 +1,8 @@
+A sheet of three separate small line-drawn birds standing in one row, each seen from the side, with wide empty margins between them. No text, no letters, no numbers, no arrows, no ground, no water, no frame.
+
+STYLE: a deadpan-serious technical infographic, like icons for an architecture diagram in an engineering report. Plain warm ivory paper background (#F0EEE6), completely empty between the objects. Thin precise charcoal lines (#262624) of one fine, even weight. Flat muted fills used sparingly: terracotta (#D97757) as the single strong accent, plus a little soft sage (#BCD1CA), dusty blue (#6A9BCC) and sand (#D4A27F). No thick outlines, no chunky cartoon shapes, no candy colours, no gradients, no shadows on the paper. All three are drawn with the same line weight.
+
+LEFT TO RIGHT, each facing right:
+1. A small sparrow standing, sand and charcoal plumage.
+2. A duck standing on its feet, ivory body with a sage head and terracotta feet and beak.
+3. A seagull standing, ivory body with dusty-blue wings.
