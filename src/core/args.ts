@@ -12,6 +12,8 @@ export interface Args {
 
 /** Launch arguments from the URL: ?seed=7&gym=agree&state=rich&debug=1&save=1 */
 export function readArgs(search: string): Args {
+  // the release reads nothing from the address: no gyms, no quick starts
+  if (!__TOOLS__) return { seed: Date.now() >>> 0, gym: '', state: '', debug: false, capture: false, save: false, menu: false };
   const p = new URLSearchParams(search);
   const seed = Number(p.get('seed'));
   return {

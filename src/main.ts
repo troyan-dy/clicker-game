@@ -32,10 +32,10 @@ mountUiScale(stage, ui);
 
 // the game · ?gym=agree — the same scene for tuning and captures · ?gym=lookdev — the look-dev scene · ?gym=hello — environment check
 function pickScene(): Phaser.Scene {
-  if (args.gym === 'hello') return new HelloScene(rng, createHud(ui));
-  if (args.gym === 'lookdev') return new LookdevScene(rng, createLookdevUi(ui, 'assets/img/scene_blueprint.webp'));
+  if (__TOOLS__ && args.gym === 'hello') return new HelloScene(rng, createHud(ui));
+  if (__TOOLS__ && args.gym === 'lookdev') return new LookdevScene(rng, createLookdevUi(ui, 'assets/img/scene_blueprint.webp'));
   {
-    const gym = args.gym === 'agree';
+    const gym = __TOOLS__ && args.gym === 'agree';
     // one 1920×1080 container: the paper blueprint below, the terminal on top of it
     const layer = document.createElement('div');
     layer.className = 'ui1080';
@@ -57,7 +57,7 @@ function pickScene(): Phaser.Scene {
     return new GameScene(rng, createTerminal(layer), paper, card, { overlay: args.debug, save, gym, menu, start });
   }
 }
-const hello = args.gym === 'hello';
+const hello = __TOOLS__ && args.gym === 'hello';
 stage.classList.toggle('overlay-canvas', !hello);
 
 // text needs the web fonts before the first frame

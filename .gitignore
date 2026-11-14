@@ -26,6 +26,8 @@
 # >>> studioigor:web
 node_modules/
 dist/
+dist-gym/
+public/LICENSES.txt
 .vite/
 coverage/
 test-results/

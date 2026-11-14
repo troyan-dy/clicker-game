@@ -1,11 +1,12 @@
 {
   "name": "da-claude",
   "private": true,
-  "version": "0.0.0",
+  "version": "1.0.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc --noEmit && vite build",
+    "build": "node tools/licenses.mjs && tsc --noEmit && vite build",
+    "build:gym": "node tools/licenses.mjs && tsc --noEmit && vite build --mode gym --outDir dist-gym",
     "preview": "vite preview",
     "test": "tsc --noEmit && vitest run",
     "lint": "eslint src tests",

@@ -32,13 +32,14 @@ VERIFIED: yes
 - редактора у веб-стека нет: весь проект — код в репозитории
 - гимы: `http://localhost:5173/?gym=<имя>` (agree — M01, hello — проверка окружения); `&debug=1` включает оверлей; клавиша P пишет настройки в `.studioigor/captures/tuning/` через dev-сервер
 - эскизы интерфейса: `node tools/shot.mjs <файл.html> <out.png>`
+- две сборки: `npm run build` → `dist/` — релиз, без гимов, быстрых стартов, клавиши M и `window.__gym`; `npm run build:gym` → `dist-gym/` — то же плюс гимы, для съёмки (`tools/capture.mjs --dir dist-gym`)
 - быстрый старт гима с большого экрана: `http://localhost:5173/?gym=agree&state=city|gov|planet|street|finale` (finale — сразу карточка итогов и эпилог) — всё прежнее куплено, деньги на первые покупки; клавиша M — полминуты дохода
 
 ## Commands
 RUN: npm run dev -- --open
 TEST: npx tsc --noEmit && npx vitest run
 BUILD: npm run build
-CAPTURE: npm run build && node tools/capture.mjs --dir dist --url "/?gym=hello" --out .studioigor/captures/hello --duration 5 --every 1 --inputs tools/inputs/hello.json --wait-for "window.__GAME__?.ready" --seed 7
+CAPTURE: npm run build:gym && node tools/capture.mjs --dir dist-gym --url "/?gym=hello" --out .studioigor/captures/hello --duration 5 --every 1 --inputs tools/inputs/hello.json --wait-for "window.__GAME__?.ready" --seed 7
 EDITOR: none — the code is in the repository
 
 ## Pitfalls

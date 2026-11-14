@@ -187,6 +187,7 @@ const CREDITS = [
   'Шрифты: JetBrains Mono — JetBrains, OFL · Source Serif 4 — Adobe, OFL',
   'Звук: ZzFX — Frank Force, MIT · музыка: «In the Lobby» — Umplix, CC0',
   'Картинки нарисованы нейросетью по описаниям',
+  'Тексты лицензий — в файле LICENSES.txt рядом с игрой',
 ];
 
 /**
@@ -229,7 +230,7 @@ export class GameScene extends Phaser.Scene {
   private view!: BlueprintView;
   private readonly hubs = new Map<number, HubView>();
   private squares!: Squares;
-  private panel!: TuningPanel;
+  private panel: TuningPanel | null = null;
   private overlay!: Overlay;
   /** 1 — the terminal, 2 — the blueprint, 3… — the big screens */
   private stage = 1;
@@ -324,14 +325,14 @@ export class GameScene extends Phaser.Scene {
       this.hubs.set(Number(screen), hub);
     }
     this.squares = new Squares(this, this.rng, 700);
-    this.term.extra.innerHTML = this.gym ? HELP : HELP_GAME;
+    this.term.extra.innerHTML = __TOOLS__ && this.gym ? HELP : HELP_GAME;
     // on paper the manager's strip takes the place of the help line: the keys were learnt at the terminal
-    this.paper.extra.innerHTML = this.gym ? HELP_PAPER : '';
+    this.paper.extra.innerHTML = __TOOLS__ && this.gym ? HELP_PAPER : '';
     setSoundOn(this.settings.sound);
     setMusicOn(this.settings.music);
     this.overlay = createOverlay(this.showOverlay);
     const t = this.cfg.tuning;
-    this.panel = createTuningPanel('M01', [
+    if (__TOOLS__ && this.gym) this.panel = createTuningPanel('M01', [
       { target: t, key: 'pay', label: '$ за задачу', min: 1, max: 20, step: 1 },
       { target: t, key: 'backlogMax', label: 'бэклог, макс.', min: 5, max: 100, step: 5 },
       { target: t, key: 'readyMax', label: 'ждут «Да», макс.', min: 1, max: 30, step: 1 },
@@ -361,7 +362,7 @@ export class GameScene extends Phaser.Scene {
       else if (!el.closest('.tm-side') && !el.closest('.bl-shop')) this.press();
     });
     window.addEventListener('pagehide', () => this.saveGame());
-    window.__gym = {
+    if (__TOOLS__) window.__gym = {
       buy: (what) => this.buy(what),
       click: (row) => this.click(row),
       take: (id) => this.takeWhole(id),
@@ -528,7 +529,7 @@ export class GameScene extends Phaser.Scene {
       { label: 'Новая игра', note: 'стереть сохранение', off: title && !this.resumed },
       { label: 'Титры' },
     ];
-    const lines = title ? ['Клод работает. Вы соглашаетесь.', 'Кликер про одну клавишу и очень много работ.'] : ['Клод подождёт. Сессии — тоже: мир стоит, пока открыто меню.'];
+    const lines = title ? ['Клод работает. Вы соглашаетесь.', `Кликер про одну клавишу и очень много работ. Версия ${__VERSION__}.`] : ['Клод подождёт. Сессии — тоже: мир стоит, пока открыто меню.'];
     const again = (i: number): void => this.openMenu(title, i);
     this.card.show({ head: 'claude — ~/работа/все-сразу', title: title ? 'Да, Клод' : 'Пауза', lines, options, selected, hint: 'Enter — Да · ↑↓ — выбрать' }, (i) => {
       this.wake();
@@ -794,15 +795,15 @@ export class GameScene extends Phaser.Scene {
       this.openMenu(false);
       return;
     }
-    if (!this.gym || !GYM_KEYS.has(e.code)) {
+    if (!__TOOLS__ || !this.gym || !GYM_KEYS.has(e.code)) {
       this.press();
       return;
     }
     e.preventDefault();
     if (e.code === 'KeyR') this.wipe(); // «заново» means a new game: the save goes too
-    else if (e.code === 'Tab') this.panel.toggle();
+    else if (e.code === 'Tab') this.panel?.toggle();
     else if (e.code === 'KeyO') this.overlay.toggle();
-    else if (e.code === 'KeyP') this.panel.dump({ tuning: this.cfg.tuning, sources: this.cfg.sources, auto: this.cfg.auto });
+    else if (e.code === 'KeyP') this.panel?.dump({ tuning: this.cfg.tuning, sources: this.cfg.sources, auto: this.cfg.auto });
     else if (e.code === 'KeyT') this.slow = !this.slow;
     else if (e.code === 'KeyM') this.gift(Math.max(GYM_GIFT, Math.round(this.income * 30))); // half a minute of income
   }
