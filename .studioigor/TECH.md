@@ -7,7 +7,7 @@ ENGINE: web
 ENGINE VERSION: Phaser 4.2.1
 DIMENSION: 2D
 LANGUAGE: TypeScript
-PLATFORMS: web (свой сайт или инди-витрина, браузер на ПК)
+PLATFORMS: web — GitHub Pages (ссылка на игру, браузер на ПК)
 
 ## Decision
 - context: 2D бесконечный кликер в браузере на ПК; гладкий вектор, тысячи пикселей-частиц, камера с отъездом по 6 масштабам, магазин и цифры обычным текстом
