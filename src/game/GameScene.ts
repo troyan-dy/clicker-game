@@ -42,9 +42,11 @@ import {
   inflowOf,
   payOf,
   pressPipe,
+  replacedOf,
   screenOf,
   sessionsOf,
   shareOf,
+  sourceInflow,
   sourcePrice,
   stepPipe,
   subagentPrice,
@@ -227,7 +229,7 @@ export class GameScene extends Phaser.Scene {
     this.view = new BlueprintView(this, this.rng);
     this.view.onDelivered = (x, y) => this.delivered(x, y);
     for (const [screen, layout] of Object.entries(HUBS)) {
-      const hub = new HubView(this, layout);
+      const hub = new HubView(this, layout, this.rng);
       hub.onDelivered = (x, y) => this.delivered(x, y);
       this.hubs.set(Number(screen), hub);
     }
@@ -324,7 +326,7 @@ export class GameScene extends Phaser.Scene {
       this.view.show(0);
     } else if (this.stage >= 3) {
       const hub = this.hubs.get(this.stage)!;
-      hub.sync({ owned: this.state.owned, farms: this.state.farms, offer: this.offer().map((x) => x.id) });
+      hub.sync(this.hubTopology());
       hub.show(0);
     }
     this.pendingReport = offlineReport(this.state, this.cfg, saveData, (Date.now() - file.at) / 1000);
@@ -430,6 +432,7 @@ export class GameScene extends Phaser.Scene {
     const lines = [
       'Вы — единственный клиент Anthropic и единственный программист планеты.',
       `Время: ${h ? `${h} ч ` : ''}${m} мин · нажатий: ${short(s.presses)} · задач закрыто: ${short(s.closedHere + s.closedBySubagents)}`,
+      `Программистов заменено: ${short(replacedOf(s, this.cfg))}. Все они теперь свободны.`,
       'Клод: «Дальше я могу нажимать „Да“ сам. Продолжать без вас?»',
     ];
     const options = [{ label: 'Да' }, { label: 'Да, и больше не спрашивай' }, { label: 'Нет', note: 'недоступно в вашем тарифе', off: true }];
@@ -563,6 +566,7 @@ export class GameScene extends Phaser.Scene {
     if (!ok) return false;
     this.lastMoney -= before - s.money; // a purchase is not negative income
     playSound('buy', BUY_PITCH[what.split(':')[0]] ?? 0);
+    if (what.startsWith('src:')) this.layOff(what.slice(4));
     logEvent(`buy_${what}`);
     if (what === 'noask') this.pullBack();
     else if (what === 'scale') this.scaleUp();
@@ -626,7 +630,7 @@ export class GameScene extends Phaser.Scene {
     this.stage = next;
     this.owed = { in: 0, me: 0, sub: 0 };
     const hub = this.hubs.get(next)!;
-    hub.sync({ owned: this.state.owned, farms: this.state.farms, offer: this.offer().map((x) => x.id) });
+    hub.sync(this.hubTopology());
     hub.show(450);
     playSound('scale');
     logEvent(`scale_${next}`);
@@ -866,16 +870,42 @@ export class GameScene extends Phaser.Scene {
     });
   }
 
-  /** the employers of a big screen that hire right now: the next two, in the order of the map */
-  private offer(): Source[] {
-    return this.cfg.sources.filter((src) => src.screen === this.stage && !this.state.owned[src.id]).slice(0, 2);
+  /** The people whose work was just taken walk out with their boxes: the more of them, the longer the line. */
+  private layOff(id: string): void {
+    const src = this.cfg.sources.find((x) => x.id === id);
+    if (!src?.staff) return;
+    const count = Math.min(4, 1 + Math.floor(Math.log10(src.staff)));
+    if (this.stage === 2) this.view.leave(id, count);
+    else if (this.stage >= 3) this.hubs.get(this.stage)!.leave(id, count);
   }
 
+  private hubTopology(): { floors: Record<string, number>; farms: Record<string, number> } {
+    const floors: Record<string, number> = {};
+    for (const src of this.cfg.sources) if (src.screen === this.stage) floors[src.id] = (this.state.owned[src.id] ?? 0) / src.max;
+    return { floors, farms: this.state.farms };
+  }
+
+  /** the employers of a big screen with something left to take, the cheapest next unit first */
+  private offer(): Source[] {
+    const s = this.state;
+    return this.cfg.sources
+      .filter((src) => src.screen === this.stage && (s.owned[src.id] ?? 0) < src.max)
+      .sort((a, b) => sourcePrice(a, s.owned[a.id] ?? 0) - sourcePrice(b, s.owned[b.id] ?? 0));
+  }
+
+  /** the shop lists the three cheapest next units; the map sells every building */
   private employerRows(): ShopRow[] {
+    const s = this.state;
     const left = this.offer();
     const t = HUB_TEXT[this.stage];
     if (!left.length) return [{ buy: '', title: t.doneTitle, sub: t.doneSub, count: '', price: '', state: 'owned' }];
-    return left.map((src) => this.row(src.name, `+${flowText(src.inflow)}/с · ${src.note}`, '', `src:${src.id}`, src.price));
+    return left.slice(0, 3).map((src) => {
+      const owned = s.owned[src.id] ?? 0;
+      const last = owned + 1 === src.max && src.full ? ` · целиком: ×${fmt1.format(src.full)}` : '';
+      // a long name does not fit next to the counter: the short one from the map stands in
+      const title = src.name.length > 22 ? src.tag : src.name;
+      return this.row(title, `+${flowText(src.inflow)}/с · ${t.floor[0]} ${owned + 1} из ${src.max}${last}`, owned ? `${owned}/${src.max}` : '', `src:${src.id}`, sourcePrice(src, owned));
+    });
   }
 
   private farmRows(): ShopRow[] {
@@ -952,10 +982,10 @@ export class GameScene extends Phaser.Scene {
     ];
   }
 
-  private hubShelves(neck: Neck, hired: number, total: number): ShopShelf[] {
+  private hubShelves(neck: Neck, taken: number, total: number): ShopShelf[] {
     const t = HUB_TEXT[this.stage];
     return [
-      { title: `${t.employers} · ${hired} из ${total}`, hot: neck === 'tasks' && hired < total, rows: this.employerRows() },
+      { title: `${t.employers} · ${taken} из ${total} ${plural(total, t.floor)}`, hot: neck === 'tasks' && taken < total, rows: this.employerRows() },
       { title: t.farms, hot: neck === 'claude', rows: this.farmRows() },
       { title: 'УЛУЧШЕНИЯ · быстрее и дороже', hot: false, rows: [...this.planRows(false), ...this.gradeRows()] },
       ...this.scaleShelf(),
@@ -997,6 +1027,10 @@ export class GameScene extends Phaser.Scene {
     const s = this.state;
     if (name.startsWith('own:')) return s.owned[name.slice(4)] ?? 0;
     if (name.startsWith('farm:')) return s.farms[name.slice(5)] ?? 0;
+    if (name.startsWith('full:')) {
+      const screen = Number(name.slice(5));
+      return this.cfg.sources.filter((x) => x.screen === screen && (s.owned[x.id] ?? 0) >= x.max).length;
+    }
     if (name.startsWith('hired:')) {
       const screen = Number(name.slice(6));
       return this.cfg.sources.filter((x) => x.screen === screen && s.owned[x.id]).length;
@@ -1015,6 +1049,7 @@ export class GameScene extends Phaser.Scene {
       piles: this.meta.piles,
       legends: this.meta.legends.length,
       reports: this.meta.reports,
+      replaced: replacedOf(s, this.cfg),
     };
     return stats[name] ?? 0;
   }
@@ -1081,7 +1116,7 @@ export class GameScene extends Phaser.Scene {
       quip: this.feed.quip,
       quipAt: 'desk',
       ask: this.pile(),
-      hint: 'Enter — «Да» на вопросы сессий',
+      hint: `заменено программистов: ${short(replacedOf(s, cfg))} · Enter — «Да» на вопросы сессий`,
     });
   }
 
@@ -1093,24 +1128,27 @@ export class GameScene extends Phaser.Scene {
     const t = HUB_TEXT[this.stage];
     const neck = this.neck();
     const capacity = claudeRate(s, cfg) + subagentRate(s, cfg);
-    const offer = this.offer();
-    this.hubs.get(this.stage)!.sync({ owned: s.owned, farms: s.farms, offer: offer.map((x) => x.id) });
+    this.hubs.get(this.stage)!.sync(this.hubTopology());
 
     // the numbers of the middle live in the line under the money: connectors arrive at it from every side
     const tags: BlueprintTag[] = [{ x: layout.home.x, y: layout.home.y + 4, mid: true, small: true, html: t.home }];
     const employers = cfg.sources.filter((src) => src.screen === this.stage);
-    let hired = 0;
+    // the map sells itself: a caption and the building above it buy the next unit of that employer
+    let taken = 0;
+    let total = 0;
     for (const src of employers) {
-      if (!s.owned[src.id]) continue;
-      hired++;
-      const lot = layout.lots[src.id];
-      if (lot) tags.push({ x: lot.x, y: lot.y + 4, mid: true, small: true, html: `${src.tag}<br><b>+${short(src.inflow)}/с</b>` });
-    }
-    // who hires next is signed on the map itself: the caption and the building above it buy the contract
-    for (const src of offer) {
+      const owned = s.owned[src.id] ?? 0;
+      taken += owned;
+      total += src.max;
       const lot = layout.lots[src.id];
       if (!lot) continue;
-      tags.push({ x: lot.x, y: lot.y + 4, mid: true, small: true, buy: `src:${src.id}`, can: s.money >= src.price, html: `${src.tag}<br><b>нанять · $${short(src.price)}</b>` });
+      if (owned >= src.max) {
+        tags.push({ x: lot.x, y: lot.y + 4, mid: true, small: true, html: `${src.tag} · целиком<br><b>+${short(sourceInflow(src, owned))}/с</b>` });
+        continue;
+      }
+      const price = sourcePrice(src, owned);
+      const head = owned ? `${src.tag} · ${owned}/${src.max}` : src.tag;
+      tags.push({ x: lot.x, y: lot.y + 4, mid: true, small: true, buy: `src:${src.id}`, can: s.money >= price, html: `${head}<br><b>${owned ? 'ещё ' : ''}${t.floor[0]} · $${short(price)}</b>` });
     }
     for (const node of Object.values(layout.farms)) {
       const n = this.farmSessions(node.ids);
@@ -1125,7 +1163,7 @@ export class GameScene extends Phaser.Scene {
     }
 
     const sessions = sessionsOf(s, cfg) + 1; // and the player's own
-    const all = hired === employers.length;
+    const all = taken === total;
     this.paper.render({
       money: s.money,
       income: Math.max(0, this.income),
@@ -1142,12 +1180,12 @@ export class GameScene extends Phaser.Scene {
                 ? `узкое место: <b>задачи</b> — сессии простаивают, ${t.needEmployers}`
                 : 'узких мест нет — можно просить повышение'),
       tags,
-      shelves: this.hubShelves(neck, hired, employers.length),
+      shelves: this.hubShelves(neck, taken, total),
       news: this.feed.news,
       quip: this.feed.quip,
       quipAt: 'corner',
       ask: this.pile(),
-      hint: `${t.place}: ${hired} из ${employers.length} ${t.unit}`,
+      hint: `${t.place}: ${taken} из ${total} ${plural(total, t.floor)} · заменено программистов: ${short(replacedOf(s, cfg))}`,
     });
   }
 

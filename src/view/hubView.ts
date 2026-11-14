@@ -1,6 +1,8 @@
 import type Phaser from 'phaser';
+import type { Rng } from '../core/rng';
 import type { HubLayout } from '../data/layout/hubs';
 import { CORAL } from './squares';
+import { Walkers } from './walkers';
 
 type Pt = readonly [number, number];
 
@@ -8,19 +10,16 @@ const INK = 0x262624;
 const RULE = 0xc9c5b8;
 /** the part of the screen a map may draw on: left of the shop, between the header and the news */
 const FIELD = { x0: 16, x1: 1324, y0: 284, y1: 1012 };
-const GHOST = 0.2; // what is not bought yet is a pale outline
-const OFFER = 0.55; // …and the employers that hire right now stand out of it
+const GHOST = 0.28; // what is not taken yet is a pale outline
 const DOT_SPEED = 560; // px per second along a connector
 const DOTS = 80;
 
-/** What the player owns on a big screen: contracts with employers and farms of sessions. */
+/** What the player owns on a big screen: units of the employers and farms of sessions. */
 export interface HubTopology {
-  /** units owned per source id; an employer is hired when its id is above zero */
-  owned: Record<string, number>;
+  /** how much of each employer is taken, 0..1 by source id: the building is coloured in that far from the ground up */
+  floors: Record<string, number>;
   /** units owned per farm id */
   farms: Record<string, number>;
-  /** employers that can be hired right now */
-  offer: readonly string[];
 }
 
 interface Route {
@@ -37,25 +36,38 @@ interface Dot {
   dist: number;
 }
 
+/** An employer on the map: the pale outline, the coloured part over it, and how much of it is shown. */
+interface Lot {
+  ghost: Phaser.GameObjects.Image;
+  fill: Phaser.GameObjects.Image;
+  scale: number;
+  /** the part coloured in right now, 0..1 */
+  shown: number;
+  target: number;
+}
+
 /**
  * A big screen (M16–M18): the previous screen as a node in the middle, employers around it, farms
- * of sessions next to it. Employers send squares of tasks to the middle, the middle hands them to
- * the farms. Draws state, decides nothing.
+ * of sessions next to it. An employer is taken unit by unit: its building is coloured in from the
+ * ground up, squares of tasks run from it to the middle, the middle hands them to the farms.
+ * Draws state, decides nothing.
  */
 export class HubView {
   private readonly scene: Phaser.Scene;
   private readonly layout: HubLayout;
   private readonly root: Phaser.GameObjects.Container;
   private readonly lines: Phaser.GameObjects.Graphics;
+  private readonly lots = new Map<string, Lot>();
   private readonly nodes = new Map<string, Phaser.GameObjects.Image>();
   private readonly routes = new Map<string, Route>();
   private readonly lit = new Map<string, string>();
   private readonly dots: Dot[] = [];
+  private readonly walkers: Walkers;
   private readonly mid: Pt;
   /** called when a square of tasks reaches a farm: the tasks are closed there */
   onDelivered: (x: number, y: number) => void = () => undefined;
 
-  constructor(scene: Phaser.Scene, layout: HubLayout) {
+  constructor(scene: Phaser.Scene, layout: HubLayout, rng: Rng) {
     this.scene = scene;
     this.layout = layout;
     this.mid = [layout.home.x, layout.home.y - layout.home.h * 0.42];
@@ -77,10 +89,18 @@ export class HubView {
     ].sort((a, b) => a.y - b.y);
     for (const p of places) {
       const img = scene.add.image(p.x, p.y, `node_${p.key}`).setOrigin(0.5, 1);
-      img.setScale(this.fit(img, p.h)).setAlpha(p.id === 'home' ? 1 : GHOST);
+      const scale = this.fit(img, p.h);
+      img.setScale(scale).setAlpha(p.id === 'home' ? 1 : GHOST);
       this.root.add(img);
-      this.nodes.set(p.id, img);
+      if (p.id in layout.lots) {
+        // the same picture in full colour, cut off above the part that is taken
+        const fill = scene.add.image(p.x, p.y, `node_${p.key}`).setOrigin(0.5, 1).setScale(scale);
+        fill.setCrop(0, fill.height, fill.width, 0);
+        this.root.add(fill);
+        this.lots.set(p.id, { ghost: img, fill, scale, shown: 0, target: 0 });
+      } else this.nodes.set(p.id, img);
     }
+    this.walkers = new Walkers(scene, this.root, rng);
 
     for (let i = 0; i < DOTS; i++) {
       const rect = scene.add.rectangle(0, 0, 11, 11, CORAL).setVisible(false);
@@ -109,15 +129,26 @@ export class HubView {
     });
   }
 
-  /** Whatever was bought lights up and gets a connector: employers → the middle → the farms. */
+  /** Whatever was bought shows: buildings are coloured in, connectors appear — employers → the middle → the farms. */
   sync(t: HubTopology): void {
     let changed = false;
-    for (const [id, lot] of Object.entries(this.layout.lots)) {
-      if (!t.owned[id]) this.nodes.get(id)!.setAlpha(t.offer.includes(id) ? OFFER : GHOST);
-      if (!t.owned[id] || this.routes.has(id)) continue;
-      this.light(id);
-      this.routes.set(id, this.spoke([lot.x, lot.y - 22], false));
-      changed = true;
+    for (const [id, place] of Object.entries(this.layout.lots)) {
+      const lot = this.lots.get(id)!;
+      const target = Math.min(1, t.floors[id] ?? 0);
+      if (target === lot.target) continue;
+      const first = lot.target === 0;
+      lot.target = target;
+      // the colour climbs to the new floor, the building gives a little jump
+      this.scene.tweens.add({ targets: lot, shown: target, duration: first ? 0 : 380, ease: 'Cubic.Out', onUpdate: () => this.crop(lot) });
+      if (first) {
+        lot.shown = target;
+        this.crop(lot);
+      }
+      this.scene.tweens.add({ targets: [lot.ghost, lot.fill], scale: { from: lot.scale * 1.07, to: lot.scale }, duration: 300, ease: 'Back.Out' });
+      if (!this.routes.has(id)) {
+        this.routes.set(id, this.spoke([place.x, place.y - 22], false));
+        changed = true;
+      }
     }
     for (const [id, f] of Object.entries(this.layout.farms)) {
       if (!f.ids.some((farm) => t.farms[farm] > 0)) continue;
@@ -128,7 +159,9 @@ export class HubView {
       const img = this.nodes.get(node)!;
       img.setTexture(`node_${key}`).setScale(this.fit(img, f.h));
       this.lit.set(node, key);
-      this.light(node);
+      const scale = img.scale;
+      img.setScale(scale * 0.7);
+      this.scene.tweens.add({ targets: img, scale, alpha: 1, duration: 320, ease: 'Back.Out' });
       this.routes.set(node, this.spoke(f.above ? [f.x, f.y + 6] : [f.x, f.y - f.h - 6], true));
       changed = true;
     }
@@ -145,6 +178,14 @@ export class HubView {
     dot.rect.setPosition(route.from[0], route.from[1]).setVisible(true);
   }
 
+  /** `count` laid-off programmers leave the building of an employer and walk off the map, away from the middle. */
+  leave(id: string, count: number): void {
+    const place = this.layout.lots[id];
+    if (!place) return;
+    const limit = place.x < this.layout.home.x ? FIELD.x0 + 20 : FIELD.x1 - 20;
+    this.walkers.spawn(place.x + (place.x < this.layout.home.x ? -30 : 30), place.y + 4, limit, count);
+  }
+
   step(dt: number): void {
     for (const d of this.dots) {
       if (!d.route) continue;
@@ -159,6 +200,15 @@ export class HubView {
       const f = d.dist / len;
       d.rect.setPosition(from[0] + (to[0] - from[0]) * f, from[1] + (to[1] - from[1]) * f);
     }
+    this.walkers.step(dt);
+  }
+
+  /** Shows the taken part of a building: full colour up to `shown` of its height, the outline above. */
+  private crop(lot: Lot): void {
+    const h = lot.fill.height;
+    const taken = Math.round(h * lot.shown);
+    lot.fill.setCrop(0, h - taken, lot.fill.width, taken);
+    lot.ghost.setAlpha(lot.shown >= 1 ? 0 : GHOST);
   }
 
   /** A city plan: two families of pale lines at the isometric angle, `gap` px apart. */
@@ -182,13 +232,6 @@ export class HubView {
 
   private fit(img: Phaser.GameObjects.Image, h: number): number {
     return Math.min(h / img.height, this.layout.maxWidth / img.width);
-  }
-
-  private light(id: string): void {
-    const img = this.nodes.get(id)!;
-    const scale = img.scale;
-    img.setScale(scale * 0.7);
-    this.scene.tweens.add({ targets: img, scale, alpha: 1, duration: 320, ease: 'Back.Out' });
   }
 
   /**

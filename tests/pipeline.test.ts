@@ -23,6 +23,7 @@ import {
   payOf,
   pressPipe,
   sessionsOf,
+  sourceInflow,
   sourcePrice,
   stepPipe,
   type Farm,
@@ -166,11 +167,16 @@ describe('pipeline', () => {
     expect(buyScale(s, cfg)).toBe(true);
     expect(s.scale).toBe(1);
     expect(buyScale(s, cfg)).toBe(false); // the next scale costs far more than a million
+    // a company is taken department by department; taken whole, it brings more
     const company = cfg.sources.find((x) => x.screen === 3)!;
     const before = inflowOf(s, cfg);
     expect(buySource(s, cfg, company.id)).toBe(true);
-    expect(buySource(s, cfg, company.id)).toBe(false); // one contract per company
     expect(inflowOf(s, cfg)).toBe(before + company.inflow);
+    s.money = 1e12;
+    while (buySource(s, cfg, company.id));
+    expect(s.owned[company.id]).toBe(company.max); // nothing is sold above the last department
+    expect(sourceInflow(company, company.max)).toBeCloseTo(company.max * company.inflow * (company.full ?? 1));
+    expect(inflowOf(s, cfg)).toBeGreaterThan(before + company.max * company.inflow * 0.999);
     expect(backlogCap(s, cfg)).toBeGreaterThan(cfg.tuning.backlogMax); // the tray grows with the flow
     expect(buyFarm(s, cfg, cfg.farms[0].id)).toBe(true);
     expect(sessionsOf(s, cfg)).toBe(cfg.farms[0].sessions);

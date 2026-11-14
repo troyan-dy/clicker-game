@@ -5,6 +5,7 @@ const NODES = [
   'tower', 'datacenter', 'bank', 'garage', 'mall', 'factory', 'admin', 'warehouse', 'rack', 'racks', // the city
   'cityblock', 'parliament', 'military', 'launchpad', 'gpus', 'back_state', // the state
   'island', 'dish', 'hq', 'satellite', 'globe', // the planet
+  'person1', 'person2', 'person3', // the laid-off programmers
 ];
 
 /** Loads every node icon once: both the blueprint and the city draw from the same set. */

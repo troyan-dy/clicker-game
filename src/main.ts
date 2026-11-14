@@ -40,14 +40,15 @@ function pickScene(): Phaser.Scene {
     const layer = document.createElement('div');
     layer.className = 'ui1080';
     ui.append(layer);
-    const paper = createBlueprint(layer);
-    // dialogs live in a layer of their own, above the canvas
+    // captions and dialogs live in a layer of their own, above the canvas
     const top = document.createElement('div');
     top.id = 'top';
     top.innerHTML = '<div class="ui1080"></div>';
     stage.append(top);
     mountUiScale(stage, top);
-    const card = createCard(top.firstElementChild as HTMLElement, () => playSound('ui'));
+    const over = top.firstElementChild as HTMLElement;
+    const paper = createBlueprint(layer, over);
+    const card = createCard(over, () => playSound('ui'));
     // a gym saves and shows the menu only when asked; a capture never touches the player's save
     const save = !args.capture && (gym ? args.save : true);
     const menu = args.menu || (!gym && !args.capture);

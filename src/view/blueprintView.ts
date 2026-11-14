@@ -2,6 +2,7 @@ import type Phaser from 'phaser';
 import type { Rng } from '../core/rng';
 import { BP, deskScreen } from '../data/layout/blueprint';
 import { CORAL } from './squares';
+import { Walkers } from './walkers';
 
 type Pt = readonly [number, number];
 
@@ -43,6 +44,7 @@ export class BlueprintView {
   private readonly routes = new Map<string, Route>();
   private readonly dots: Dot[] = [];
   private signature = '';
+  private readonly walkers: Walkers;
   /** called when a square reaches a session: the task is closed there */
   onDelivered: (x: number, y: number) => void = () => undefined;
 
@@ -62,11 +64,19 @@ export class BlueprintView {
     this.root.add(face);
     this.route('ses:me', [BP.trayOut, [640, BP.trayOut[1]]]);
 
+    this.walkers = new Walkers(scene, this.root, rng);
+
     for (let i = 0; i < DOTS; i++) {
       const rect = scene.add.rectangle(0, 0, 11, 11, CORAL).setVisible(false);
       this.root.add(rect);
       this.dots.push({ rect, route: null, key: '', dist: 0 });
     }
+  }
+
+  /** `count` laid-off programmers leave a source of work and walk off the sheet to the left. */
+  leave(id: string, count: number): void {
+    const place = BP.sources[id];
+    if (place) this.walkers.spawn(place.x + 40, place.y + 2, 26, count);
   }
 
   /** The pull-back: the diagram appears after `delayMs`. */
@@ -150,6 +160,7 @@ export class BlueprintView {
   }
 
   step(dt: number): void {
+    this.walkers.step(dt);
     for (const d of this.dots) {
       if (!d.route) continue;
       d.dist += DOT_SPEED * dt;

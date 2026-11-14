@@ -1,5 +1,6 @@
 /* Stage 2 of the game: the paper blueprint. Sits under the terminal layer inside .ui1080. */
-.bl {
+.bl,
+.bl-over {
   --paper: #f0eee6;
   --card: #faf9f5;
   --ink: #262624;
@@ -7,6 +8,23 @@
   --rule: #c9c5b8;
   --coral: #d97757;
   --money: #3f7d58;
+}
+/* the captions of the nodes: a layer above the canvas, connectors pass behind the text */
+.bl-over {
+  position: absolute;
+  inset: 0;
+  color: var(--ink);
+  opacity: 0;
+  transition: opacity 0.2s linear;
+}
+.bl-over.on {
+  opacity: 1;
+  transition: opacity 0.5s linear 0.85s;
+}
+.bl-over.on.now {
+  transition: none;
+}
+.bl {
   position: absolute;
   inset: 0;
   background-color: var(--paper);
@@ -79,7 +97,9 @@
 /* every node on the diagram is signed */
 .bl-tag {
   position: absolute;
-  padding: 2px 0 3px;
+  padding: 2px 5px 3px;
+  /* a label on a drawing: whatever runs under it is covered */
+  background: var(--paper);
   border-bottom: 1.5px solid var(--ink);
   font: 400 17px 'JetBrains Mono', monospace;
   white-space: nowrap;

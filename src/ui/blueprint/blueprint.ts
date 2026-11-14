@@ -53,21 +53,25 @@ const fmt = new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 0 });
 const fmt1 = new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 1 });
 const esc = (s: string): string => s.replace(/&/g, '&amp;').replace(/</g, '&lt;');
 
-/** Adds the paper blueprint as a layer of a 1920×1080 `.ui1080` container (below the terminal). */
-export function createBlueprint(layer: HTMLElement): BlueprintUi {
+/**
+ * Adds the paper blueprint as a layer of a 1920×1080 `.ui1080` container (below the terminal).
+ * The captions of the nodes go into `over` — a layer above the canvas, so that connectors pass behind the text.
+ */
+export function createBlueprint(layer: HTMLElement, over: HTMLElement): BlueprintUi {
   layer.insertAdjacentHTML(
     'beforeend',
     `
   <div class="bl"><div class="bl-hud">
     <div class="bl-money"><b>$0</b><span></span></div>
     <div class="bl-neck"></div>
-    <div class="bl-tags"></div>
     <div class="bl-quip"><i></i><span></span><div class="bl-ask"><b></b><u><s></s></u></div></div>
     <aside class="bl-shop"><div class="bl-shelves"></div><div class="bl-extra"></div></aside>
     <div class="bl-news"><i>НОВОСТИ</i><span></span><em></em></div>
   </div></div>`,
   );
   const root = layer.lastElementChild as HTMLElement;
+  over.insertAdjacentHTML('afterbegin', '<div class="bl-over"><div class="bl-tags"></div></div>');
+  const overRoot = over.firstElementChild as HTMLElement;
   const q = <T extends HTMLElement>(sel: string): T => root.querySelector<T>(sel)!;
   const money = q('.bl-money b');
   const quip = q('.bl-quip');
@@ -77,7 +81,7 @@ export function createBlueprint(layer: HTMLElement): BlueprintUi {
   const parts: Record<string, HTMLElement> = {
     summary: q('.bl-money span'),
     neck: q('.bl-neck'),
-    tags: q('.bl-tags'),
+    tags: overRoot.querySelector<HTMLElement>('.bl-tags')!,
     shelves: q('.bl-shelves'),
     news: q('.bl-news span'),
     hint: q('.bl-news em'),
@@ -88,7 +92,7 @@ export function createBlueprint(layer: HTMLElement): BlueprintUi {
   const showMark = (): void => {
     if (!mark) return;
     // the same thing may be sold in the shop and on the map: both answer
-    const els = root.querySelectorAll(`[data-row="${mark.row}"]`);
+    const els = [...root.querySelectorAll(`[data-row="${mark.row}"]`), ...overRoot.querySelectorAll(`[data-row="${mark.row}"]`)];
     const { cls } = mark;
     if (performance.now() > mark.until) {
       els.forEach((el) => el.classList.remove(cls));
@@ -109,8 +113,10 @@ export function createBlueprint(layer: HTMLElement): BlueprintUi {
   return {
     extra: q('.bl-extra'),
     show(now = false) {
-      root.classList.add('on');
-      root.classList.toggle('now', now);
+      for (const el of [root, overRoot]) {
+        el.classList.add('on');
+        el.classList.toggle('now', now);
+      }
     },
     render(m) {
       // the counter jumps a few times a second at most: restarting the animation forces a layout

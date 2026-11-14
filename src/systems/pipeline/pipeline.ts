@@ -24,8 +24,12 @@ export interface Source {
   /** units owned at the start */
   start: number;
   max: number;
-  /** the screen it is sold from: 1 — the terminal, 2 — the blueprint, 3–5 — the city, the state, the planet (one-off: max 1) */
+  /** the screen it is sold from: 1 — the terminal, 2 — the blueprint, 3–5 — the city, the state, the planet */
   screen: number;
+  /** inflow multiplier once every unit is bought: the employer is taken whole */
+  full?: number;
+  /** programmers one unit used to employ */
+  staff?: number;
 }
 
 /** A step of the career ladder: every closed task pays `mult` times the base. */
@@ -159,8 +163,20 @@ export function createPipe(cfg: PipeConfig): PipeState {
 /** tasks per second coming in from all sources */
 export function inflowOf(s: PipeState, cfg: PipeConfig): number {
   let sum = 0;
-  for (const src of cfg.sources) sum += (s.owned[src.id] ?? 0) * src.inflow;
+  for (const src of cfg.sources) sum += sourceInflow(src, s.owned[src.id] ?? 0);
   return sum;
+}
+
+/** tasks per second `owned` units of a source bring; an employer taken whole brings more */
+export function sourceInflow(src: Source, owned: number): number {
+  return owned * src.inflow * (owned >= src.max ? (src.full ?? 1) : 1);
+}
+
+/** programmers whose work the player does now; the first job is the player's own */
+export function replacedOf(s: PipeState, cfg: PipeConfig): number {
+  let n = 0;
+  for (const src of cfg.sources) n += Math.max(0, (s.owned[src.id] ?? 0) - src.start) * (src.staff ?? 0);
+  return n;
 }
 
 /** tasks per second Claude prepares in the player's terminal */
