@@ -311,6 +311,7 @@ export class GameScene extends Phaser.Scene {
     this.feed.shown = file.feed.shown;
     this.feed.said = file.feed.said;
     this.meta = file.meta;
+    this.selfPlay = file.meta.auto;
     this.won = file.won;
     this.seconds = file.seconds;
     this.stage = screenOf(this.state);
@@ -323,7 +324,7 @@ export class GameScene extends Phaser.Scene {
       this.view.show(0);
     } else if (this.stage >= 3) {
       const hub = this.hubs.get(this.stage)!;
-      hub.sync({ owned: this.state.owned, farms: this.state.farms });
+      hub.sync({ owned: this.state.owned, farms: this.state.farms, offer: this.offer().map((x) => x.id) });
       hub.show(0);
     }
     this.pendingReport = offlineReport(this.state, this.cfg, saveData, (Date.now() - file.at) / 1000);
@@ -409,10 +410,13 @@ export class GameScene extends Phaser.Scene {
   /** A new game: the save goes, the page starts over. */
   private wipe(): void {
     this.frozen = true;
-    try {
-      localStorage.removeItem(SAVE_KEY);
-    } catch {
-      // nothing was saved anyway
+    // a gym that does not save must not touch the player's save either
+    if (this.saving) {
+      try {
+        localStorage.removeItem(SAVE_KEY);
+      } catch {
+        // nothing was saved anyway
+      }
     }
     window.location.reload();
   }
@@ -431,6 +435,7 @@ export class GameScene extends Phaser.Scene {
     const options = [{ label: 'Да' }, { label: 'Да, и больше не спрашивай' }, { label: 'Нет', note: 'недоступно в вашем тарифе', off: true }];
     this.card.show({ head: 'claude — итоги', title: 'Работать больше некому', lines, options }, (i) => {
       this.selfPlay = i === 1;
+      this.meta.auto = this.selfPlay;
       this.paused = false;
       this.say('after', true);
       this.saveGame();
@@ -470,6 +475,7 @@ export class GameScene extends Phaser.Scene {
 
   /** gym-only: pretend the game was closed for `hours` and open it again */
   private away(hours: number): void {
+    if (!this.saving) return;
     this.saveGame();
     this.frozen = true;
     try {
@@ -620,7 +626,7 @@ export class GameScene extends Phaser.Scene {
     this.stage = next;
     this.owed = { in: 0, me: 0, sub: 0 };
     const hub = this.hubs.get(next)!;
-    hub.sync({ owned: this.state.owned, farms: this.state.farms });
+    hub.sync({ owned: this.state.owned, farms: this.state.farms, offer: this.offer().map((x) => x.id) });
     hub.show(450);
     playSound('scale');
     logEvent(`scale_${next}`);
@@ -860,12 +866,16 @@ export class GameScene extends Phaser.Scene {
     });
   }
 
-  /** the next two employers of a big screen, in the order of the map */
+  /** the employers of a big screen that hire right now: the next two, in the order of the map */
+  private offer(): Source[] {
+    return this.cfg.sources.filter((src) => src.screen === this.stage && !this.state.owned[src.id]).slice(0, 2);
+  }
+
   private employerRows(): ShopRow[] {
-    const left = this.cfg.sources.filter((src) => src.screen === this.stage && !this.state.owned[src.id]);
+    const left = this.offer();
     const t = HUB_TEXT[this.stage];
     if (!left.length) return [{ buy: '', title: t.doneTitle, sub: t.doneSub, count: '', price: '', state: 'owned' }];
-    return left.slice(0, 2).map((src) => this.row(src.name, `+${flowText(src.inflow)}/с · ${src.note}`, '', `src:${src.id}`, src.price));
+    return left.map((src) => this.row(src.name, `+${flowText(src.inflow)}/с · ${src.note}`, '', `src:${src.id}`, src.price));
   }
 
   private farmRows(): ShopRow[] {
@@ -1083,7 +1093,8 @@ export class GameScene extends Phaser.Scene {
     const t = HUB_TEXT[this.stage];
     const neck = this.neck();
     const capacity = claudeRate(s, cfg) + subagentRate(s, cfg);
-    this.hubs.get(this.stage)!.sync({ owned: s.owned, farms: s.farms });
+    const offer = this.offer();
+    this.hubs.get(this.stage)!.sync({ owned: s.owned, farms: s.farms, offer: offer.map((x) => x.id) });
 
     // the numbers of the middle live in the line under the money: connectors arrive at it from every side
     const tags: BlueprintTag[] = [{ x: layout.home.x, y: layout.home.y + 4, mid: true, small: true, html: t.home }];
@@ -1094,6 +1105,12 @@ export class GameScene extends Phaser.Scene {
       hired++;
       const lot = layout.lots[src.id];
       if (lot) tags.push({ x: lot.x, y: lot.y + 4, mid: true, small: true, html: `${src.tag}<br><b>+${short(src.inflow)}/с</b>` });
+    }
+    // who hires next is signed on the map itself: the caption and the building above it buy the contract
+    for (const src of offer) {
+      const lot = layout.lots[src.id];
+      if (!lot) continue;
+      tags.push({ x: lot.x, y: lot.y + 4, mid: true, small: true, buy: `src:${src.id}`, can: s.money >= src.price, html: `${src.tag}<br><b>нанять · $${short(src.price)}</b>` });
     }
     for (const node of Object.values(layout.farms)) {
       const n = this.farmSessions(node.ids);

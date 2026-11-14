@@ -53,7 +53,7 @@ function grown() {
 describe('save', () => {
   it('test_save_round_trip_keeps_the_whole_game', () => {
     const s = grown();
-    const meta = { legends: ['rust'], awards: ['first_yes', 'no_ask'], piles: 4, reports: 1 };
+    const meta = { legends: ['rust'], awards: ['first_yes', 'no_ask'], piles: 4, reports: 1, auto: true };
     const json = packSave({ at: 123, state: s, feed: { shown: [1, 4], said: { yes: 2 } }, meta, won: false, seconds: 600 });
     const file = unpackSave(json, cfg)!;
     expect(file.state).toEqual(s);

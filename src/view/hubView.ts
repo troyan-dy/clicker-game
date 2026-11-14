@@ -6,6 +6,7 @@ type Pt = readonly [number, number];
 
 const INK = 0x262624;
 const GHOST = 0.2; // what is not bought yet is a pale outline
+const OFFER = 0.55; // …and the employers that hire right now stand out of it
 const DOT_SPEED = 560; // px per second along a connector
 const DOTS = 80;
 
@@ -15,6 +16,8 @@ export interface HubTopology {
   owned: Record<string, number>;
   /** units owned per farm id */
   farms: Record<string, number>;
+  /** employers that can be hired right now */
+  offer: readonly string[];
 }
 
 interface Route {
@@ -106,6 +109,7 @@ export class HubView {
   sync(t: HubTopology): void {
     let changed = false;
     for (const [id, lot] of Object.entries(this.layout.lots)) {
+      if (!t.owned[id]) this.nodes.get(id)!.setAlpha(t.offer.includes(id) ? OFFER : GHOST);
       if (!t.owned[id] || this.routes.has(id)) continue;
       this.light(id);
       this.routes.set(id, this.spoke([lot.x, lot.y - 22], false));

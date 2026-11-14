@@ -41,10 +41,12 @@ export interface SavedMeta {
   piles: number;
   /** morning reports taken */
   reports: number;
+  /** after the ending Claude answers the piles of questions himself */
+  auto: boolean;
 }
 
 export function freshMeta(): SavedMeta {
-  return { legends: [], awards: [], piles: 0, reports: 0 };
+  return { legends: [], awards: [], piles: 0, reports: 0, auto: false };
 }
 
 export interface SaveFile {
@@ -130,7 +132,7 @@ export function unpackSave(json: string | null, cfg: PipeConfig): SaveFile | nul
     at: num(data.at, 0),
     state: restorePipe(cfg, data.state),
     feed: { shown: Array.isArray(feed.shown) ? feed.shown.filter((i): i is number => Number.isInteger(i)) : [], said },
-    meta: { legends: ids(meta.legends), awards: ids(meta.awards), piles: Math.floor(num(meta.piles, 0)), reports: Math.floor(num(meta.reports, 0)) },
+    meta: { legends: ids(meta.legends), awards: ids(meta.awards), piles: Math.floor(num(meta.piles, 0)), reports: Math.floor(num(meta.reports, 0)), auto: meta.auto === true },
     won: data.won === true,
     seconds: num(data.seconds, 0),
   };

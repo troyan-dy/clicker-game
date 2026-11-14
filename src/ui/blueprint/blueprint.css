@@ -104,6 +104,41 @@
   text-align: center;
   line-height: 1.35;
 }
+/* a caption that sells: it and the picture above it are one button */
+.bl-tag.act {
+  pointer-events: auto;
+  cursor: pointer;
+}
+.bl-tag.act::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: 100%;
+  width: 190px;
+  height: 185px;
+  transform: translateX(-50%);
+}
+.bl-tag.act b {
+  color: var(--dim);
+}
+.bl-tag.act.can b {
+  color: var(--money);
+}
+.bl-tag.act.denied {
+  animation: bl-tag-denied 0.24s ease-in-out;
+}
+@keyframes bl-tag-denied {
+  0%,
+  100% {
+    transform: translateX(-50%);
+  }
+  25% {
+    transform: translateX(calc(-50% - 7px));
+  }
+  75% {
+    transform: translateX(calc(-50% + 7px));
+  }
+}
 
 /* Claude's remark: a small dark terminal card */
 .bl-quip {

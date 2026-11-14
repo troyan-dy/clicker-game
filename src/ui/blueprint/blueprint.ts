@@ -13,6 +13,9 @@ export interface BlueprintTag {
   small?: boolean;
   /** centred on x instead of starting at it */
   mid?: boolean;
+  /** a caption that sells: a click on it (or on the picture above it) buys `buy`; `can` — there is enough money */
+  buy?: string;
+  can?: boolean;
 }
 
 /** Everything the blueprint's HTML layer shows. The UI reads it and decides nothing. */
@@ -84,11 +87,13 @@ export function createBlueprint(layer: HTMLElement): BlueprintUi {
   let mark: { row: string; cls: string; until: number } | null = null;
   const showMark = (): void => {
     if (!mark) return;
-    const el = root.querySelector(`[data-row="${mark.row}"]`);
+    // the same thing may be sold in the shop and on the map: both answer
+    const els = root.querySelectorAll(`[data-row="${mark.row}"]`);
+    const { cls } = mark;
     if (performance.now() > mark.until) {
-      el?.classList.remove(mark.cls);
+      els.forEach((el) => el.classList.remove(cls));
       mark = null;
-    } else el?.classList.add(mark.cls);
+    } else els.forEach((el) => el.classList.add(cls));
   };
 
   // write to the DOM only when a value actually changed
@@ -135,7 +140,7 @@ export function createBlueprint(layer: HTMLElement): BlueprintUi {
         m.tags
           .map(
             (t) =>
-              `<div class="bl-tag${t.hot ? ' hot' : ''}${t.small ? ' small' : ''}${t.mid ? ' mid' : ''}" style="left:${t.x}px;top:${t.y}px">${t.html}</div>`,
+              `<div class="bl-tag${t.hot ? ' hot' : ''}${t.small ? ' small' : ''}${t.mid ? ' mid' : ''}${t.buy ? ' act' : ''}${t.can ? ' can' : ''}"${t.buy ? ` data-row="${t.buy}"` : ''} style="left:${t.x}px;top:${t.y}px">${t.html}</div>`,
           )
           .join(''),
       );
