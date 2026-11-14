@@ -53,7 +53,7 @@ files: ASSETS.md
 
 ## Phase 6 — Mechanics
 files:
-- [x] all mvp mechanics locked, each with research and a playtest — check: python3 {skill}/scripts/studio.py mechanics --check
+- [ ] all mvp mechanics locked, each with research and a playtest — check: python3 {skill}/scripts/studio.py mechanics --check
 - [x] design holism check passed, findings in BACKLOG.md — check: manual
 
 ## Phase 7 — Vertical slice
