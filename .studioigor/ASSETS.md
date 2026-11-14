@@ -24,6 +24,9 @@
 | A016 FNT | шрифты | JetBrains Mono 400/700, Source Serif 4 400/600, кириллица | woff2 ≤ 300 КБ | Fontsource (OFL) | wip |
 | A017 SFX | звук | нажатие, закрытие задачи, покупка, отъезд камеры, легендарный тикет | параметры в коде | ZzFX | plan |
 | A018 MUS | музыка | спокойный зацикленный лоу-фай «In the Lobby» (1,4 МБ); запасной кандидат — «Calm Track», pmiller, CC0, https://opengameart.org/content/calm-track | ≤ 3 МБ | CC0, OpenGameArt | wip |
+| A019 ND_Street | узлы | улица: супермаркет, кофейня, парикмахерская, стройка, такси, пиццерия с мопедами, ферма, поликлиника, школа, завод роботов | public/assets/img/nodes/*.webp, 10 шт | генерация (Codex), листы street_a…d | final |
+| A020 CH_Robots | персонажи | андроид и робособака: светлый корпус, голова — коралловый квадрат с двумя глазами (свой знак Клода) | android.webp, robodog.webp | генерация (Codex), лист street_d | final |
+| A021 CH_People | персонажи | люди без работы: три пикетчика с пустыми плакатами, шесть групп отдыхающих в парке (скамейка, шахматы, гамак, пикник, мольберт, рыбалка) | picket1–3.webp, rest_*.webp | генерация (Codex), листы street_e…g | final |
 
 ## Strategy by category
 | category | source (pack / Blender / procedural / generation / user) | why | status |

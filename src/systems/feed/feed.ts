@@ -88,6 +88,12 @@ export function stepFeed(
   }
 }
 
+/** The ticker shows exactly this line now: something big has just happened. */
+export function headline(f: FeedState, tuning: FeedTuning, text: string): void {
+  f.news = text;
+  f.newsLeft = tuning.newsHold;
+}
+
 /** Claude says exactly this: an award, a one-off line. Always heard. */
 export function tell(f: FeedState, tuning: FeedTuning, text: string): void {
   f.quip = text;

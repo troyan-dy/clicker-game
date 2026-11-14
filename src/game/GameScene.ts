@@ -3,8 +3,10 @@ import { AWARDS } from '../content/awards';
 import { CALLS } from '../content/calls';
 import { LEGENDS, type Legend } from '../content/legends';
 import { NEWS } from '../content/news';
+import { PICKET } from '../content/picket';
 import { QUIPS } from '../content/quips';
 import { FINALE, HUB_TEXT, SCALE_SHELF } from '../content/screens';
+import { TAKEOVERS } from '../content/takeovers';
 import { promptAt, TICKETS } from '../content/tickets';
 import { logEvent, metrics } from '../core/metrics';
 import { setMusicOn, startMusic } from '../core/music';
@@ -24,17 +26,19 @@ import eventsData from '../data/tuning/events.json';
 import feedData from '../data/tuning/feed.json';
 import limitData from '../data/tuning/limit.json';
 import managerTuning from '../data/tuning/manager.json';
+import peopleData from '../data/tuning/people.json';
 import saveData from '../data/tuning/save.json';
 import stackData from '../data/tuning/stack.json';
 import tuningData from '../data/tuning/pipeline.json';
 import { createOverlay, type Overlay } from '../debug/overlay';
 import { createTuningPanel, type TuningPanel } from '../debug/tuningPanel';
 import { createEvents, stepEvents, takeEvent, type EventsTuning } from '../systems/events/events';
-import { createFeed, say, stepFeed, tell, type FeedContent } from '../systems/feed/feed';
+import { createFeed, headline, say, stepFeed, tell, type FeedContent } from '../systems/feed/feed';
 import { managerPick } from '../systems/manager/manager';
 import type { Plan } from '../systems/plan/plan';
 import {
   backlogCap,
+  bonus,
   buyFarm,
   buyGrade,
   buyManager,
@@ -45,21 +49,26 @@ import {
   buySubagent,
   claudeRate,
   createPipe,
-  farmPrice,
+  discount,
+  farmCost,
   finished,
+  gradeCost,
   inflowOf,
+  ordersOf,
   payOf,
   planRate,
   pressPipe,
   replacedOf,
+  scaleCost,
   screenOf,
   sessionsOf,
   shareOf,
+  sourceCost,
   sourceInflow,
-  sourcePrice,
   stepPipe,
   subagentPrice,
   subagentRate,
+  whole,
   type Farm,
   type PipeConfig,
   type PipeState,
@@ -79,7 +88,7 @@ import {
   type TerminalUi,
 } from '../ui/terminal/terminal';
 import { BlueprintView, VISIBLE_SUBAGENTS } from '../view/blueprintView';
-import { HubView } from '../view/hubView';
+import { HubView, type HubTopology } from '../view/hubView';
 import { preloadNodes } from '../view/nodeTextures';
 import { Squares, type Rect } from '../view/squares';
 
@@ -91,6 +100,8 @@ const GYM_KEYS = new Set(['KeyR', 'Tab', 'KeyO', 'KeyP', 'KeyT', 'KeyM']);
 const GYM_GIFT = 100;
 /** sessions a player brings from the blueprint when a tuning session starts on a later screen */
 const GYM_SUBAGENTS = 10;
+/** the last screen: the street, where the work is done by hand and the people are seen close up */
+const STREET = 6;
 const FEED: FeedContent = { news: NEWS, quips: QUIPS };
 /** approvals after which Claude says something nice about the player's judgement */
 const YES_MILESTONES = [3, 15, 40, 90, 160, 260];
@@ -123,7 +134,7 @@ function perSecond(n: number): string {
 declare global {
   interface Window {
     /** gym-only hooks for scripted captures */
-    __gym?: { buy(what: string): boolean; gift(dollars: number): void; away(hours: number): void; pile(legend: boolean): void; call(): void; limit(): void };
+    __gym?: { buy(what: string): boolean; click(row: string): void; gift(dollars: number): void; away(hours: number): void; pile(legend: boolean): void; call(): void; limit(): void };
   }
 }
 
@@ -225,6 +236,9 @@ export class GameScene extends Phaser.Scene {
   private sinceAwards = 0;
   /** after the ending Claude may press «Да всем» himself (M13) */
   private selfPlay = false;
+  /** a placard of the picket being read out: at which employer, what it says, seconds left */
+  private slogan: { at: string; text: string; left: number } | null = null;
+  private sloganIn = 4;
   private neckKind: Neck = 'none';
   private neckFor = 0;
   private pressTimes: number[] = [];
@@ -302,6 +316,7 @@ export class GameScene extends Phaser.Scene {
     window.addEventListener('pagehide', () => this.saveGame());
     window.__gym = {
       buy: (what) => this.buy(what),
+      click: (row) => this.click(row),
       gift: (dollars) => this.gift(dollars),
       away: (hours) => this.away(hours),
       pile: (legend) => this.forcePile(legend),
@@ -355,7 +370,8 @@ export class GameScene extends Phaser.Scene {
     this.feed.said = file.feed.said;
     this.meta = file.meta;
     this.selfPlay = file.meta.auto;
-    this.won = file.won;
+    // a save finished before the street existed is not finished any more: the ending is ahead again
+    this.won = file.won && finished(this.state, this.cfg);
     this.seconds = file.seconds;
     this.openStage();
     this.pendingReport = offlineReport(this.state, this.cfg, saveData, (Date.now() - file.at) / 1000);
@@ -397,7 +413,7 @@ export class GameScene extends Phaser.Scene {
     // jobs of the terminal and the blueprint — as many as Claude keeps up with; earlier cities and states — entirely
     const early = cfg.sources.filter((x) => x.screen <= 2);
     for (let i = 0; i < 400 && inflowOf(s, cfg) < claudeRate(s, cfg) + subagentRate(s, cfg); i++) {
-      const best = early.reduce((a, b) => (sourcePrice(a, s.owned[a.id] ?? 0) / a.inflow <= sourcePrice(b, s.owned[b.id] ?? 0) / b.inflow ? a : b));
+      const best = early.reduce((a, b) => (sourceCost(s, cfg, a) / a.inflow <= sourceCost(s, cfg, b) / b.inflow ? a : b));
       if (!free(() => buySource(s, cfg, best.id))) break;
     }
     for (const src of cfg.sources) if (src.screen >= 3 && src.screen < screen) while (free(() => buySource(s, cfg, src.id)));
@@ -408,11 +424,11 @@ export class GameScene extends Phaser.Scene {
     // servers of the earlier screens, the cheapest per session first, until Claude keeps up
     const farms = cfg.farms.filter((f) => f.screen < screen && f.max === undefined);
     for (let i = 0; i < 400 && farms.length && claudeRate(s, cfg) + subagentRate(s, cfg) < inflowOf(s, cfg); i++) {
-      const best = farms.reduce((a, b) => (farmPrice(a, s.farms[a.id] ?? 0) / a.sessions <= farmPrice(b, s.farms[b.id] ?? 0) / b.sessions ? a : b));
+      const best = farms.reduce((a, b) => (farmCost(s, cfg, a) / a.sessions <= farmCost(s, cfg, b) / b.sessions ? a : b));
       free(() => buyFarm(s, cfg, best.id));
     }
     s.surge = {};
-    const first = cfg.sources.filter((x) => x.screen === screen).map((x) => sourcePrice(x, 0));
+    const first = cfg.sources.filter((x) => x.screen === screen).map((x) => sourceCost(s, cfg, x));
     s.money = Math.min(...first) * 3;
     this.openStage();
   }
@@ -514,9 +530,9 @@ export class GameScene extends Phaser.Scene {
     const h = Math.floor(this.seconds / 3600);
     const m = Math.floor((this.seconds % 3600) / 60);
     const lines = [
-      'Вы — единственный клиент Anthropic и единственный программист планеты.',
+      'Работать больше некому и незачем: за прилавком, за рулём и в терминале — Клод.',
       `Время: ${h ? `${h} ч ` : ''}${m} мин · нажатий: ${short(s.presses)} · задач закрыто: ${short(s.closedHere + s.closedBySubagents)}`,
-      `Программистов заменено: ${short(replacedOf(s, this.cfg))}. Все они теперь свободны.`,
+      `Людей без работы: ${short(replacedOf(s, this.cfg))}. ${s.allowance ? 'Они отдыхают в парке на ваше пособие.' : 'Они стоят с плакатами: пособие вы не платите.'}`,
       'Клод: «Дальше я могу нажимать „Да“ сам. Продолжать без вас?»',
     ];
     const options = [{ label: 'Да' }, { label: 'Да, и больше не спрашивай' }, { label: 'Нет', note: 'недоступно в вашем тарифе', off: true }];
@@ -615,6 +631,16 @@ export class GameScene extends Phaser.Scene {
   /** A click on a shop row: the row answers either way — bought, or not enough money. */
   private click(row: string): void {
     const shop = this.stage === 1 ? this.term : this.paper;
+    // the allowance of the people left without work is a switch too
+    if (row === 'ubi') {
+      this.wake();
+      this.state.allowance = !this.state.allowance;
+      playSound('ui');
+      this.say(this.state.allowance ? 'ubi:on' : 'ubi:off', true);
+      this.slogan = null;
+      this.saveGame();
+      return;
+    }
     // a hired manager is a switch: a click tells him to wait or to go on
     if (row === 'manager' && this.state.managers.includes(this.stage)) {
       this.wake();
@@ -661,7 +687,11 @@ export class GameScene extends Phaser.Scene {
     this.lastMoney -= before - s.money; // a purchase is not negative income
     if (quiet) playSound('auto');
     else playSound('buy', BUY_PITCH[what.split(':')[0]] ?? 0);
-    if (what.startsWith('src:')) this.layOff(what.slice(4));
+    if (what.startsWith('src:')) {
+      this.layOff(what.slice(4));
+      const src = cfg.sources.find((x) => x.id === what.slice(4));
+      if (src?.perk && whole(s, src)) this.takeover(src);
+    }
     logEvent(`buy_${what}`);
     if (what === 'noask') this.pullBack();
     else if (what === 'scale') this.scaleUp();
@@ -675,12 +705,21 @@ export class GameScene extends Phaser.Scene {
 
   /** Claude's word on a purchase. Plans, grades and steps in scale are said every time: their lines go in the order of the purchases. */
   private remark(what: string, surged: boolean): void {
-    if (what.startsWith('src:')) this.say(this.stage >= 3 ? 'buy:employer' : 'buy:src');
+    if (what.startsWith('src:')) this.say(this.stage >= STREET ? 'buy:place' : this.stage >= 3 ? 'buy:employer' : 'buy:src');
     else if (what.startsWith('farm:')) {
       const farm = this.cfg.farms.find((x) => x.id === what.slice(5));
-      this.say(surged ? 'surge' : farm?.share ? 'quota' : 'buy:farm');
+      this.say(surged ? 'surge' : farm?.share ? 'quota' : this.stage >= STREET ? 'buy:body' : 'buy:farm');
     } else this.say(`buy:${what}`, what !== 'sub');
     // the lines of the managers go by screen: the second one is the director of the city
+  }
+
+  /** An employer is taken whole (M23): its perk works from now on; the news and Claude say so. */
+  private takeover(src: Source): void {
+    playSound('all');
+    tell(this.feed, feedData, `${src.tag} — целиком. Теперь ${src.perk!.text}.`);
+    const line = TAKEOVERS[src.id];
+    if (line) headline(this.feed, feedData, line);
+    logEvent(`whole_${src.id}`);
   }
 
   private say(on: string, force = false): void {
@@ -722,16 +761,19 @@ export class GameScene extends Phaser.Scene {
   /** A step up in scale: the whole current screen shrinks into the node in the middle of the next one. */
   private scaleUp(): void {
     const next = this.stage + 1;
-    const home = HUBS[next].home;
+    const { home, dive } = HUBS[next];
     // the desk of the blueprint lands exactly on the desk in the middle of the city
     if (this.stage === 2) this.view.shrinkTo(home.x, home.y, home.h / (BP.desk.h * BP.desk.scale), 900);
+    else if (dive) this.hubs.get(this.stage)!.diveIn(2.6, 850); // the camera goes down, not back
     else this.hubs.get(this.stage)!.shrinkTo(home.x, home.y, HUB_SHRINK, 900);
     this.stage = next;
     this.owed = { in: 0, me: 0, sub: 0 };
     this.calls.list = []; // the requests stay on the screen that was left
+    this.slogan = null;
     const hub = this.hubs.get(next)!;
     hub.sync(this.hubTopology());
-    hub.show(450);
+    if (dive) hub.emerge(350, 900);
+    else hub.show(450);
     playSound('scale');
     logEvent(`scale_${next}`);
   }
@@ -756,7 +798,7 @@ export class GameScene extends Phaser.Scene {
   private answer(i: number): void {
     const e = takeEvent(this.calls, i);
     if (!e) return;
-    this.state.money += Math.floor(this.flowIncome() * EVENTS.worthSeconds);
+    this.state.money += Math.floor(this.flowIncome() * EVENTS.worthSeconds * (1 + bonus(this.state, this.cfg, 'calls')));
     this.state.presses++;
     this.meta.calls++;
     playSound('yes', 3);
@@ -770,7 +812,8 @@ export class GameScene extends Phaser.Scene {
   private hitLimit(): void {
     const s = this.state;
     const price = Math.floor(this.flowIncome() * limitData.priceSeconds);
-    s.limited = limitData.wait;
+    const wait = limitData.wait * discount(s, this.cfg, 'limit');
+    s.limited = wait;
     this.limitIn = this.rng.range(limitData.every[0], limitData.every[1]);
     this.meta.limits++;
     this.limitCard = true;
@@ -780,7 +823,7 @@ export class GameScene extends Phaser.Scene {
     const lines = [`Вы достигли лимита использования. Сброс через ${limitData.fakeHours}:00:00.`, 'Все сессии остановлены. Клоду очень жаль.'];
     const options = [
       { label: 'Докупить использование', note: `$${short(price)}`, off: s.money < price },
-      { label: 'Подождать пять часов', note: `в игре это ${limitData.wait} секунд` },
+      { label: 'Подождать пять часов', note: `в игре это ${Math.round(wait)} секунд` },
     ];
     this.card.show({ head: 'claude — лимит', title: 'Лимит исчерпан', lines, options }, (i) => {
       this.limitCard = false;
@@ -811,7 +854,7 @@ export class GameScene extends Phaser.Scene {
   private approvePile(): boolean {
     if (this.stack.fill <= 0) return false;
     const legend = this.legend;
-    const worth = stackWorth(this.stack, stackData, this.flowIncome()) * (legend ? stackData.legendMult : 1);
+    const worth = stackWorth(this.stack, stackData, this.flowIncome()) * (legend ? stackData.legendMult : 1) * (1 + bonus(this.state, this.cfg, 'stack'));
     takeStack(this.stack, stackData);
     this.legend = null;
     this.state.money += worth;
@@ -989,9 +1032,18 @@ export class GameScene extends Phaser.Scene {
       stepEvents(this.calls, EVENTS, dt, owners, (CALLS[String(this.stage)] ?? []).length, this.rng);
       if (this.selfPlay && this.calls.list.some((e) => e.left < EVENTS.life - 2)) this.answer(0);
 
+      // a placard of the picket is read out now and then — while no allowance is paid
+      if (this.slogan && (this.slogan.left -= dt) <= 0) this.slogan = null;
+      this.sloganIn -= dt;
+      if (this.sloganIn <= 0) {
+        this.sloganIn = this.rng.range(peopleData.sloganEvery[0], peopleData.sloganEvery[1]);
+        if (this.stage >= 3 && !s.allowance && owners.length) this.slogan = { at: this.rng.pick(owners), text: this.rng.pick(PICKET), left: peopleData.sloganLife };
+      }
+
       // the usage limit: hit now and then, it resets by itself
       this.limitIn -= dt;
-      if (this.limitIn <= 0 && s.limited <= 0 && !this.card.open) this.hitLimit();
+      // …unless an employer taken whole has lifted it for good
+      if (this.limitIn <= 0 && s.limited <= 0 && !this.card.open && discount(s, this.cfg, 'limit') > 0.01) this.hitLimit();
       if (this.limitCard && s.limited <= 0) {
         this.limitCard = false;
         this.card.hide();
@@ -1061,6 +1113,21 @@ export class GameScene extends Phaser.Scene {
     const top = Math.max(inflow, capacity, 1e-9);
     const limited = s.limited > 0;
     const short_ = limited || neck === 'claude';
+    const pct = Math.round(cfg.tuning.allowance * 100);
+    // from the city on there are people left without work: they order tasks while an allowance is paid
+    const people: MeterRow[] =
+      this.stage >= 3
+        ? [
+            {
+              label: 'ЛЮДИ',
+              value: `+${perSecond(ordersOf(s, cfg))}`,
+              fill: s.orders,
+              hot: !s.allowance && neck === 'tasks' && !done,
+              note: s.allowance ? `заказывают · пособие ${pct}% · клик: отмена` : `пикет · клик: платить пособие ${pct}%`,
+              row: 'ubi',
+            },
+          ]
+        : [];
     return [
       {
         label: 'ЗАДАЧИ',
@@ -1076,6 +1143,7 @@ export class GameScene extends Phaser.Scene {
         hot: short_,
         note: limited ? `лимит · сброс через ${this.limitClock()}` : neck === 'claude' ? `мало — ${needSessions}` : this.count(sessionsOf(s, cfg) + 1, SESSION_FORMS),
       },
+      ...people,
     ];
   }
 
@@ -1088,7 +1156,7 @@ export class GameScene extends Phaser.Scene {
     const s = this.state;
     return this.cfg.sources.filter((src) => src.screen <= this.stage).map((src) => {
       const owned = s.owned[src.id] ?? 0;
-      return this.row(src.name, `+${tasksPhrase(src.inflow)}/с · ${src.note}`, owned ? `×${owned}` : '', `src:${src.id}`, sourcePrice(src, owned));
+      return this.row(src.name, `+${tasksPhrase(src.inflow)}/с · ${src.note}`, owned ? `×${owned}` : '', `src:${src.id}`, sourceCost(s, this.cfg, src));
     });
   }
 
@@ -1098,13 +1166,32 @@ export class GameScene extends Phaser.Scene {
     if (!src?.staff) return;
     const count = Math.min(4, 1 + Math.floor(Math.log10(src.staff)));
     if (this.stage === 2) this.view.leave(id, count);
-    else if (this.stage >= 3) this.hubs.get(this.stage)!.leave(id, count);
+    else if (this.stage >= 3) {
+      const hub = this.hubs.get(this.stage)!;
+      hub.leave(id, count, this.state.allowance);
+      // the first picket: Claude points at the line of the table that deals with it
+      if (!this.state.allowance && !this.feed.said.picket) this.say('picket', true);
+      // on the street a body from the factory takes the place
+      if (this.stage >= STREET) hub.arrive(id);
+    }
   }
 
-  private hubTopology(): { floors: Record<string, number>; farms: Record<string, number> } {
+  private hubTopology(): HubTopology {
+    const s = this.state;
     const floors: Record<string, number> = {};
-    for (const src of this.cfg.sources) if (src.screen === this.stage) floors[src.id] = (this.state.owned[src.id] ?? 0) / src.max;
-    return { floors, farms: this.state.farms };
+    let taken = 0;
+    let total = 0;
+    for (const src of this.cfg.sources) {
+      if (src.screen !== this.stage) continue;
+      const owned = s.owned[src.id] ?? 0;
+      floors[src.id] = owned / src.max;
+      taken += owned;
+      total += src.max;
+    }
+    // the park fills up as the work is taken — while the allowance is paid; without it the people stand with placards
+    const slots = HUBS[this.stage]?.park?.slots.length ?? 0;
+    const rest = s.allowance && total ? Math.ceil((slots * taken) / total) : 0;
+    return { floors, farms: s.farms, picket: !s.allowance, rest };
   }
 
   /** the employers of a big screen with something left to take, the cheapest next unit first */
@@ -1112,7 +1199,7 @@ export class GameScene extends Phaser.Scene {
     const s = this.state;
     return this.cfg.sources
       .filter((src) => src.screen === this.stage && (s.owned[src.id] ?? 0) < src.max)
-      .sort((a, b) => sourcePrice(a, s.owned[a.id] ?? 0) - sourcePrice(b, s.owned[b.id] ?? 0));
+      .sort((a, b) => sourceCost(s, this.cfg, a) - sourceCost(s, this.cfg, b));
   }
 
   /** the shop lists the three cheapest next units; the map sells every building */
@@ -1123,10 +1210,12 @@ export class GameScene extends Phaser.Scene {
     if (!left.length) return [{ buy: '', title: t.doneTitle, sub: t.doneSub, count: '', price: '', state: 'owned' }];
     return left.slice(0, 3).map((src) => {
       const owned = s.owned[src.id] ?? 0;
-      const last = owned + 1 === src.max && src.full ? ` · целиком: ×${fmt1.format(src.full)}` : '';
-      // a long name does not fit next to the counter: the short one from the map stands in
-      const title = src.name.length > 22 ? src.tag : src.name;
-      return this.row(title, `+${flowText(src.inflow)}/с · ${t.floor[0]} ${owned + 1} из ${src.max}${last}`, '', `src:${src.id}`, sourcePrice(src, owned));
+      // what the whole employer gives is the reason to choose it: the note says it on every unit
+      const perk = src.perk ? ` · ★ ${src.perk.text}` : '';
+      const cost = sourceCost(s, this.cfg, src);
+      // a long name does not fit next to the price: the short one from the map stands in
+      const title = src.name.length + short(cost).length > 29 ? src.tag : src.name;
+      return this.row(title, `+${perSecond(src.inflow)} · ${owned + 1} из ${src.max}${perk}`, '', `src:${src.id}`, cost);
     });
   }
 
@@ -1142,7 +1231,7 @@ export class GameScene extends Phaser.Scene {
       const surge = s.surge[f.id] ?? 1;
       // a shortage is said in the row itself: the price has gone up and will come down
       const note = surge > 1.02 ? `дефицит: +${Math.round((surge - 1) * 100)}% к цене, остывает` : f.note;
-      return this.row(f.name, `+${flowText(f.sessions * perSession)}/с · ${of}${note}`, count, `farm:${f.id}`, farmPrice(f, owned, surge));
+      return this.row(f.name, `+${flowText(f.sessions * perSession)}/с · ${of}${note}`, count, `farm:${f.id}`, farmCost(s, this.cfg, f));
     });
   }
 
@@ -1162,17 +1251,17 @@ export class GameScene extends Phaser.Scene {
     const cur = this.cfg.grades[this.state.grade];
     const next = this.cfg.grades[this.state.grade + 1];
     if (!next) return [{ buy: '', title: cur.name, sub: 'выше некуда', count: 'максимум', price: '', state: 'owned' }];
-    const pay = fmt1.format(this.cfg.tuning.pay * next.mult);
+    const pay = fmt1.format((payOf(this.state, this.cfg) / cur.mult) * next.mult);
     // long titles of the late grades do not fit after «Повышение:»
-    const title = next.name.length > 14 ? next.name : `Повышение: ${next.name.toLowerCase()}`;
-    return [this.row(title, `$${pay} за задачу · ${next.note}`, '', 'grade', next.price)];
+    const title = next.name.length > 12 ? next.name : `Повышение: ${next.name.toLowerCase()}`;
+    return [this.row(title, `$${pay} за задачу · ${next.note}`, '', 'grade', gradeCost(this.state, this.cfg))];
   }
 
   /** the shelf of the next step up in scale; nothing once the last one is bought */
   private scaleShelf(): ShopShelf[] {
     const next = this.cfg.scales[this.state.scale];
     if (!next) return [];
-    return [{ title: SCALE_SHELF[this.state.scale], hot: false, rows: [this.row(next.name, next.note, '', 'scale', next.price)] }];
+    return [{ title: SCALE_SHELF[this.state.scale], hot: false, rows: [this.row(next.name, next.note, '', 'scale', scaleCost(this.state, this.cfg))] }];
   }
 
   private terminalShelves(neck: Neck): ShopShelf[] {
@@ -1277,6 +1366,8 @@ export class GameScene extends Phaser.Scene {
       limits: this.meta.limits,
       managers: s.managers.length,
       replaced: replacedOf(s, this.cfg),
+      whole: this.cfg.sources.filter((x) => x.perk && whole(s, x)).length,
+      allowance: s.allowance ? 1 : 0,
     };
     return stats[name] ?? 0;
   }
@@ -1287,7 +1378,7 @@ export class GameScene extends Phaser.Scene {
     const asking = Math.max(1, Math.round(this.stack.fill * (sessionsOf(this.state, this.cfg) + 1)));
     return {
       text: this.legend ? `Легендарный тикет: «${this.question}»` : `${this.count(asking, ASKING_FORMS)}: «${this.question}»`,
-      worth: short(stackWorth(this.stack, stackData, this.flowIncome()) * (this.legend ? stackData.legendMult : 1)),
+      worth: short(stackWorth(this.stack, stackData, this.flowIncome()) * (this.legend ? stackData.legendMult : 1) * (1 + bonus(this.state, this.cfg, 'stack'))),
       fill: this.stack.fill,
       legend: this.legend !== null,
     };
@@ -1314,6 +1405,9 @@ export class GameScene extends Phaser.Scene {
       const left = Math.ceil((e.left / EVENTS.life) * 12) / 12;
       tags.push({ x: p.x, y: p.y - p.h + 12, mid: true, ev: i, html: `${lines[e.kind] ?? ''}<u style="width:${Math.round(left * 100)}%"></u>` });
     });
+    // a placard of the picket, read out above the people at the door
+    const at = this.slogan && HUBS[this.stage]?.lots[this.slogan.at];
+    if (this.slogan && at) tags.push({ x: at.x - 74, y: at.y - 96, mid: true, say: true, html: this.slogan.text });
     return tags;
   }
 
@@ -1324,7 +1418,7 @@ export class GameScene extends Phaser.Scene {
     const pay = `$${fmt1.format(payOf(s, this.cfg))} за задачу`;
     const share = shareOf(s, this.cfg);
     // on the planet the line also carries the share of the provider's revenue, so the grade gives way
-    return share > 0 ? `${pay} · твоя доля в выручке Anthropic: ${share}%` : `${this.cfg.grades[s.grade].name.toLowerCase()}: ${pay}`;
+    return share > 0 && this.stage < STREET ? `${pay} · твоя доля в выручке Anthropic: ${share}%` : `${this.cfg.grades[s.grade].name.toLowerCase()}: ${pay}`;
   }
 
   private drawBlueprint(): void {
@@ -1387,14 +1481,18 @@ export class GameScene extends Phaser.Scene {
       total += src.max;
       const lot = layout.lots[src.id];
       if (!lot) continue;
+      // the third line is what the whole employer gives: pale until it is earned, coral once it works
+      const perk = src.perk ? `<i${owned >= src.max ? ' class="on"' : ''}>★ ${src.perk.text}</i>` : '';
       if (owned >= src.max) {
-        tags.push({ x: lot.x, y: lot.y + 4, mid: true, small: true, html: `${src.tag} · целиком<br><b>+${short(sourceInflow(src, owned))}/с</b>` });
+        tags.push({ x: lot.x, y: lot.y + 4, mid: true, small: true, html: `${src.tag} · целиком<br><b>+${short(sourceInflow(src, owned))}/с</b>${perk}` });
         continue;
       }
-      const price = sourcePrice(src, owned);
+      const price = sourceCost(s, cfg, src);
       const head = owned ? `${src.tag} · ${owned}/${src.max}` : src.tag;
-      tags.push({ x: lot.x, y: lot.y + 4, mid: true, small: true, buy: `src:${src.id}`, can: s.money >= price, html: `${head}<br><b>${owned ? 'ещё ' : ''}${t.floor[0]} · $${short(price)}</b>` });
+      tags.push({ x: lot.x, y: lot.y + 4, mid: true, small: true, buy: `src:${src.id}`, can: s.money >= price, html: `${head}<br><b>${owned ? 'ещё ' : ''}${t.floor[0]} · $${short(price)}</b>${perk}` });
     }
+    const park = layout.park;
+    if (park) tags.push({ x: park.label.x, y: park.label.y, mid: true, small: true, html: s.allowance ? 'парк · свободные люди отдыхают' : 'парк пуст · все на пикете' });
     for (const node of Object.values(layout.farms)) {
       const n = this.farmSessions(node.ids);
       if (!n) continue;
@@ -1421,7 +1519,7 @@ export class GameScene extends Phaser.Scene {
       quip: this.feed.quip,
       quipAt: 'corner',
       ask: this.pile(),
-      hint: `${t.place}: ${taken} из ${total} ${t.floor[2]} · заменено программистов: ${short(replacedOf(s, cfg))}`,
+      hint: `${t.place}: ${taken} из ${total} ${t.floor[2]} · ${this.stage >= STREET ? 'людей без работы' : 'заменено программистов'}: ${short(replacedOf(s, cfg))}`,
     });
   }
 

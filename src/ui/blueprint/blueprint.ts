@@ -18,6 +18,8 @@ export interface BlueprintTag {
   can?: boolean;
   /** a request from an employer (M20): a dark bubble, a click answers the request with this number */
   ev?: number;
+  /** words on a placard of the picket (M24): a light bubble, nothing to click */
+  say?: boolean;
 }
 
 /** Claude the manager at the top of the shop (M21): for hire, working or told to wait. */
@@ -183,7 +185,7 @@ export function createBlueprint(layer: HTMLElement, over: HTMLElement): Blueprin
         m.tags
           .map(
             (t) =>
-              `<div class="bl-tag${t.hot ? ' hot' : ''}${t.small ? ' small' : ''}${t.mid ? ' mid' : ''}${t.buy ? ' act' : ''}${t.can ? ' can' : ''}${t.ev === undefined ? '' : ' ev'}"${t.buy ? ` data-row="${t.buy}"` : ''}${t.ev === undefined ? '' : ` data-ev="${t.ev}"`} style="left:${t.x}px;top:${t.y}px">${t.html}</div>`,
+              `<div class="bl-tag${t.hot ? ' hot' : ''}${t.small ? ' small' : ''}${t.mid ? ' mid' : ''}${t.buy ? ' act' : ''}${t.can ? ' can' : ''}${t.ev === undefined ? '' : ' ev'}${t.say ? ' say' : ''}"${t.buy ? ` data-row="${t.buy}"` : ''}${t.ev === undefined ? '' : ` data-ev="${t.ev}"`} style="left:${t.x}px;top:${t.y}px">${t.html}</div>`,
           )
           .join(''),
       );

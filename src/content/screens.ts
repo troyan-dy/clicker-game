@@ -1,4 +1,4 @@
-/** Words of the big screens: the city (3), the state (4), the planet (5). */
+/** Words of the big screens: the city (3), the state (4), the planet (5), the street (6). */
 export interface HubText {
   /** caption under the node in the middle */
   home: string;
@@ -60,10 +60,23 @@ export const HUB_TEXT: Record<number, HubText> = {
     unit: 'операций',
     floor: ['регион', 'региона', 'регионов'],
   },
+  6: {
+    home: 'завод «Бостон Механикс»',
+    employers: 'РАБОЧИЕ МЕСТА',
+    farms: 'ТЕЛА · больше сессий',
+    needEmployers: 'нужны ещё рабочие места',
+    needFarms: 'нужны тела с завода',
+    done: 'улица твоя: за прилавком и за рулём — Клод',
+    doneTitle: 'Улица твоя',
+    doneSub: 'за прилавком и за рулём — Клод',
+    place: 'улица',
+    unit: 'мест',
+    floor: ['место', 'места', 'мест'],
+  },
 };
 
 /** the shelf of the next step up in scale, by how many are already bought */
-export const SCALE_SHELF = ['МАСШТАБ · дальше — город', 'МАСШТАБ · дальше — государство', 'МАСШТАБ · дальше — планета'];
+export const SCALE_SHELF = ['МАСШТАБ · дальше — город', 'МАСШТАБ · дальше — государство', 'МАСШТАБ · дальше — планета', 'МАСШТАБ · дальше — улица'];
 
-/** the last line of the game: every screen is done and the provider has no other customers left */
-export const FINALE = 'ты — единственный клиент Anthropic и единственный программист планеты';
+/** the last line of the game: every screen is done, there is no work left for anybody else */
+export const FINALE = 'работать больше некому и незачем: всё делает Клод';

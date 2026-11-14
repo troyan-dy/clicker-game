@@ -1,0 +1,1 @@
+[{"t": 1.0, "eval": "window.__gym.gift(4e13); window.__gym.buy('src:exchange'); window.__gym.buy('src:exchange'); window.__gym.buy('src:exchange'); window.__gym.buy('src:exchange'); window.__gym.buy('src:shipping')"}, {"t": 4.0, "eval": "window.__gym.gift(4e13); window.__gym.buy('scale')"}]

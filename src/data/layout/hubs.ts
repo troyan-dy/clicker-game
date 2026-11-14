@@ -1,8 +1,8 @@
 /**
- * The big screens — the city (3), the state (4), the planet (5) — share one layout: the previous
- * screen shrunk into a node in the middle, one-off employers around it, the farms that run the
- * sessions next to it. Scene coordinates (1920×1080), nodes anchored at their bottom centre,
- * `h` — the height a node is drawn at, px.
+ * The big screens — the city (3), the state (4), the planet (5), the street (6) — share one layout:
+ * a node in the middle (the previous screen shrunk, or the factory of the street), employers around
+ * it, the farms that run the sessions next to it. Scene coordinates (1920×1080), nodes anchored at
+ * their bottom centre, `h` — the height a node is drawn at, px.
  */
 export interface HubLayout {
   home: { key: string; x: number; y: number; h: number };
@@ -21,6 +21,14 @@ export interface HubLayout {
   backdrop?: { key: string; x: number; y: number; h: number; alpha: number };
   /** a pale isometric grid of streets behind everything: the distance between them, px */
   streets?: number;
+  /** the street seen close up: two roads that cross in the middle and a lawn instead of a plan */
+  roads?: boolean;
+  /** where the people freed from work rest: the feet of every group (the far ones first), their height, the caption */
+  park?: { slots: readonly (readonly [number, number])[]; h: number; label: { x: number; y: number } };
+  /** bodies walk from the middle to the place they take; employers listed here get a robot dog, the rest an android */
+  dogs?: readonly string[];
+  /** the camera does not pull back to this screen: it dives into the previous one */
+  dive?: boolean;
 }
 
 const MID = { x: 670, y: 700 };
@@ -33,18 +41,18 @@ export const HUBS: Record<number, HubLayout> = {
     home: { key: 'desk', ...MID, h: 144 },
     homeRadius: 105,
     lots: {
-      vector: { key: 'office', x: 410, y: 700, h: 170 },
+      vector: { key: 'office', x: 410, y: 700, h: 158 },
       cats: { key: 'garage', x: 930, y: 700, h: 150 },
       creative: { key: 'studio', x: 410, y: 480, h: 150 },
       market: { key: 'mall', x: 930, y: 930, h: 150 },
       logistics: { key: 'warehouse', x: 930, y: 480, h: 140 },
-      factory: { key: 'factory', x: 410, y: 930, h: 165 },
+      factory: { key: 'factory', x: 410, y: 930, h: 158 },
       bank: { key: 'bank', x: 150, y: 480, h: 160 },
-      telecom: { key: 'tower', x: 1190, y: 930, h: 175 },
-      gov: { key: 'admin', x: 1190, y: 480, h: 165 },
+      telecom: { key: 'tower', x: 1190, y: 930, h: 160 },
+      gov: { key: 'admin', x: 1190, y: 480, h: 158 },
       cloud: { key: 'garage', x: 150, y: 930, h: 150 },
-      consult: { key: 'office', x: 150, y: 700, h: 170 },
-      everyone: { key: 'tower', x: 1190, y: 700, h: 175 },
+      consult: { key: 'office', x: 150, y: 700, h: 158 },
+      everyone: { key: 'tower', x: 1190, y: 700, h: 160 },
     },
     farms: {
       servers: { key: 'rack', ...BELOW, h: 150, ids: ['rack', 'hall'], upgrade: { farm: 'hall', key: 'racks' } },
@@ -58,13 +66,13 @@ export const HUBS: Record<number, HubLayout> = {
     home: { key: 'cityblock', ...MID, h: 150 },
     homeRadius: 110,
     lots: {
-      pension: { key: 'office', x: 410, y: 700, h: 170 },
+      pension: { key: 'office', x: 410, y: 700, h: 158 },
       customs: { key: 'warehouse', x: 930, y: 700, h: 140 },
-      tax: { key: 'tower', x: 410, y: 480, h: 175 },
-      digital: { key: 'admin', x: 930, y: 480, h: 165 },
+      tax: { key: 'tower', x: 410, y: 480, h: 160 },
+      digital: { key: 'admin', x: 930, y: 480, h: 158 },
       central: { key: 'bank', x: 410, y: 930, h: 160 },
-      space: { key: 'launchpad', x: 930, y: 930, h: 175 },
-      parliament: { key: 'parliament', x: 150, y: 700, h: 170 },
+      space: { key: 'launchpad', x: 930, y: 930, h: 160 },
+      parliament: { key: 'parliament', x: 150, y: 700, h: 158 },
       defence: { key: 'military', x: 1190, y: 700, h: 150 },
     },
     farms: {
@@ -81,12 +89,12 @@ export const HUBS: Record<number, HubLayout> = {
     lots: {
       exchange: { key: 'bank', x: 410, y: 700, h: 160 },
       shipping: { key: 'warehouse', x: 930, y: 700, h: 140 },
-      satnet: { key: 'dish', x: 410, y: 480, h: 165 },
-      games: { key: 'admin', x: 930, y: 480, h: 165 },
-      station: { key: 'launchpad', x: 410, y: 930, h: 175 },
+      satnet: { key: 'dish', x: 410, y: 480, h: 158 },
+      games: { key: 'admin', x: 930, y: 480, h: 158 },
+      station: { key: 'launchpad', x: 410, y: 930, h: 160 },
       standards: { key: 'hq', x: 930, y: 930, h: 150 },
       peace: { key: 'military', x: 150, y: 700, h: 150 },
-      nations: { key: 'parliament', x: 1190, y: 700, h: 170 },
+      nations: { key: 'parliament', x: 1190, y: 700, h: 158 },
     },
     farms: {
       quota: { key: 'racks', ...BELOW, h: 150, ids: ['quota'] },
@@ -94,5 +102,42 @@ export const HUBS: Record<number, HubLayout> = {
     },
     maxWidth: 185,
     backdrop: { key: 'globe', x: 670, y: 1010, h: 760, alpha: 0.3 },
+  },
+  // the street: the camera is back on the ground; the factory in the middle, work done by hand around it, a park for the people
+  6: {
+    home: { key: 'robofactory', ...MID, h: 160 },
+    homeRadius: 110,
+    lots: {
+      checkout: { key: 'supermarket', x: 150, y: 480, h: 150 },
+      coffee: { key: 'coffee', x: 410, y: 480, h: 140 },
+      courier: { key: 'pizzeria', x: 1190, y: 700, h: 140 },
+      taxi: { key: 'taxi', x: 930, y: 700, h: 120 },
+      barber: { key: 'barber', x: 930, y: 480, h: 145 },
+      depot: { key: 'warehouse', x: 410, y: 930, h: 135 },
+      build: { key: 'build', x: 930, y: 930, h: 160 },
+      clinic: { key: 'clinic', x: 1190, y: 480, h: 130 },
+      school: { key: 'school', x: 150, y: 930, h: 135 },
+      farm: { key: 'farm', x: 1190, y: 930, h: 150 },
+    },
+    farms: {
+      android: { key: 'android', ...ABOVE, h: 120, ids: ['android'], above: true },
+      dogs: { key: 'robodog', ...BELOW, h: 100, ids: ['dogs'] },
+    },
+    maxWidth: 185,
+    roads: true,
+    park: {
+      slots: [
+        [100, 662],
+        [270, 662],
+        [440, 662],
+        [185, 754],
+        [355, 754],
+        [520, 754],
+      ],
+      h: 84,
+      label: { x: 270, y: 756 },
+    },
+    dogs: ['courier', 'depot', 'farm'],
+    dive: true,
   },
 };

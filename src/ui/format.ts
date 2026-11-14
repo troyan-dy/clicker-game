@@ -1,5 +1,7 @@
 const int = new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 0 });
 const UNITS: readonly [number, string][] = [
+  [1e21, 'скстлн'],
+  [1e18, 'квнтлн'],
   [1e15, 'квдрлн'],
   [1e12, 'трлн'],
   [1e9, 'млрд'],

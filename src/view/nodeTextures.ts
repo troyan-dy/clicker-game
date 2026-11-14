@@ -6,6 +6,9 @@ const NODES = [
   'cityblock', 'parliament', 'military', 'launchpad', 'gpus', 'back_state', // the state
   'island', 'dish', 'hq', 'satellite', 'globe', // the planet
   'person1', 'person2', 'person3', // the laid-off programmers
+  'picket1', 'picket2', 'picket3', // …who did not leave
+  'robofactory', 'android', 'robodog', 'supermarket', 'coffee', 'barber', 'build', 'taxi', 'pizzeria', 'farm', 'clinic', 'school', // the street
+  'rest_hammock', 'rest_chess', 'rest_bench', 'rest_fishing', 'rest_picnic', 'rest_easel', // the park
 ];
 
 /** Loads every node icon once: both the blueprint and the city draw from the same set. */

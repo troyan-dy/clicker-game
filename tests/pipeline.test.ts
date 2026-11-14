@@ -23,7 +23,9 @@ import {
   buySubagent,
   claudeRate,
   createPipe,
+  farmCost,
   farmPrice,
+  finished,
   inflowOf,
   payOf,
   pressPipe,
@@ -252,6 +254,54 @@ describe('pipeline', () => {
     expect(takeEvent(st, 0)).toBeDefined();
     expect(st.list.length).toBe(n - 1);
     expect(st.taken).toBe(1);
+  });
+
+  it('test_perk_of_a_whole_employer_changes_pay_and_prices', () => {
+    const s = createPipe(cfg);
+    s.noAsk = true;
+    const max = (id: string): number => cfg.sources.find((x) => x.id === id)!.max;
+    const pay = payOf(s, cfg);
+    s.owned.bank = max('bank') - 1; // «+10% за задачу» once the bank is taken whole
+    expect(payOf(s, cfg)).toBe(pay);
+    s.owned.bank = max('bank');
+    expect(payOf(s, cfg)).toBeCloseTo(pay * 1.1);
+    // discounts multiply: servers 10% and 15% off
+    const rack = cfg.farms.find((f) => f.id === 'rack')!;
+    const before = farmCost(s, cfg, rack);
+    s.owned.logistics = max('logistics');
+    s.owned.cloud = max('cloud');
+    expect(farmCost(s, cfg, rack)).toBe(Math.round(before * 0.9 * 0.85));
+    // and the purchase takes the discounted price
+    s.money = farmCost(s, cfg, rack);
+    expect(buyFarm(s, cfg, 'rack')).toBe(true);
+    expect(s.money).toBe(0);
+  });
+
+  it('test_allowance_costs_a_share_of_the_pay_and_brings_orders', () => {
+    const s = createPipe(cfg);
+    s.noAsk = true;
+    s.owned.vector = 2;
+    const work = inflowOf(s, cfg);
+    const pay = payOf(s, cfg);
+    s.allowance = true;
+    expect(payOf(s, cfg)).toBeCloseTo(pay * (1 - cfg.tuning.allowance));
+    run(s, cfg.tuning.ordersRise + 1, 0);
+    expect(inflowOf(s, cfg)).toBeCloseTo(work * (1 + cfg.tuning.orders));
+    s.allowance = false;
+    run(s, cfg.tuning.ordersFade + 1, 0);
+    expect(inflowOf(s, cfg)).toBeCloseTo(work); // without the allowance the orders dry up
+  });
+
+  it('test_game_ends_when_the_last_screen_is_taken_whole', () => {
+    const s = createPipe(cfg);
+    s.noAsk = true;
+    s.scale = cfg.scales.length;
+    const last = 2 + cfg.scales.length;
+    expect(finished(s, cfg)).toBe(false);
+    for (const src of cfg.sources) if (src.screen === last) s.owned[src.id] = src.max;
+    expect(finished(s, cfg)).toBe(true);
+    s.scale--;
+    expect(finished(s, cfg)).toBe(false);
   });
 
   it('test_pipe_prices_grow_and_money_is_required', () => {

@@ -3,7 +3,7 @@
  * work when tasks run short, the next sessions when they pile up — and leaves plans, promotions and
  * steps up in scale to the player. Pure logic: says what to buy, buys nothing itself.
  */
-import { farmPrice, sourcePrice, subagentPrice, type PipeConfig, type PipeState } from '../pipeline/pipeline';
+import { farmCost, sourceCost, subagentPrice, type PipeConfig, type PipeState } from '../pipeline/pipeline';
 
 export interface ManagerTuning {
   /** seconds between his purchases */
@@ -26,14 +26,14 @@ export function managerPick(s: PipeState, cfg: PipeConfig, screen: number, need:
     for (const src of cfg.sources) {
       const owned = s.owned[src.id] ?? 0;
       const onSale = screen >= 3 ? src.screen === screen : src.screen <= screen;
-      if (onSale && owned < src.max) offer(`src:${src.id}`, sourcePrice(src, owned));
+      if (onSale && owned < src.max) offer(`src:${src.id}`, sourceCost(s, cfg, src));
     }
   } else if (screen === 2) {
     offer('sub', subagentPrice(cfg, s.subagents));
   } else {
     for (const f of cfg.farms) {
       const owned = s.farms[f.id] ?? 0;
-      if (f.screen === screen && owned < (f.max ?? Infinity)) offer(`farm:${f.id}`, farmPrice(f, owned, s.surge[f.id] ?? 1));
+      if (f.screen === screen && owned < (f.max ?? Infinity)) offer(`farm:${f.id}`, farmCost(s, cfg, f));
     }
   }
   const pick = best as { key: string; price: number } | null;

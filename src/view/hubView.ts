@@ -13,6 +13,12 @@ const FIELD = { x0: 16, x1: 1324, y0: 284, y1: 1012 };
 const GHOST = 0.28; // what is not taken yet is a pale outline
 const DOT_SPEED = 560; // px per second along a connector
 const DOTS = 80;
+const LAWN = 0xbcd1ca;
+const ROAD = 0xe4e0d3;
+const PICKET_H = 66; // a figure with a placard, px
+const PICKETS = ['node_picket1', 'node_picket2', 'node_picket3'];
+const RESTS = ['node_rest_bench', 'node_rest_chess', 'node_rest_hammock', 'node_rest_picnic', 'node_rest_easel', 'node_rest_fishing'];
+const MASCOT = 'mascot';
 
 /** What the player owns on a big screen: units of the employers and farms of sessions. */
 export interface HubTopology {
@@ -20,6 +26,10 @@ export interface HubTopology {
   floors: Record<string, number>;
   /** units owned per farm id */
   farms: Record<string, number>;
+  /** the people left without work stand at the buildings with placards (no allowance is paid) */
+  picket: boolean;
+  /** how many groups of people rest in the park, if the screen has one */
+  rest: number;
 }
 
 interface Route {
@@ -44,6 +54,10 @@ interface Lot {
   /** the part coloured in right now, 0..1 */
   shown: number;
   target: number;
+  /** people with placards at the door */
+  pickets: Phaser.GameObjects.Image[];
+  /** Claude on the roof of a building taken whole */
+  flag?: Phaser.GameObjects.Image;
 }
 
 /**
@@ -62,6 +76,9 @@ export class HubView {
   private readonly routes = new Map<string, Route>();
   private readonly lit = new Map<string, string>();
   private readonly dots: Dot[] = [];
+  private readonly rests: Phaser.GameObjects.Image[] = [];
+  private resting = 0;
+  private readonly rng: Rng;
   private readonly walkers: Walkers;
   private readonly mid: Pt;
   /** called when a square of tasks reaches a farm: the tasks are closed there */
@@ -70,7 +87,16 @@ export class HubView {
   constructor(scene: Phaser.Scene, layout: HubLayout, rng: Rng) {
     this.scene = scene;
     this.layout = layout;
+    this.rng = rng;
     this.mid = [layout.home.x, layout.home.y - layout.home.h * 0.42];
+    if (!scene.textures.exists(MASCOT)) {
+      // Claude's face: a coral square with two eyes
+      const g = scene.make.graphics({}, false);
+      g.fillStyle(CORAL, 1).fillRect(0, 0, 26, 22);
+      g.fillStyle(INK, 1).fillRect(7, 7, 4, 7).fillRect(15, 7, 4, 7);
+      g.generateTexture(MASCOT, 26, 22);
+      g.destroy();
+    }
     this.lines = scene.add.graphics();
     this.root = scene.add.container(0, 0).setAlpha(0).setVisible(false);
     if (layout.backdrop) {
@@ -79,7 +105,13 @@ export class HubView {
       this.root.add(img.setScale(b.h / img.height));
     }
     if (layout.streets) this.root.add(this.streets(layout.streets));
+    if (layout.roads) this.root.add(this.roads());
     this.root.add(this.lines);
+    for (const [i, [x, y]] of (layout.park?.slots ?? []).entries()) {
+      const img = scene.add.image(x, y, RESTS[i % RESTS.length]).setOrigin(0.5, 1).setVisible(false);
+      this.root.add(img.setScale(layout.park!.h / img.height));
+      this.rests.push(img);
+    }
 
     // far rows first, so that nearer nodes overlap them
     const places = [
@@ -97,7 +129,7 @@ export class HubView {
         const fill = scene.add.image(p.x, p.y, `node_${p.key}`).setOrigin(0.5, 1).setScale(scale);
         fill.setCrop(0, fill.height, fill.width, 0);
         this.root.add(fill);
-        this.lots.set(p.id, { ghost: img, fill, scale, shown: 0, target: 0 });
+        this.lots.set(p.id, { ghost: img, fill, scale, shown: 0, target: 0, pickets: [] });
       } else this.nodes.set(p.id, img);
     }
     this.walkers = new Walkers(scene, this.root, rng);
@@ -113,6 +145,28 @@ export class HubView {
   show(delayMs: number): void {
     this.root.setVisible(true);
     this.scene.tweens.add({ targets: this.root, alpha: 1, delay: delayMs, duration: 500 });
+  }
+
+  /** The dive: the camera comes down to this screen — it grows out of the point in its middle. */
+  emerge(delayMs: number, ms: number): void {
+    const { x, y } = this.layout.home;
+    this.root.setVisible(true).setScale(0.12).setPosition(x * 0.88, y * 0.88);
+    this.scene.tweens.add({ targets: this.root, scale: 1, x: 0, y: 0, alpha: 1, delay: delayMs, duration: ms, ease: 'Cubic.Out' });
+  }
+
+  /** …and the screen it dives into grows around its middle; it is gone before it reaches the shop. */
+  diveIn(scale: number, ms: number): void {
+    const { x, y } = this.layout.home;
+    this.scene.tweens.add({ targets: this.root, alpha: 0, duration: ms * 0.6 });
+    this.scene.tweens.add({
+      targets: this.root,
+      scale,
+      x: x * (1 - scale),
+      y: (y - this.layout.home.h / 2) * (1 - scale),
+      duration: ms,
+      ease: 'Cubic.In',
+      onComplete: () => this.root.setVisible(false),
+    });
   }
 
   /** The next pull-back: the whole screen shrinks into one node — its middle lands at the foot (x, y) of that node. */
@@ -135,6 +189,9 @@ export class HubView {
     for (const [id, place] of Object.entries(this.layout.lots)) {
       const lot = this.lots.get(id)!;
       const target = Math.min(1, t.floors[id] ?? 0);
+      // those whose work was taken stand at the door: one, two when the whole building is gone
+      this.picket(lot, place, t.picket && target > 0 ? (target >= 1 ? 2 : 1) : 0);
+      if (target >= 1 && !lot.flag) this.raiseFlag(lot, place, lot.target > 0);
       if (target === lot.target) continue;
       const first = lot.target === 0;
       lot.target = target;
@@ -166,6 +223,46 @@ export class HubView {
       changed = true;
     }
     if (changed) this.redrawLines();
+    this.rest(Math.min(this.rests.length, t.rest));
+  }
+
+  /** `want` people with placards stand at the door of a building; the rest of them go. */
+  private picket(lot: Lot, place: { x: number; y: number }, want: number): void {
+    while (lot.pickets.length < want) {
+      const n = lot.pickets.length;
+      const img = this.scene.add.image(place.x - 62 - n * 24, place.y + 6 + n * 5, PICKETS[this.rng.int(0, PICKETS.length - 1)]).setOrigin(0.5, 1);
+      const scale = PICKET_H / img.height;
+      this.root.add(img.setScale(scale).setAlpha(0));
+      this.scene.tweens.add({ targets: img, alpha: 1, scale: { from: scale * 0.7, to: scale }, delay: 500 + n * 250, duration: 260, ease: 'Back.Out' });
+      lot.pickets.push(img);
+    }
+    while (lot.pickets.length > want) {
+      const img = lot.pickets.pop()!;
+      this.scene.tweens.add({ targets: img, alpha: 0, duration: 400, onComplete: () => img.destroy() });
+    }
+  }
+
+  /** Claude's face appears on the roof of a building that is taken whole; `pop` — it has just happened. */
+  private raiseFlag(lot: Lot, place: { x: number; y: number }, pop: boolean): void {
+    const flag = this.scene.add.image(place.x, place.y - lot.fill.displayHeight + 9, MASCOT).setOrigin(0.5, 1);
+    this.root.add(flag);
+    lot.flag = flag;
+    if (pop) this.scene.tweens.add({ targets: flag, y: { from: flag.y - 46, to: flag.y }, alpha: { from: 0, to: 1 }, duration: 420, delay: 380, ease: 'Bounce.Out' });
+  }
+
+  /** `n` groups of people rest in the park: new ones settle in, the others get up and go. */
+  private rest(n: number): void {
+    if (n === this.resting) return;
+    this.rests.forEach((img, i) => {
+      const on = i < n;
+      if (on === img.visible) return;
+      if (on) {
+        const scale = img.scale;
+        img.setVisible(true).setAlpha(0);
+        this.scene.tweens.add({ targets: img, alpha: 1, scale: { from: scale * 0.8, to: scale }, duration: 320, delay: 900, ease: 'Back.Out' });
+      } else this.scene.tweens.add({ targets: img, alpha: 0, duration: 400, onComplete: () => img.setVisible(false) });
+    });
+    this.resting = n;
   }
 
   /** Sends a square along a connector: an employer id → the middle, `farm:<node>` → from the middle to that farm. */
@@ -178,12 +275,29 @@ export class HubView {
     dot.rect.setPosition(route.from[0], route.from[1]).setVisible(true);
   }
 
-  /** `count` laid-off programmers leave the building of an employer and walk off the map, away from the middle. */
-  leave(id: string, count: number): void {
+  /**
+   * `count` people whose work was taken leave the building of an employer. `toPark` — they are paid
+   * an allowance and go to rest: to the park of this screen, or off the map where there is none.
+   */
+  leave(id: string, count: number, toPark: boolean): void {
     const place = this.layout.lots[id];
     if (!place) return;
-    const limit = place.x < this.layout.home.x ? FIELD.x0 + 20 : FIELD.x1 - 20;
-    this.walkers.spawn(place.x + (place.x < this.layout.home.x ? -30 : 30), place.y + 4, limit, count);
+    const left = place.x < this.layout.home.x;
+    const from: Pt = [place.x + (left ? -30 : 30), place.y + 4];
+    const park = this.layout.park;
+    if (toPark && park) {
+      const [x, y] = park.slots[this.rng.int(0, park.slots.length - 1)];
+      this.walkers.spawn('person', from, [x, y - 6], count);
+    } else this.walkers.spawn('person', from, [left ? FIELD.x0 + 20 : FIELD.x1 - 20, place.y + 4], count);
+  }
+
+  /** A body from the factory in the middle walks to the place it takes at an employer. */
+  arrive(id: string): void {
+    const place = this.layout.lots[id];
+    if (!place) return;
+    const { x, y } = this.layout.home;
+    const kind = this.layout.dogs?.includes(id) ? 'robodog' : 'android';
+    this.walkers.spawn(kind, [x + (place.x < x ? -50 : 50), y + 2], [place.x + (place.x < x ? 40 : -40), place.y + 4], 1);
   }
 
   step(dt: number): void {
@@ -226,6 +340,52 @@ export class HubView {
         if (xb - xa < 4 || ya < y0 - 1 || ya > y1 + 1 || yb < y0 - 1 || yb > y1 + 1) continue;
         g.lineBetween(xa, ya, xb, yb);
       }
+    }
+    return g;
+  }
+
+  /** The street close up: two pale roads that cross in the middle, a lawn in the corner between them. */
+  private roads(): Phaser.GameObjects.Graphics {
+    const g = this.scene.add.graphics();
+    const { x0, x1, y0, y1 } = FIELD;
+    const { x: mx, y: my } = this.layout.home;
+    const park = this.layout.park;
+    if (park) {
+      // the lawn under the people who rest
+      const xs = park.slots.map((p) => p[0]);
+      const ys = park.slots.map((p) => p[1]);
+      const left = Math.min(...xs) - 90;
+      const right = Math.max(...xs) + 70;
+      const top = Math.min(...ys) - park.h - 4;
+      const bottom = Math.max(...ys) + 12;
+      g.fillStyle(LAWN, 0.32).fillRoundedRect(left, top, right - left, bottom - top, 26);
+    }
+    const half = 30; // half the width of a road, measured down the screen
+    for (const slope of [0.5, -0.5]) {
+      // the road goes through the middle: y = my + slope · (x − mx); cut to the field
+      const at = (x: number): number => my + slope * (x - mx);
+      const clip = (x: number): number => {
+        const y = at(x);
+        if (y > y1 - half) return mx + (y1 - half - my) / slope;
+        if (y < y0 + half) return mx + (y0 + half - my) / slope;
+        return x;
+      };
+      const xa = clip(x0);
+      const xb = clip(x1);
+      g.fillStyle(ROAD, 0.85);
+      g.beginPath();
+      g.moveTo(xa, at(xa) - half);
+      g.lineTo(xb, at(xb) - half);
+      g.lineTo(xb, at(xb) + half);
+      g.lineTo(xa, at(xa) + half);
+      g.closePath();
+      g.fillPath();
+      g.lineStyle(2, RULE, 1);
+      g.lineBetween(xa, at(xa) - half, xb, at(xb) - half);
+      g.lineBetween(xa, at(xa) + half, xb, at(xb) + half);
+      // the dashes of the middle line
+      g.lineStyle(3, 0xffffff, 0.9);
+      for (let x = xa + 20; x < xb - 40; x += 70) g.lineBetween(x, at(x), x + 34, at(x + 34));
     }
     return g;
   }

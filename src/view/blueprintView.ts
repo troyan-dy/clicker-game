@@ -76,7 +76,7 @@ export class BlueprintView {
   /** `count` laid-off programmers leave a source of work and walk off the sheet to the left. */
   leave(id: string, count: number): void {
     const place = BP.sources[id];
-    if (place) this.walkers.spawn(place.x + 40, place.y + 2, 26, count);
+    if (place) this.walkers.spawn('person', [place.x + 40, place.y + 2], [26, place.y + 2], count);
   }
 
   /** The pull-back: the diagram appears after `delayMs`. */

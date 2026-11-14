@@ -1,6 +1,7 @@
 /**
  * The core loop as a conveyor of tasks (M01 «Согласие», M02 sources, M03 plan, M05 «не спрашивай» and subagents,
- * M15 promotions, M16–M18 the scales — city, state, planet: one-off employers as sources, farms as packs of sessions):
+ * M15 promotions, M16–M18 the scales — city, state, planet: employers taken unit by unit, farms as packs of sessions,
+ * M23 perks of the employers taken whole, M24 the people left without work, M25 the street):
  *
  *   sources ──► backlog ──► Claude (plan rate) ──► waiting for «Да» ──► $ per task
  *                  └──────► subagents: their own sessions, no «Да» needed ──► $
@@ -9,6 +10,20 @@
  * Pure logic: no rendering, no clocks of its own; all numbers come from src/data.
  */
 import { buyNextPlan, type Plan, type PlanState } from '../plan/plan';
+
+/**
+ * What an employer gives once it is taken whole (M23). «Plus» kinds add up: pay, inflow, rate,
+ * sessions, calls, stack, surge. «Off» kinds multiply what is left: farms, sources, grades, scale, limit.
+ */
+export type PerkKind = 'pay' | 'inflow' | 'rate' | 'sessions' | 'calls' | 'stack' | 'surge' | 'farms' | 'sources' | 'grades' | 'scale' | 'limit';
+
+export interface Perk {
+  kind: PerkKind;
+  /** a share: 0.1 is «+10%» or «10% off» */
+  value: number;
+  /** how the map says it: «серверы дешевле на 10%» */
+  text: string;
+}
 
 export interface Source {
   id: string;
@@ -28,8 +43,10 @@ export interface Source {
   screen: number;
   /** inflow multiplier once every unit is bought: the employer is taken whole */
   full?: number;
-  /** programmers one unit used to employ */
+  /** people one unit used to employ */
   staff?: number;
+  /** what the employer gives once every unit is bought */
+  perk?: Perk;
 }
 
 /** A step of the career ladder: every closed task pays `mult` times the base. */
@@ -91,8 +108,17 @@ export interface PipeTuning {
   backlogMax: number;
   /** …or this many seconds of inflow, whichever is more: the tray grows with the business */
   backlogSeconds: number;
-  /** percent of the provider's revenue the player is on reaching the last screen */
+  /** percent of the provider's revenue the player is on reaching the planet */
   shareBase: number;
+  /** the share is counted once this many steps up in scale are bought */
+  shareFrom: number;
+  /** the people left without work (M24): the part of every task's pay the allowance takes */
+  allowance: number;
+  /** …the extra tasks they order while it is paid, as a share of the inflow */
+  orders: number;
+  /** …seconds for the orders to grow to full / to dry up without the allowance */
+  ordersRise: number;
+  ordersFade: number;
   /** finished tasks that can wait for a «Да»; Claude pauses above this */
   readyMax: number;
   /** «Да» that can be given in advance */
@@ -136,6 +162,10 @@ export interface PipeState {
   managers: number[];
   /** seconds until the usage limit resets; 0 — Claude works */
   limited: number;
+  /** the player pays an allowance to the people left without work */
+  allowance: boolean;
+  /** 0..1: how much of their orders the people place now */
+  orders: number;
   presses: number;
   wasted: number;
   /** tasks closed in the player's terminal / by subagents */
@@ -166,6 +196,8 @@ export function createPipe(cfg: PipeConfig): PipeState {
     grade: 0,
     managers: [],
     limited: 0,
+    allowance: false,
+    orders: 0,
     presses: 0,
     wasted: 0,
     closedHere: 0,
@@ -175,11 +207,40 @@ export function createPipe(cfg: PipeConfig): PipeState {
   };
 }
 
-/** tasks per second coming in from all sources */
-export function inflowOf(s: PipeState, cfg: PipeConfig): number {
+/** every unit of the employer is bought */
+export function whole(s: PipeState, src: Source): boolean {
+  return (s.owned[src.id] ?? 0) >= src.max;
+}
+
+/** the perks of one kind earned so far, added up: «+10%» and «+15%» give 0.25 */
+export function bonus(s: PipeState, cfg: PipeConfig, kind: PerkKind): number {
+  let sum = 0;
+  for (const src of cfg.sources) if (src.perk?.kind === kind && whole(s, src)) sum += src.perk.value;
+  return sum;
+}
+
+/** what is left of a price or a wait after the perks of one kind: 10% and 20% off give 0.72 */
+export function discount(s: PipeState, cfg: PipeConfig, kind: PerkKind): number {
+  let left = 1;
+  for (const src of cfg.sources) if (src.perk?.kind === kind && whole(s, src)) left *= 1 - src.perk.value;
+  return Math.max(0, left);
+}
+
+/** tasks per second the employers bring, before the orders of the people */
+export function workOf(s: PipeState, cfg: PipeConfig): number {
   let sum = 0;
   for (const src of cfg.sources) sum += sourceInflow(src, s.owned[src.id] ?? 0);
-  return sum;
+  return sum * (1 + bonus(s, cfg, 'inflow'));
+}
+
+/** tasks per second the people left without work order: they have the time, and the allowance */
+export function ordersOf(s: PipeState, cfg: PipeConfig): number {
+  return workOf(s, cfg) * cfg.tuning.orders * s.orders;
+}
+
+/** tasks per second coming in: the employers and the orders of the people */
+export function inflowOf(s: PipeState, cfg: PipeConfig): number {
+  return workOf(s, cfg) * (1 + cfg.tuning.orders * s.orders);
 }
 
 /** tasks per second `owned` units of a source bring; an employer taken whole brings more */
@@ -187,7 +248,7 @@ export function sourceInflow(src: Source, owned: number): number {
   return owned * src.inflow * (owned >= src.max ? (src.full ?? 1) : 1);
 }
 
-/** programmers whose work the player does now; the first job is the player's own */
+/** people whose work the player does now; the first job is the player's own */
 export function replacedOf(s: PipeState, cfg: PipeConfig): number {
   let n = 0;
   for (const src of cfg.sources) n += Math.max(0, (s.owned[src.id] ?? 0) - src.start) * (src.staff ?? 0);
@@ -196,7 +257,7 @@ export function replacedOf(s: PipeState, cfg: PipeConfig): number {
 
 /** tasks per second the plan gives one session */
 export function planRate(s: PipeState, cfg: PipeConfig): number {
-  return cfg.plans[s.plan.index].rate;
+  return cfg.plans[s.plan.index].rate * (1 + bonus(s, cfg, 'rate'));
 }
 
 /** tasks per second Claude prepares in the player's terminal right now: nothing while the usage limit is hit */
@@ -206,9 +267,9 @@ export function claudeRate(s: PipeState, cfg: PipeConfig): number {
 
 /** Claude sessions working besides the player's own: subagents and everything in the server farms */
 export function sessionsOf(s: PipeState, cfg: PipeConfig): number {
-  let n = s.subagents;
-  for (const f of cfg.farms) n += (s.farms[f.id] ?? 0) * f.sessions;
-  return n;
+  let farmed = 0;
+  for (const f of cfg.farms) farmed += (s.farms[f.id] ?? 0) * f.sessions;
+  return s.subagents + Math.round(farmed * (1 + bonus(s, cfg, 'sessions')));
 }
 
 /** tasks per second all those sessions close on their own */
@@ -225,18 +286,23 @@ export function farmPrice(f: Farm, owned: number, surge = 1): number {
   return Math.round(f.price * f.growth ** owned * surge);
 }
 
-/** percent of the provider's revenue that comes from the player; counted from the last screen on */
+/** what the next unit of a farm costs now: the shortage and the perks included */
+export function farmCost(s: PipeState, cfg: PipeConfig, f: Farm): number {
+  return Math.round(farmPrice(f, s.farms[f.id] ?? 0, s.surge[f.id] ?? 1) * discount(s, cfg, 'farms'));
+}
+
+/** percent of the provider's revenue that comes from the player; counted from the planet on */
 export function shareOf(s: PipeState, cfg: PipeConfig): number {
-  if (s.scale < cfg.scales.length) return 0;
+  if (s.scale < cfg.tuning.shareFrom) return 0;
   let share = cfg.tuning.shareBase;
   for (const f of cfg.farms) share += (f.share ?? 0) * (s.farms[f.id] ?? 0);
   return Math.min(100, share);
 }
 
-/** the end of the game: every employer of the last screen hired and no other customers left */
+/** the end of the game: the last screen is reached and every employer on it is taken whole */
 export function finished(s: PipeState, cfg: PipeConfig): boolean {
   const last = 2 + cfg.scales.length;
-  return shareOf(s, cfg) >= 100 && cfg.sources.every((x) => x.screen !== last || (s.owned[x.id] ?? 0) >= x.max);
+  return s.scale >= cfg.scales.length && cfg.sources.every((x) => x.screen !== last || whole(s, x));
 }
 
 /** the screen the player is on: 1 — the terminal, 2 — the blueprint, 3… — the scales */
@@ -248,13 +314,31 @@ export function sourcePrice(src: Source, owned: number): number {
   return Math.round(src.price * src.growth ** (owned - src.start));
 }
 
+/** what the next unit of an employer costs now: the perks included (they work on the big screens) */
+export function sourceCost(s: PipeState, cfg: PipeConfig, src: Source): number {
+  const base = sourcePrice(src, s.owned[src.id] ?? 0);
+  return src.screen >= 3 ? Math.round(base * discount(s, cfg, 'sources')) : base;
+}
+
+/** what the next promotion costs now; Infinity — there is none */
+export function gradeCost(s: PipeState, cfg: PipeConfig): number {
+  const next = cfg.grades[s.grade + 1];
+  return next ? Math.round(next.price * discount(s, cfg, 'grades')) : Infinity;
+}
+
+/** what the next step up in scale costs now; Infinity — there is none */
+export function scaleCost(s: PipeState, cfg: PipeConfig): number {
+  const next = cfg.scales[s.scale];
+  return next ? Math.round(next.price * discount(s, cfg, 'scale')) : Infinity;
+}
+
 export function subagentPrice(cfg: PipeConfig, owned: number): number {
   return Math.round(cfg.auto.subagent.price * cfg.auto.subagent.growth ** owned);
 }
 
-/** dollars one closed task pays at the current grade */
+/** dollars one closed task pays: the grade, the perks, less the allowance if it is paid */
 export function payOf(s: PipeState, cfg: PipeConfig): number {
-  return cfg.tuning.pay * cfg.grades[s.grade].mult;
+  return cfg.tuning.pay * cfg.grades[s.grade].mult * (1 + bonus(s, cfg, 'pay')) * (s.allowance ? 1 - cfg.tuning.allowance : 1);
 }
 
 function pay(s: PipeState, cfg: PipeConfig, bySubagent: boolean, tasks = 1): void {
@@ -275,10 +359,15 @@ export function stepPipe(
   if (s.limited > 0) s.limited = Math.max(0, s.limited - dt);
 
   // shortages ease off
+  const calm = 1 + bonus(s, cfg, 'surge');
   for (const f of cfg.farms) {
     const m = s.surge[f.id];
-    if (f.surge && m > 1) s.surge[f.id] = 1 + (m - 1) * 0.5 ** (dt / f.surge.halfLife);
+    if (f.surge && m > 1) s.surge[f.id] = 1 + (m - 1) * 0.5 ** ((dt * calm) / f.surge.halfLife);
   }
+
+  // the people left without work order tasks while the allowance is paid; without it the orders dry up
+  if (s.allowance) s.orders = Math.min(1, s.orders + dt / t.ordersRise);
+  else s.orders = Math.max(0, s.orders - dt / t.ordersFade);
 
   // tasks arrive
   const cap = backlogCap(s, cfg);
@@ -364,7 +453,7 @@ export function buySource(s: PipeState, cfg: PipeConfig, id: string): boolean {
   const src = cfg.sources.find((x) => x.id === id);
   if (!src) return false;
   const owned = s.owned[id] ?? 0;
-  if (owned >= src.max || !spend(s, sourcePrice(src, owned))) return false;
+  if (owned >= src.max || !spend(s, sourceCost(s, cfg, src))) return false;
   s.owned[id] = owned + 1;
   return true;
 }
@@ -389,7 +478,7 @@ export function buyFarm(s: PipeState, cfg: PipeConfig, id: string): boolean {
   const f = cfg.farms.find((x) => x.id === id);
   if (!f) return false;
   const owned = s.farms[id] ?? 0;
-  if (owned >= (f.max ?? Infinity) || !spend(s, farmPrice(f, owned, s.surge[id] ?? 1))) return false;
+  if (owned >= (f.max ?? Infinity) || !spend(s, farmCost(s, cfg, f))) return false;
   s.farms[id] = owned + 1;
   if (f.surge) s.surge[id] = (s.surge[id] ?? 1) * f.surge.step;
   return true;
@@ -397,8 +486,7 @@ export function buyFarm(s: PipeState, cfg: PipeConfig, id: string): boolean {
 
 /** The next step up in scale; the first one needs a terminal that agrees by itself. */
 export function buyScale(s: PipeState, cfg: PipeConfig): boolean {
-  const next = cfg.scales[s.scale];
-  if (!next || !s.noAsk || !spend(s, next.price)) return false;
+  if (!cfg.scales[s.scale] || !s.noAsk || !spend(s, scaleCost(s, cfg))) return false;
   s.scale++;
   return true;
 }
@@ -413,8 +501,7 @@ export function buyManager(s: PipeState, cfg: PipeConfig, screen: number): boole
 
 /** A promotion: the next grade, bought in order. */
 export function buyGrade(s: PipeState, cfg: PipeConfig): boolean {
-  const next = cfg.grades[s.grade + 1];
-  if (!next || !spend(s, next.price)) return false;
+  if (!cfg.grades[s.grade + 1] || !spend(s, gradeCost(s, cfg))) return false;
   s.grade++;
   return true;
 }
