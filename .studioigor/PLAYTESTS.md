@@ -218,3 +218,4 @@ One session — one section. The user's feedback — verbatim. The first questio
 - is it fun? feedback (verbatim): «Финал пойдет»
 - self-check: кадры captures/pt20/01-epilogue, 03-epilogue; 0 ошибок
 - conclusions → actions: lock: M13 (Клод жмёт «Да» сам и эпилог)
+- M11 «Да всем» и M12 легендарные тикеты проверены пользователем в полной игре: PT-19 — «тикеты дают слишком много денег» (исправлено балансом: стопка 5 с дохода, легенда × 4, стопка берётся только полной), PT-20 — «Темп хороший»

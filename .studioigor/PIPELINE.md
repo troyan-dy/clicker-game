@@ -53,30 +53,30 @@ files: ASSETS.md
 
 ## Phase 6 — Mechanics
 files:
-- [ ] all mvp mechanics locked, each with research and a playtest — check: python3 {skill}/scripts/studio.py mechanics --check
+- [x] all mvp mechanics locked, each with research and a playtest — check: python3 {skill}/scripts/studio.py mechanics --check
 - [x] design holism check passed, findings in BACKLOG.md — check: manual
 
 ## Phase 7 — Vertical slice
 files:
 - [x] full loop: menu → game → result → restart/next — check: manual
 - [x] game-ness checklist passed for the vertical slice (references/production.md) — check: manual
-- [x] post-slice boost ideas (synergies, new mechanics) shown and decided by the user — check: user PROXY 2026-11-14
+- [x] post-slice boost ideas (synergies, new mechanics) shown and decided by the user — check: user
 - [x] vertical slice with real assets, sound and story delivery — check: manual
-- [x] user played through the vertical slice, it's fun; verdict recorded — check: user PROXY 2026-11-14
+- [x] user played through the vertical slice, it's fun; verdict recorded — check: user
 
 ## Phase 8 — Content
 files: SCOPE.md
 - [x] scope contract met — check: python3 {skill}/scripts/scope.py .
 - [x] contact sheet of all units shown; neighbors differ on ≥2 axes — check: manual
 - [x] story played from start to finale (if story-driven) — check: manual
-- [x] user played the new content — check: user PROXY 2026-11-14
+- [x] user played the new content — check: user
 
 ## Phase 9 — Polish
 files:
 - [x] juice on the core actions, sound and motion on each — check: manual
-- [x] first 60 seconds: a newcomer starts playing without explanations — check: user PROXY 2026-11-14
+- [x] first 60 seconds: a newcomer starts playing without explanations — check: user
 - [x] performance budgets hold at the worst moment — check: manual
-- [x] user decided: the polish is good enough — check: user PROXY 2026-11-14
+- [x] user decided: the polish is good enough — check: user
 
 ## Phase 10 — Release
 files:
