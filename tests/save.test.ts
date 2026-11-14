@@ -69,7 +69,7 @@ describe('save', () => {
     s.police = 2;
     s.aim.robodog = 'depot';
     s.owned.depot = 1.25; // robots are half-way through the second unit
-    const meta = { legends: ['rust'], awards: ['first_yes', 'no_ask'], piles: 4, reports: 1, calls: 3, limits: 1, riots: 2, managerOff: true, auto: true };
+    const meta = { legends: ['rust'], awards: ['first_yes', 'no_ask'], piles: 4, reports: 1, calls: 3, limits: 1, riots: 2, news: ['Первая новость', 'Вторая'], managerOff: true, auto: true };
     const json = packSave({ at: 123, state: s, feed: { shown: [1, 4], said: { yes: 2 } }, meta, won: false, seconds: 600 });
     const file = unpackSave(json, cfg)!;
     expect(file.state).toEqual(s);

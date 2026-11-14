@@ -140,8 +140,8 @@ export function createTerminal(layer: HTMLElement): TerminalUi {
       <div class="tm-quip"><span class="tm-sq"></span><span data-f="quip"></span></div>
     </section>
     <aside class="tm-side"><div class="tm-shop"></div><div class="tm-extra"></div></aside>
-    <footer class="tm-status">
-      <span>НОВОСТИ</span><span class="news" data-f="news"></span>
+    <footer class="tm-status" data-row="news" title="история новостей">
+      <span>НОВОСТИ ▸</span><span class="news" data-f="news"></span>
       <span class="r" data-f="autostate"></span>
     </footer>
   </div>`,

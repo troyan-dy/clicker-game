@@ -14,6 +14,8 @@ import {
 } from '../pipeline/pipeline';
 
 export const SAVE_VERSION = 1;
+/** headlines the history of the ticker keeps */
+export const NEWS_KEPT = 120;
 
 export interface SaveTuning {
   /** share of the usual income the sessions earn while nobody watches */
@@ -47,6 +49,8 @@ export interface SavedMeta {
   limits: number;
   /** riots of the Luddites lived through */
   riots: number;
+  /** the headlines the ticker has shown, the newest first */
+  news: string[];
   /** the manager is told to wait */
   managerOff: boolean;
   /** after the ending Claude answers the piles of questions himself */
@@ -54,7 +58,7 @@ export interface SavedMeta {
 }
 
 export function freshMeta(): SavedMeta {
-  return { legends: [], awards: [], piles: 0, reports: 0, calls: 0, limits: 0, riots: 0, managerOff: false, auto: false };
+  return { legends: [], awards: [], piles: 0, reports: 0, calls: 0, limits: 0, riots: 0, news: [], managerOff: false, auto: false };
 }
 
 export interface SaveFile {
@@ -169,7 +173,7 @@ export function unpackSave(json: string | null, cfg: PipeConfig): SaveFile | nul
     at: num(data.at, 0),
     state: restorePipe(cfg, data.state),
     feed: { shown: Array.isArray(feed.shown) ? feed.shown.filter((i): i is number => Number.isInteger(i)) : [], said },
-    meta: { legends: ids(meta.legends), awards: ids(meta.awards), piles: Math.floor(num(meta.piles, 0)), reports: Math.floor(num(meta.reports, 0)), calls: Math.floor(num(meta.calls, 0)), limits: Math.floor(num(meta.limits, 0)), riots: Math.floor(num(meta.riots, 0)), managerOff: meta.managerOff === true, auto: meta.auto === true },
+    meta: { legends: ids(meta.legends), awards: ids(meta.awards), piles: Math.floor(num(meta.piles, 0)), reports: Math.floor(num(meta.reports, 0)), calls: Math.floor(num(meta.calls, 0)), limits: Math.floor(num(meta.limits, 0)), riots: Math.floor(num(meta.riots, 0)), news: ids(meta.news).slice(0, NEWS_KEPT), managerOff: meta.managerOff === true, auto: meta.auto === true },
     won: data.won === true,
     seconds: num(data.seconds, 0),
   };

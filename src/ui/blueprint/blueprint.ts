@@ -81,8 +81,11 @@ export interface BlueprintUi {
   toast(title: string, text: string): void;
   /** the ending: the interface gives way to the picture, and comes back */
   cut(on: boolean): void;
-  /** the ending: one line under the picture; empty — none */
-  caption(text: string): void;
+  /**
+   * The ending: a line under the picture, typed letter by letter; empty — none. `kind`: «claude» —
+   * Claude says it, «title» — big words in the middle of the screen, «dark» — the same over a dark picture.
+   */
+  caption(text: string, kind?: 'plain' | 'claude' | 'title' | 'dark'): void;
   /** below the shop: a gym puts its help here */
   extra: HTMLElement;
 }
@@ -104,14 +107,15 @@ export function createBlueprint(layer: HTMLElement, over: HTMLElement): Blueprin
     <div class="bl-meter"></div>
     <div class="bl-quip"><i></i><span></span><div class="bl-ask"><b></b><u><s></s></u></div></div>
     <aside class="bl-shop"><div class="bl-manager"></div><div class="bl-shelves"></div><div class="bl-extra"></div></aside>
-    <div class="bl-news"><i>НОВОСТИ</i><span></span><em></em></div>
+    <div class="bl-news" data-row="news" title="история новостей"><i>НОВОСТИ ▸</i><span></span><em></em></div>
   </div></div>`,
   );
   const root = layer.lastElementChild as HTMLElement;
-  over.insertAdjacentHTML('afterbegin', '<div class="bl-over"><div class="bl-tags"></div><div class="bl-toast"><i></i><b></b><span></span></div><div class="bl-cine"></div></div>');
+  over.insertAdjacentHTML('afterbegin', '<div class="bl-over"><div class="bl-tags"></div><div class="bl-toast"><i></i><b></b><span></span></div><div class="bl-bar top"></div><div class="bl-bar bottom"></div><div class="bl-cine"><i></i><span></span></div></div>');
   const overRoot = over.firstElementChild as HTMLElement;
   const toast = overRoot.querySelector<HTMLElement>('.bl-toast')!;
   const cine = overRoot.querySelector<HTMLElement>('.bl-cine')!;
+  let typing = 0;
   const q = <T extends HTMLElement>(sel: string): T => root.querySelector<T>(sel)!;
   const money = q('.bl-money b');
   const quip = q('.bl-quip');
@@ -222,9 +226,22 @@ export function createBlueprint(layer: HTMLElement, over: HTMLElement): Blueprin
       root.classList.toggle('cut', on);
       overRoot.classList.toggle('cut', on);
     },
-    caption(text) {
-      if (text) cine.textContent = text;
-      cine.classList.toggle('on', text !== '');
+    caption(text, kind = 'plain') {
+      window.clearInterval(typing);
+      if (!text) {
+        cine.classList.remove('on');
+        return;
+      }
+      const line = cine.querySelector('span')!;
+      cine.className = `bl-cine on ${kind}`;
+      // typed like a terminal prints: a few letters at a time
+      let shown = 0;
+      line.textContent = '';
+      typing = window.setInterval(() => {
+        shown = Math.min(text.length, shown + 2);
+        line.textContent = text.slice(0, shown);
+        if (shown >= text.length) window.clearInterval(typing);
+      }, 28);
     },
     toast(title, text) {
       toast.querySelector('b')!.textContent = title;

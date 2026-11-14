@@ -1,0 +1,1 @@
+[{"t": 1.0, "eval": "window.__gym.gift(3e6); window.__gym.take('vector'); window.__gym.take('cats'); window.__gym.take('creative'); window.__gym.buy('farm:rack')"}, {"t": 27.0, "eval": "window.__gym.click('news')"}]

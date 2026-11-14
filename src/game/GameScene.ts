@@ -101,7 +101,7 @@ import {
   type RobotKind,
   type Source,
 } from '../systems/pipeline/pipeline';
-import { applyOffline, freshMeta, offlineReport, packSave, unpackSave, type OfflineReport } from '../systems/save/save';
+import { applyOffline, freshMeta, NEWS_KEPT, offlineReport, packSave, unpackSave, type OfflineReport } from '../systems/save/save';
 import { createStack, stackWorth, stepStack, takeStack } from '../systems/stack/stack';
 import type { BlueprintTag, BlueprintUi, ManagerStrip, MeterRow } from '../ui/blueprint/blueprint';
 import type { CardUi } from '../ui/card/card';
@@ -393,7 +393,10 @@ export class GameScene extends Phaser.Scene {
       this.acc -= STEP;
     }
     // the ending: nothing is earned or bought, but the figures on the desk still walk
-    if (this.cine) this.view.step(Math.min(deltaMs / 1000, 0.05));
+    if (this.cine) {
+      this.view.step(Math.min(deltaMs / 1000, 0.05));
+      this.squares.step(Math.min(deltaMs / 1000, 0.05));
+    }
     if (this.stage === 1) this.drawTerminal();
     else if (this.stage === 2) this.drawBlueprint();
     else this.drawHub();
@@ -553,14 +556,23 @@ export class GameScene extends Phaser.Scene {
     });
   }
 
-  /** A long list on a card, a page at a time. */
-  private openList(head: string, title: string, lines: string[], page: number, back: () => void): void {
-    const per = 10;
+  /** The history of the news: a click on the ticker opens it, the newest headline first. The world waits meanwhile. */
+  private openNews(): void {
+    if (this.card.open || this.cine || this.paused) return;
+    this.wake();
+    playSound('ui');
+    this.paused = true;
+    const lines = this.meta.news.length ? this.meta.news : ['Пока тихо: мир ещё ничего не заметил.'];
+    this.openList('claude — лента новостей', `Новости: ${this.meta.news.length}`, lines, 0, () => (this.paused = false), 7);
+  }
+
+  /** A long list on a card, a page at a time, `per` lines on each. */
+  private openList(head: string, title: string, lines: string[], page: number, back: () => void, per = 10): void {
     const pages = Math.ceil(lines.length / per);
     const more = page + 1 < pages;
     const options = more ? [{ label: 'Дальше', note: `страница ${page + 1} из ${pages}` }, { label: 'Назад' }] : [{ label: 'Назад' }];
     this.card.show({ head, title, lines: lines.slice(page * per, (page + 1) * per), options, dense: true }, (i) => {
-      if (more && i === 0) this.openList(head, title, lines, page + 1, back);
+      if (more && i === 0) this.openList(head, title, lines, page + 1, back, per);
       else back();
     });
   }
@@ -625,7 +637,7 @@ export class GameScene extends Phaser.Scene {
     this.squares.step(4); // the squares in flight land before the picture changes
     // the desk as the player left it: every job and every laptop in place
     this.view.sync({ sources: this.state.owned, subagents: this.state.subagents });
-    this.hubs.get(last)?.fade(400);
+    this.hubs.get(last)?.fade(500);
     // every employer of a screen taken, Claude on every roof: how the world looks when the work is over
     const taken = (screen: number): HubTopology => {
       const floors: Record<string, number> = {};
@@ -640,39 +652,81 @@ export class GameScene extends Phaser.Scene {
     const at = (ms: number, what: () => void): void => {
       this.time.delayedCall(ms, what);
     };
-    at(0, () => this.paper.caption(EPILOGUE.vacancy));
-    at(500, () => this.view.reveal(500));
-    at(5200, () => this.paper.caption(EPILOGUE.fired));
-    at(6600, () => {
+    // the laptop goes on agreeing by itself: squares leave its screen whether somebody sits there or not
+    const [sx, sy] = this.deskSpot();
+    const yes = this.time.addEvent({
+      delay: 420,
+      loop: true,
+      callback: () => {
+        const [x, y] = this.view.onScreen(sx, sy);
+        this.squares.fly({ x: x - 8, y: y - 8, w: 16, h: 16 }, { x: x + 260, y: y - 520, w: 60, h: 40 }, 1, MONEY_ON_PAPER, 120, [0.7, 1.0]);
+      },
+    });
+
+    // 1. the desk, close up: a vacancy nobody will get
+    at(700, () => this.view.reveal(700, 1.9));
+    at(1600, () => {
+      this.paper.caption(EPILOGUE.vacancy);
+      playSound('quip');
+    });
+    // 2. Claude has done the sums
+    at(7400, () => {
+      this.paper.caption(EPILOGUE.counted, 'claude');
+      playSound('quip');
+    });
+    at(10600, () => {
+      this.paper.caption(EPILOGUE.fired, 'claude');
+      playSound('quip');
+    });
+    // 3. the chair is empty, the last worker walks away with a box
+    at(13800, () => {
+      this.paper.caption('');
       this.view.vacate();
       playSound('waste');
     });
-    at(11200, () => this.paper.caption(EPILOGUE.moral));
-    // the ride back: every screen shrinks into the middle of the next one, as it did on the way up
+    at(16800, () => {
+      this.paper.caption(EPILOGUE.alone, 'claude');
+      playSound('auto');
+    });
+    // 4. the moral, in big words over the empty chair
+    at(20400, () => {
+      this.paper.caption(EPILOGUE.moral, 'title');
+      playSound('all');
+    });
+    // 5. the ride back: every screen shrinks into the middle of the next one, as it did on the way up
     const ride = [3, 4, 5].filter((n) => n < last && this.hubs.has(n));
-    let t = 12200;
+    let t = 25200;
     ride.forEach((n, i) => {
       const home = HUBS[n].home;
       at(t, () => {
-        if (i === 0) this.view.shrinkTo(home.x, home.y, home.h / (BP.desk.h * BP.desk.scale), 900);
-        else this.hubs.get(ride[i - 1])!.shrinkTo(home.x, home.y, HUB_SHRINK, 900);
-        this.hubs.get(n)!.reveal(taken(n), 450);
+        if (i === 0) {
+          yes.remove();
+          this.view.shrinkTo(home.x, home.y, home.h / (BP.desk.h * BP.desk.scale), 1300);
+        } else this.hubs.get(ride[i - 1])!.shrinkTo(home.x, home.y, HUB_SHRINK, 1300);
+        this.hubs.get(n)!.reveal(taken(n), 650);
+        this.paper.caption(EPILOGUE.ride[n] ?? '');
         playSound('scale');
       });
-      t += 1700;
+      t += 3400;
     });
-    // the planet at night
+    // 6. the planet at night: it works, the people rest
     at(t, () => {
+      yes.remove();
       const prev = ride.length ? this.hubs.get(ride[ride.length - 1])! : null;
-      if (prev) prev.fade(700);
-      else this.view.shrinkTo(960, 540, 0.1, 700);
+      if (prev) prev.fade(900);
+      else this.view.shrinkTo(960, 540, 0.1, 900);
       const dark = this.add.rectangle(960, 540, 1920, 1080, 0x1f1e1d).setAlpha(0).setDepth(50);
-      const earth = this.add.image(960, 540, 'node_earth_night').setAlpha(0).setDepth(51);
-      earth.setScale(1080 / earth.height);
-      this.tweens.add({ targets: [dark, earth], alpha: 1, duration: 900 });
-      this.paper.caption(EPILOGUE.planet);
+      const earth = this.add.image(960, 560, 'node_earth_night').setAlpha(0).setDepth(51);
+      const fit = 1080 / earth.height;
+      // the camera keeps pulling away: the planet comes into the frame slowly
+      earth.setScale(fit * 1.9);
+      this.tweens.add({ targets: [dark, earth], alpha: 1, duration: 1100 });
+      this.tweens.add({ targets: earth, scale: fit * 0.92, y: 500, duration: 9000, ease: 'Sine.Out' });
+      this.paper.caption('');
       playSound('finale');
-      this.time.delayedCall(5200, () => {
+      this.time.delayedCall(2600, () => this.paper.caption(EPILOGUE.planet, 'dark'));
+      this.time.delayedCall(6400, () => this.paper.caption(EPILOGUE.limit, 'dark'));
+      this.time.delayedCall(10400, () => {
         this.paper.caption('');
         this.card.show({ head: 'claude — эпилог', title: EPILOGUE.moral, lines: EPILOGUE.lines, options: [{ label: 'Продолжить' }] }, () => {
           this.tweens.add({ targets: [dark, earth], alpha: 0, duration: 500, onComplete: () => [dark, earth].forEach((o) => o.destroy()) });
@@ -781,6 +835,11 @@ export class GameScene extends Phaser.Scene {
   /** A click on a shop row: the row answers either way — bought, or not enough money. */
   private click(row: string): void {
     const shop = this.stage === 1 ? this.term : this.paper;
+    // the ticker: its history
+    if (row === 'news') {
+      this.openNews();
+      return;
+    }
     // the allowance of the people left without work is a switch too
     if (row === 'ubi') {
       this.wake();
@@ -1353,6 +1412,11 @@ export class GameScene extends Phaser.Scene {
       this.neckFor = -45; // and not again for a while
     }
     stepFeed(this.feed, FEED, feedData, dt, this.stage, (id) => this.has(id), this.rng);
+    // every headline the ticker shows goes into its history
+    if (this.feed.news && this.feed.news !== this.meta.news[0]) {
+      this.meta.news.unshift(this.feed.news);
+      if (this.meta.news.length > NEWS_KEPT) this.meta.news.length = NEWS_KEPT;
+    }
 
     // smoothed readings: what is slowest, how much comes in per second
     const k = dt / SMOOTH;

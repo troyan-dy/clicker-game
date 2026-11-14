@@ -242,28 +242,98 @@
   pointer-events: none;
   transition: opacity 0.4s linear;
 }
-/* …and one line is said under it */
+/* …between two black bars, as in a film */
+.bl-bar {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 0;
+  background: #1f1e1d;
+  transition: height 0.7s ease-in-out;
+}
+.bl-bar.top {
+  top: 0;
+}
+.bl-bar.bottom {
+  bottom: 0;
+}
+.bl-over.cut .bl-bar {
+  height: 118px;
+}
+/* …and the lines are typed under it */
 .bl-cine {
   position: absolute;
   left: 50%;
-  bottom: 86px;
-  max-width: 1400px;
-  padding: 16px 34px 18px;
+  bottom: 150px;
+  max-width: 1300px;
+  padding: 18px 38px 21px;
   border-radius: 14px;
   background: #262624;
   color: #f0eee6;
-  font: 400 30px/1.35 'Source Serif 4', serif;
+  font: 400 34px/1.35 'Source Serif 4', serif;
   text-align: center;
   opacity: 0;
   transform: translate(-50%, 10px);
-  transition:
-    opacity 0.4s linear,
-    transform 0.4s ease-out;
+  transition: opacity 0.35s linear;
   pointer-events: none;
 }
 .bl-cine.on {
   opacity: 1;
   transform: translate(-50%, 0);
+}
+.bl-cine i {
+  display: none;
+}
+/* Claude says it: his face and the type of his terminal */
+.bl-cine.claude {
+  padding-left: 92px;
+  font: 400 30px/1.4 'JetBrains Mono', monospace;
+  text-align: left;
+  outline: 2px solid var(--coral);
+}
+.bl-cine.claude i {
+  display: block;
+  position: absolute;
+  left: 34px;
+  top: 24px;
+  width: 30px;
+  height: 25px;
+  background: var(--coral);
+}
+.bl-cine.claude i::before,
+.bl-cine.claude i::after {
+  content: '';
+  position: absolute;
+  top: 8px;
+  width: 4px;
+  height: 8px;
+  background: #262624;
+}
+.bl-cine.claude i::before {
+  left: 8px;
+}
+.bl-cine.claude i::after {
+  right: 8px;
+}
+/* the moral: big words in the middle of the picture */
+.bl-cine.title,
+.bl-cine.dark {
+  bottom: auto;
+  top: 136px;
+  max-width: 1700px;
+  padding: 0;
+  background: none;
+  color: var(--ink);
+  font: 600 64px/1.15 'Source Serif 4', serif;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+}
+.bl-cine.dark {
+  top: auto;
+  bottom: 160px;
+  color: #f0eee6;
+  font-size: 60px;
+  text-shadow: 0 2px 18px #1f1e1d;
 }
 
 /* a banner over the map: an employer is taken whole and gives its perk */
@@ -718,6 +788,12 @@
   background: var(--paper);
   font-size: 21px;
   white-space: nowrap;
+  /* a click opens the history of the headlines */
+  pointer-events: auto;
+  cursor: pointer;
+}
+.bl-news:hover i {
+  color: var(--ink);
 }
 .bl-news span {
   flex: 1;

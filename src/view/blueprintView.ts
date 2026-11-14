@@ -81,11 +81,17 @@ export class BlueprintView {
     if (place) this.walkers.spawn('person', [place.x + 40, place.y + 2], [26, place.y + 2], count);
   }
 
-  /** The ending: the diagram is back at full size, as it was before the camera first pulled away from it. */
-  reveal(ms: number): void {
+  /** The ending: the diagram is back, seen close up — the desk in the middle of the screen, `zoom` times its size. */
+  reveal(ms: number, zoom: number): void {
     this.scene.tweens.killTweensOf(this.root);
-    this.root.setScale(1).setPosition(0, 0).setAlpha(0).setVisible(true);
+    const cy = BP.desk.y - (BP.desk.h * BP.desk.scale) / 2;
+    this.root.setScale(zoom).setPosition(960 - BP.desk.x * zoom, 590 - cy * zoom).setAlpha(0).setVisible(true);
     this.scene.tweens.add({ targets: this.root, alpha: 1, duration: ms });
+  }
+
+  /** where a point of the diagram is on the screen right now: the diagram may be zoomed */
+  onScreen(x: number, y: number): [number, number] {
+    return [this.root.x + x * this.root.scaleX, this.root.y + y * this.root.scaleY];
   }
 
   /** The ending: the player gets up and walks away with a box; the chair stays empty, the laptop goes on by itself. */
@@ -95,7 +101,7 @@ export class BlueprintView {
     desk.setTexture('node_desk_empty');
     desk.setScale(h / desk.height);
     this.face.setVisible(false);
-    this.walkers.spawn('person', [BP.desk.x + 70, BP.desk.y - 4], [BP.desk.x - 430, BP.desk.y + 46], 1);
+    this.walkers.spawn('person', [BP.desk.x + 96, BP.desk.y + 8], [BP.desk.x - 520, BP.desk.y + 60], 1);
   }
 
   /** The pull-back: the diagram appears after `delayMs`. */

@@ -500,6 +500,9 @@
   border-top: 1px solid var(--line);
   color: var(--dim);
   font-size: 20px;
+  /* a click opens the history of the headlines */
+  pointer-events: auto;
+  cursor: pointer;
   white-space: nowrap;
 }
 .tm-status .news {
