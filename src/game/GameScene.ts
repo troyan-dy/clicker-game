@@ -81,6 +81,8 @@ const GYM_GIFT = 100;
 const FEED: FeedContent = { news: NEWS, quips: QUIPS };
 /** approvals after which Claude says something nice about the player's judgement */
 const YES_MILESTONES = [3, 15, 40, 90, 160, 260];
+/** semitones of the purchase sound by what was bought: work is the base note, capacity is lower, promotions are higher */
+const BUY_PITCH: Record<string, number> = { src: 0, sub: 2, farm: -5, plan: 4, noask: 5, grade: 7, scale: -12 };
 const IDLE_AFTER = 12; // seconds without a «Да» while requests wait
 const NECK_AFTER = 14; // seconds the same bottleneck lasts before Claude mentions it
 const SESSION_FORMS = ['сессия', 'сессии', 'сессий'] as const;
@@ -554,7 +556,7 @@ export class GameScene extends Phaser.Scene {
     else if (what === 'scale') ok = this.stage >= 2 && buyScale(s, cfg);
     if (!ok) return false;
     this.lastMoney -= before - s.money; // a purchase is not negative income
-    playSound('buy');
+    playSound('buy', BUY_PITCH[what.split(':')[0]] ?? 0);
     logEvent(`buy_${what}`);
     if (what === 'noask') this.pullBack();
     else if (what === 'scale') this.scaleUp();

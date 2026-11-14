@@ -32,7 +32,8 @@ export function playSound(name: SoundName, step = 0): void {
       zzfx(0.3, 0, 587, 0.002, 0.01, 0.04, 1, 1.2);
       break;
     case 'buy':
-      zzfx(1, 0, 523, 0.004, 0.09, 0.3, 0, 1.4, 0, 0, 262, 0.06);
+      // `step` — semitones: every kind of purchase has its own pitch
+      zzfx(1, 0, 523 * 2 ** (step / 12), 0.004, 0.09, 0.3, 0, 1.4, 0, 0, 262 * 2 ** (step / 12), 0.06);
       break;
     case 'ui':
       zzfx(0.4, 0, 660, 0.001, 0.008, 0.03, 0, 1.4);
