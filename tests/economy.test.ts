@@ -4,10 +4,12 @@ import farmData from '../src/data/balance/farms.json';
 import gradeData from '../src/data/balance/grades.json';
 import lineData from '../src/data/balance/lines.json';
 import managerData from '../src/data/balance/managers.json';
+import moduleData from '../src/data/balance/modules.json';
 import planData from '../src/data/balance/plans.json';
 import policeData from '../src/data/balance/police.json';
 import scaleData from '../src/data/balance/scales.json';
 import sourceData from '../src/data/balance/sources.json';
+import gridData from '../src/data/tuning/grid.json';
 import tuningData from '../src/data/tuning/pipeline.json';
 import eventsData from '../src/data/tuning/events.json';
 import riotData from '../src/data/tuning/riots.json';
@@ -18,12 +20,14 @@ import type { Plan } from '../src/systems/plan/plan';
 import { createRiots, stepRiots } from '../src/systems/riots/riots';
 import { createStack, stackWorth, stepStack, takeStack } from '../src/systems/stack/stack';
 import {
+  bestShifts,
   bonus,
   bribeCost,
   buyBribe,
   buyFarm,
   buyGrade,
   buyLine,
+  buyModule,
   buyScale,
   buyNoAsk,
   buyPlan,
@@ -32,15 +36,19 @@ import {
   buySubagent,
   claudeRate,
   createPipe,
+  demandOf,
   farmCost,
   finished,
+  gridOn,
   inflowOf,
   jobOf,
   keysNeeded,
   keysOf,
   lineCost,
   locked,
+  moduleCost,
   payOf,
+  peakOf,
   planRate,
   policeCost,
   pressPipe,
@@ -55,6 +63,7 @@ import {
   unemploymentOf,
   type Farm,
   type Line,
+  type Module,
   type PipeConfig,
   type Source,
 } from '../src/systems/pipeline/pipeline';
@@ -69,6 +78,8 @@ const base: PipeConfig = {
   managers: managerData,
   lines: lineData as Line[],
   police: policeData,
+  modules: moduleData as Module[],
+  grid: gridData,
   auto: autoData,
 };
 const FINGER = 5; // presses per second of a player who keeps mashing
@@ -186,6 +197,22 @@ function play(seconds: number, cfg: PipeConfig = base): { t: number; what: strin
       }
     }
 
+    // the ziggurat: the shifts that pay best are paid; power is bought before what would ask for more than there is
+    if (gridOn(s, cfg)) s.shifts = bestShifts(s, cfg);
+    const buyPower = (): void => {
+      const peak = peakOf(s, cfg);
+      const best = cfg.modules
+        .filter((m) => m.kind !== 'cell' && (s.modules[m.id] ?? 0) < (m.max ?? Infinity))
+        .map((m) => ({ m, price: moduleCost(s, cfg, m), gain: m.kind === 'baths' ? peak / (s.modules[m.id] ?? 1) : peak * (m.amount - 1) }))
+        .sort((a, b) => a.price / a.gain - b.price / b.gain)[0];
+      if (best && buyModule(s, cfg, best.m.id)) log.push({ t, what: `${best.m.name} №${s.modules[best.m.id]} → ${peakOf(s, cfg).toFixed(0)} ГВт при спросе ${demandOf(s, cfg).toFixed(0)}, $${s.money.toFixed(0)}` });
+    };
+    const lacks = (draw: number | undefined): boolean => gridOn(s, cfg) && demandOf(s, cfg) + (draw ?? 0) > peakOf(s, cfg);
+    if (lacks(0)) {
+      buyPower();
+      continue;
+    }
+
     const mine = Math.min(claudeRate(s, cfg), hands);
     const capacity = mine + subagentRate(s, cfg);
     const note = (what: string): void => {
@@ -204,7 +231,8 @@ function play(seconds: number, cfg: PipeConfig = base): { t: number; what: strin
         const best = cfg.sources
           .filter((x) => !x.made && (s.owned[x.id] ?? 0) < x.max && !jobOf(s, x.id) && (screen >= 3 ? x.screen === screen : x.screen <= screen))
           .sort((a, b) => cost(a) / a.inflow - cost(b) / b.inflow)[0];
-        if (best && locked(s, best)) {
+        if (best && lacks(best.draw)) buyPower();
+        else if (best && locked(s, best)) {
           if (buyBribe(s, cfg, best.id)) note(`взятка: ${best.name}`);
         } else if (best && buySource(s, cfg, best.id)) note(best.name);
       }
@@ -215,7 +243,7 @@ function play(seconds: number, cfg: PipeConfig = base): { t: number; what: strin
       const share = cfg.auto.subagent.share;
       const options = cfg.farms
         .filter((f) => f.screen === screen && (s.farms[f.id] ?? 0) < (f.max ?? Infinity))
-        .map((f) => ({ name: f.name, price: farmCost(s, cfg, f), gain: f.sessions * rate * share, buy: () => buyFarm(s, cfg, f.id) }));
+        .map((f) => ({ name: f.name, price: farmCost(s, cfg, f), gain: f.sessions * rate * share, buy: () => (lacks(f.draw) ? (buyPower(), false) : buyFarm(s, cfg, f.id)) }));
       const plan = cfg.plans[s.plan.index + 1];
       if (plan) options.push({ name: `тариф ${plan.name}`, price: plan.price, gain: (plan.rate - rate) * (1 + share * sessionsOf(s, cfg)), buy: () => buyPlan(s, cfg) });
       const best =
@@ -238,14 +266,14 @@ function play(seconds: number, cfg: PipeConfig = base): { t: number; what: strin
       if (needed && lineCost(s, cfg, l) * 4 <= s.money && buyLine(s, cfg, l.id)) note(l.name);
     }
   }
-  const hired = [3, 4, 5, 6].map((n) => cfg.sources.filter((x) => x.screen === n && s.owned[x.id]).length).join('/');
+  const hired = [3, 4, 5, 6, 7].map((n) => cfg.sources.filter((x) => x.screen === n && s.owned[x.id]).length).join('/');
   log.push({ t: seconds, what: `итог: экран ${screenOf(s)}, $${s.money.toExponential(2)}, вход ${inflowOf(s, cfg).toFixed(0)}/с, сессий ${sessionsOf(s, cfg)}, контрактов ${hired}` });
   return log;
 }
 
 describe('economy', () => {
   it('test_economy_opening_does_not_drag', () => {
-    const log = play(3600);
+    const log = play(Number(process.env.ECO_SECONDS ?? 3600));
     console.log(log.map((e) => `${String(Math.round(e.t)).padStart(4)} с  ${e.what}`).join('\n'));
     const first = log[0];
     const max5 = log.find((e) => e.what.startsWith('тариф Max 5x'));

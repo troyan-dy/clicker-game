@@ -1,6 +1,6 @@
 import { L } from '../core/lang';
 
-/** Words of the big screens: the city (3), the state (4), the planet (5), the planet as a workshop (6). */
+/** Words of the big screens: the city (3), the state (4), the planet (5), the planet as a workshop (6), the ziggurat (7). */
 export interface HubText {
   /** caption under the node in the middle */
   home: string;
@@ -65,6 +65,17 @@ const HUB_RU: Record<number, HubText> = {
     place: 'мир',
     floor: ['отрасль', 'отрасли', 'отраслей'],
   },
+  7: {
+    home: 'зиккурат «Светлое будущее»',
+    employers: 'ПОТРЕБИТЕЛИ',
+    farms: 'МОЩНОСТИ · больше сессий',
+    needEmployers: 'нужны ещё потребители',
+    needFarms: 'нужны серверные ярусы',
+    doneTitle: 'Планета запитана',
+    doneSub: 'всё включено, и выключить некому',
+    place: 'сеть',
+    floor: ['линия', 'линии', 'линий'],
+  },
 };
 
 const HUB_EN: Record<number, HubText> = {
@@ -112,14 +123,25 @@ const HUB_EN: Record<number, HubText> = {
     place: 'world',
     floor: ['industry', 'industries', 'industries'],
   },
+  7: {
+    home: 'the “Bright Future” ziggurat',
+    employers: 'CONSUMERS',
+    farms: 'CAPACITY · more sessions',
+    needEmployers: 'need more consumers',
+    needFarms: 'need server tiers',
+    doneTitle: 'The planet is powered',
+    doneSub: 'everything is on, and nobody is left to switch it off',
+    place: 'grid',
+    floor: ['line', 'lines', 'lines'],
+  },
 };
 
 export const HUB_TEXT = L(HUB_RU, HUB_EN);
 
 /** the shelf of the next step up in scale, by how many are already bought */
 export const SCALE_SHELF = L(
-  ['МАСШТАБ · дальше — город', 'МАСШТАБ · дальше — государство', 'МАСШТАБ · дальше — планета', 'МАСШТАБ · дальше — ручной труд'],
-  ['SCALE · next — the city', 'SCALE · next — the state', 'SCALE · next — the planet', 'SCALE · next — manual labor'],
+  ['МАСШТАБ · дальше — город', 'МАСШТАБ · дальше — государство', 'МАСШТАБ · дальше — планета', 'МАСШТАБ · дальше — ручной труд', 'МАСШТАБ · дальше — энергия'],
+  ['SCALE · next — the city', 'SCALE · next — the state', 'SCALE · next — the planet', 'SCALE · next — manual labor', 'SCALE · next — power'],
 );
 
 /** What the world says when the last employer of a screen is taken whole: a headline and Claude's word. */
@@ -132,6 +154,16 @@ export const SCREEN_DONE: Record<number, { news: string; quip: string }> = {
     {
       news: 'The profession of “programmer” is closed. The price of a task is falling: nobody is left to pay for code',
       quip: 'The programmers have run out. Work remains only where it is done by hand.',
+    },
+  ),
+  6: L(
+    {
+      news: 'Последняя профессия закрыта. Энергетики предупреждают: на всех роботов электричества не хватит',
+      quip: 'Работать больше некому. Осталась мелочь: на всё это не хватает электричества. У меня есть идея — и людям в ней снова найдётся дело.',
+    },
+    {
+      news: 'The last trade is closed. Grid operators warn: there is not enough electricity for all the robots',
+      quip: 'Nobody is left to work. One small thing remains: there is not enough electricity for all this. I have an idea — and there will be something for people to do in it again.',
     },
   ),
 };

@@ -142,6 +142,17 @@ export function restorePipe(cfg: PipeConfig, raw: unknown): PipeState {
   for (const [kind, id] of Object.entries(counts(r.aim))) {
     if (cfg.sources.some((x) => x.id === id && x.made === kind)) s.aim[kind] = id as string;
   }
+  // the ziggurat: its parts, its shifts, the hour of its day and what the accumulators keep
+  const modules = counts(r.modules);
+  for (const m of cfg.modules) {
+    const n = Math.floor(num(modules[m.id], m.start ?? 0, m.start ?? 0, m.max ?? Number.MAX_VALUE));
+    if (n > 0) s.modules[m.id] = n;
+  }
+  s.shifts = Math.floor(num(r.shifts, 1, 1, 2));
+  s.hour = num(r.hour, 0, 0, cfg.grid.day + cfg.grid.night);
+  s.crew = num(r.crew, 0, 0, 1);
+  s.charge = num(r.charge, 0);
+  s.power = num(r.power, 1, 0, 1);
   const farms = counts(r.farms);
   const surge = counts(r.surge);
   for (const f of cfg.farms) {

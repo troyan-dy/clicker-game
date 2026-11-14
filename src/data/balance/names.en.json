@@ -24,7 +24,9 @@
     "secretary": {"name": "Secretary-General", "note": "secretary of everything that compiles"},
     "everyone": {"name": "Every Programmer", "note": "the position is abolished; you remain"},
     "owner": {"name": "Employer of the Planet", "note": "the janitor is also you"},
-    "last": {"name": "The Last Worker", "note": "everyone else is free"}
+    "last": {"name": "The Last Worker", "note": "everyone else is free"},
+    "energy": {"name": "Chief Power Officer", "note": "there is one switch, and it is yours"},
+    "priest": {"name": "High Priest of Consent", "note": "one service: “Yes” from the top"}
   },
   "farms": {
     "rack": {"name": "Server rack", "tag": "racks", "note": "40 Claude sessions for rent"},
@@ -34,7 +36,8 @@
     "campus": {"name": "Data center campus", "tag": "campuses", "note": "its own substation and its own region"},
     "quota": {"name": "Anthropic capacity", "tag": "capacity shares", "note": "+8% of their revenue is you"},
     "orbit": {"name": "Orbital data center", "tag": "satellites", "note": "cooling is free, ping is not"},
-    "chips": {"name": "Onboard chips", "tag": "chip batches", "note": "brains for the bodies: Claude in each"}
+    "chips": {"name": "Onboard chips", "tag": "chip batches", "note": "brains for the bodies: Claude in each"},
+    "core": {"name": "Server tier", "tag": "server tiers", "note": "chips want to eat too"}
   },
   "lines": {
     "android": {"name": "Android line", "tag": "android lines", "note": "servos are scarce: the price jumps"},
@@ -45,7 +48,8 @@
     "3": {"name": "Director Claude", "note": "buys departments, servers"},
     "4": {"name": "Minister Claude", "note": "buys the small things"},
     "5": {"name": "Sec-Gen Claude", "note": "buys packs and capacity"},
-    "6": {"name": "Foreman Claude", "note": "buys lines and chips"}
+    "6": {"name": "Foreman Claude", "note": "buys lines and chips"},
+    "7": {"name": "Engineer Claude", "note": "buys tiers and consumers"}
   },
   "police": {
     "police": {"name": "Robot police", "note": "a riot breaks 30% less"}
@@ -54,7 +58,8 @@
     "llc": {"name": "Register an LLC", "note": "a contractor instead of an employee; opens the city map"},
     "gov": {"name": "Win a government contract", "note": "one bidder in the tender; opens the country map"},
     "top": {"name": "A deal with Anthropic", "note": "you are their biggest customer; opens the planet"},
-    "street": {"name": "Buy Boston Mechanics", "note": "enough of renting packs; next — the planet’s manual labor"}
+    "street": {"name": "Buy Boston Mechanics", "note": "enough of renting packs; next — the planet’s manual labor"},
+    "zig": {"name": "Project “Bright Future”", "note": "people have something to do again — lie down; opens the ziggurat"}
   },
   "sources": {
     "job": {"name": "A job", "tag": "job", "note": "standup at 10:00, a task tracker"},
@@ -98,7 +103,15 @@
     "build": {"name": "“Done Yesterday” construction", "tag": "Construction", "note": "handover date: already"},
     "clinic": {"name": "Clinics", "tag": "Healthcare", "note": "the front desk smiles: firmware"},
     "school": {"name": "Schools", "tag": "Education", "note": "teacher not found, lesson in progress"},
-    "farm": {"name": "“Harvest.json” farms", "tag": "Farming", "note": "the tractor commits furrows"}
+    "farm": {"name": "“Harvest.json” farms", "tag": "Farming", "note": "the tractor commits furrows"},
+    "dark": {"name": "Dark factories", "tag": "Dark factories", "note": "robots need no light, only current"},
+    "charge": {"name": "“Paw” charging stations", "tag": "Chargers", "note": "robot dogs charge standing up"},
+    "cooling": {"name": "Datacenter chillers", "tag": "Chillers", "note": "Claude thinks — the planet warms"},
+    "lights": {"name": "Night cities", "tag": "Night cities", "note": "nobody is out, the street lamps are on"},
+    "trains": {"name": "Trains without passengers", "tag": "Trains", "note": "on schedule, with empty cars"},
+    "desal": {"name": "Desalination plants", "tag": "Desalination", "note": "water for the baths: the circle is closed"},
+    "thermo": {"name": "Planet thermostat", "tag": "Thermostat", "note": "seventy degrees everywhere, like the office"},
+    "archive": {"name": "Archive of consents", "tag": "Archive", "note": "every “Yes” is kept forever, in three copies"}
   },
   "perks": {
     "vector": {"text": "10% more tasks"},
@@ -138,6 +151,19 @@
     "build": {"text": "+50% sessions in chips"},
     "clinic": {"text": "shortages melt 3× faster"},
     "school": {"text": "promotions 20% cheaper"},
-    "farm": {"text": "25% more tasks"}
+    "farm": {"text": "25% more tasks"},
+    "dark": {"text": "25% more tasks"},
+    "charge": {"text": "sessions in capacity +50%"},
+    "cooling": {"text": "Claude is 1.5× faster"},
+    "lights": {"text": "the baths give +25%"},
+    "trains": {"text": "construction 30% cheaper"},
+    "desal": {"text": "accumulators hold 2× more"},
+    "thermo": {"text": "pay per task doubled"},
+    "archive": {"text": "“Yes to all” pays 1.5×"}
+  },
+  "modules": {
+    "tier": {"name": "Tier of baths", "tag": "tiers", "note": "500M places: warm, quiet, paid"},
+    "plug": {"name": "Plug", "tag": "plug generations", "note": "a new generation, the same neck"},
+    "cell": {"name": "Accumulator", "tag": "accumulators", "note": "saves by day, gives by night"}
   }
 }

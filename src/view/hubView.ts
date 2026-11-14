@@ -18,6 +18,9 @@ const PICKET_H = 86; // a figure with a placard, px
 const PICKETS = ['node_picket1', 'node_picket2', 'node_picket3'];
 const RESTS = ['node_rest_bench', 'node_rest_chess', 'node_rest_hammock', 'node_rest_picnic', 'node_rest_easel', 'node_rest_fishing'];
 const MASCOT = 'mascot';
+const POWER = 0x6a9bcc; // what runs from the ziggurat to the things it feeds
+const SUN = 0xd4a27f;
+const SPARKS = 28;
 
 /** What the player owns on a big screen: units of the employers and farms of sessions. */
 export interface HubTopology {
@@ -37,6 +40,11 @@ export interface HubTopology {
   struck: Record<string, boolean>;
   /** units of robot police on guard at the middle */
   guards: number;
+  /**
+   * The ziggurat of the screen (M28): `built` — the part of its tiers that stands, `power` — the part of
+   * the power asked for that is given, `hour` — how far the day or the night has gone, each 0..1.
+   */
+  grid?: { built: number; power: number; hour: number; night: boolean };
 }
 
 interface Route {
@@ -87,6 +95,11 @@ export class HubView {
   private readonly dots: Dot[] = [];
   private readonly rests: Phaser.GameObjects.Image[] = [];
   private readonly police: Phaser.GameObjects.Image[] = [];
+  /** small squares of power that run from the ziggurat to what it feeds */
+  private readonly sparks: Dot[] = [];
+  /** the ziggurat in the middle, coloured in tier by tier */
+  private zig?: Lot;
+  private dial?: Phaser.GameObjects.Graphics;
   private resting = 0;
   private readonly rng: Rng;
   private readonly walkers: Walkers;
@@ -132,10 +145,17 @@ export class HubView {
     ].sort((a, b) => a.y - b.y);
     for (const p of places) {
       const img = scene.add.image(p.x, p.y, `node_${p.key}`).setOrigin(0.5, 1);
-      const scale = this.fit(img, p.h);
-      img.setScale(scale).setAlpha(p.id === 'home' ? 1 : GHOST);
+      const zig = p.id === 'home' && !!layout.grid;
+      const scale = this.fit(img, p.h, p.id === 'home' ? layout.homeWidth : undefined);
+      img.setScale(scale).setAlpha(p.id === 'home' && !zig ? 1 : GHOST);
       this.root.add(img);
-      if (p.id in layout.lots) {
+      if (zig) {
+        // the ziggurat is built like an employer is taken: the outline first, the colour tier by tier
+        const fill = scene.add.image(p.x, p.y, `node_${p.key}`).setOrigin(0.5, 1).setScale(scale);
+        fill.setCrop(0, fill.height, fill.width, 0);
+        this.root.add(fill);
+        this.zig = { ghost: img, fill, scale, shown: 0, target: -1, pickets: [], dogs: [] };
+      } else if (p.id in layout.lots) {
         // the same picture in full colour, cut off above the part that is taken
         const fill = scene.add.image(p.x, p.y, `node_${p.key}`).setOrigin(0.5, 1).setScale(scale);
         fill.setCrop(0, fill.height, fill.width, 0);
@@ -143,12 +163,21 @@ export class HubView {
         this.lots.set(p.id, { ghost: img, fill, scale, shown: 0, target: 0, pickets: [], dogs: [] });
       } else this.nodes.set(p.id, img);
     }
+    if (layout.grid) {
+      this.dial = scene.add.graphics();
+      this.root.add(this.dial);
+    }
     this.walkers = new Walkers(scene, this.root, rng);
 
     for (let i = 0; i < DOTS; i++) {
       const rect = scene.add.rectangle(0, 0, 11, 11, CORAL).setVisible(false);
       this.root.add(rect);
       this.dots.push({ rect, route: null, dist: 0 });
+    }
+    for (let i = 0; layout.grid && i < SPARKS; i++) {
+      const rect = scene.add.rectangle(0, 0, 7, 7, POWER).setVisible(false);
+      this.root.add(rect);
+      this.sparks.push({ rect, route: null, dist: 0 });
     }
   }
 
@@ -255,6 +284,7 @@ export class HubView {
       changed = true;
     }
     if (changed) this.redrawLines();
+    if (t.grid) this.syncGrid(t.grid);
     this.rest(Math.min(this.rests.length, t.rest));
     // robot police: androids in a cold blue stand in front of the middle
     while (this.police.length < Math.min(5, t.guards)) {
@@ -265,6 +295,64 @@ export class HubView {
       this.scene.tweens.add({ targets: img, alpha: 1, duration: 300 });
       this.police.push(img);
     }
+  }
+
+  /** The ziggurat: its tiers, the night over the field, what its power reaches, the dial of its day. */
+  private syncGrid(g: NonNullable<HubTopology['grid']>): void {
+    const zig = this.zig;
+    if (zig && g.built !== zig.target) {
+      const first = zig.target < 0;
+      zig.target = g.built;
+      this.scene.tweens.add({ targets: zig, shown: g.built, duration: first ? 0 : 420, ease: 'Cubic.Out', onUpdate: () => this.crop(zig) });
+      if (first) {
+        zig.shown = g.built;
+        this.crop(zig);
+      } else this.scene.tweens.add({ targets: [zig.ghost, zig.fill], scale: { from: zig.scale * 1.04, to: zig.scale }, duration: 320, ease: 'Back.Out' });
+    }
+    // short of power, what the ziggurat feeds fades towards its outline
+    const lit = 0.3 + 0.7 * g.power;
+    for (const lot of this.lots.values()) lot.fill.setAlpha(lit);
+    const d = this.dial;
+    if (!d) return;
+    // the path of the sun over the top of the ziggurat: the sun by day, the moon by night
+    const { x, y, h } = this.layout.home;
+    const cy = y - h + 46;
+    const r = 168;
+    d.clear();
+    d.lineStyle(2, RULE, 1);
+    d.beginPath();
+    d.arc(x, cy, r, Math.PI, Math.PI * 2);
+    d.strokePath();
+    d.lineBetween(x - r - 14, cy, x - r + 14, cy);
+    d.lineBetween(x + r - 14, cy, x + r + 14, cy);
+    const a = Math.PI * (1 + Math.max(0, Math.min(1, g.hour)));
+    const bx = x + Math.cos(a) * r;
+    const by = cy + Math.sin(a) * r;
+    d.fillStyle(g.night ? POWER : SUN, 1).fillCircle(bx, by, 12);
+    d.lineStyle(2, INK, 1).strokeCircle(bx, by, 12);
+    if (g.night) d.fillStyle(0xcccac5, 1).fillCircle(bx + 5, by - 4, 8); // a bite out of the moon, the colour of the night paper
+  }
+
+  /** The shift changes: `count` people walk to the baths from the edges of the map, or home from the baths. */
+  shift(inbound: boolean, count: number): void {
+    const { x, y } = this.layout.home;
+    const half = Math.ceil(count / 2);
+    const edges: Pt[] = [[FIELD.x0 + 30, y + 46], [FIELD.x1 - 30, y + 46]];
+    const doors: Pt[] = [[x - 96, y + 14], [x + 96, y + 14]];
+    for (const side of [0, 1]) {
+      const n = side === 0 ? half : count - half;
+      if (n > 0) this.walkers.spawn('person', inbound ? edges[side] : doors[side], inbound ? doors[side] : edges[side], n);
+    }
+  }
+
+  /** A square of power runs from the ziggurat to the lot `id`. */
+  feed(id: string): void {
+    const route = this.routes.get(id);
+    const dot = this.sparks.find((d) => !d.route);
+    if (!route || !dot) return;
+    dot.route = { from: route.to, to: route.from, len: route.len, pays: false };
+    dot.dist = 0;
+    dot.rect.setPosition(route.to[0], route.to[1]).setVisible(true);
   }
 
   /** `want` people with placards stand at the door of a building; the rest of them go. */
@@ -359,7 +447,7 @@ export class HubView {
 
 
   step(dt: number): void {
-    for (const d of this.dots) {
+    for (const d of [...this.dots, ...this.sparks]) {
       if (!d.route) continue;
       d.dist += DOT_SPEED * dt;
       const { from, to, len, pays } = d.route;
@@ -434,8 +522,8 @@ export class HubView {
     return g;
   }
 
-  private fit(img: Phaser.GameObjects.Image, h: number): number {
-    return Math.min(h / img.height, this.layout.maxWidth / img.width);
+  private fit(img: Phaser.GameObjects.Image, h: number, maxWidth = this.layout.maxWidth): number {
+    return Math.min(h / img.height, maxWidth / img.width);
   }
 
   /**

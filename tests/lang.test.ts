@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import awardsEn from '../src/content/awards.en.json';
 import awards from '../src/content/awards.json';
+import bathsEn from '../src/content/baths.en.json';
+import baths from '../src/content/baths.json';
 import callsEn from '../src/content/calls.en.json';
 import calls from '../src/content/calls.json';
 import legendsEn from '../src/content/legends.en.json';
@@ -17,6 +19,7 @@ import farms from '../src/data/balance/farms.json';
 import grades from '../src/data/balance/grades.json';
 import lines from '../src/data/balance/lines.json';
 import managers from '../src/data/balance/managers.json';
+import modules from '../src/data/balance/modules.json';
 import names from '../src/data/balance/names.en.json';
 import plans from '../src/data/balance/plans.json';
 import scales from '../src/data/balance/scales.json';
@@ -36,6 +39,7 @@ describe('the English text follows the Russian one', () => {
     expect(keys(takeoversEn)).toEqual(keys(takeovers));
     expect(sizes(quipsEn)).toEqual(sizes(quips));
     expect(sizes(callsEn)).toEqual(sizes(calls));
+    expect(bathsEn.length).toBe(baths.length);
     // the tests run in Russian: TICKETS here is the Russian list
     expect(TICKETS_EN.map((t) => [t.id, t.asks.length])).toEqual(TICKETS.map((t) => [t.id, t.asks.length]));
   });
@@ -46,6 +50,7 @@ describe('the English text follows the Russian one', () => {
     expect(keys(names.farms)).toEqual(ids(farms));
     expect(keys(names.grades)).toEqual(ids(grades));
     expect(keys(names.lines)).toEqual(ids(lines));
+    expect(keys(names.modules)).toEqual(ids(modules));
     expect(keys(names.plans)).toEqual(ids(plans));
     expect(keys(names.scales)).toEqual(ids(scales));
     expect(keys(names.managers)).toEqual(managers.map((m) => String(m.screen)).sort());

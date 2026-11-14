@@ -10,6 +10,8 @@ const NODES = [
   'robofactory', 'android', 'robodog', 'supermarket', 'coffee', 'barber', 'build', 'taxi', 'pizzeria', 'farm', 'clinic', 'school', // the street
   'back_world', 'earth_night', // the flat world of the last screen, the planet of the ending
   'rest_hammock', 'rest_chess', 'rest_bench', 'rest_fishing', 'rest_picnic', 'rest_easel', // the park
+  'ziggurat', 'darkfactory', 'charger', 'train', 'desal', 'archive', 'cells', // the ziggurat and what it feeds
+  'bench', 'pigeon', 'pigeon_peck', 'pigeon_fly', 'sparrow', 'duck', 'seagull', // the bench after the credits
 ];
 
 /** Loads every node icon once: both the blueprint and the city draw from the same set. */

@@ -4,7 +4,7 @@ import { L, LANG } from '../../core/lang';
 import { LOCALE, PER_S } from '../format';
 import type { Rect } from '../../view/squares';
 
-export type Neck = 'tasks' | 'claude' | 'you' | 'none';
+export type Neck = 'tasks' | 'claude' | 'you' | 'power' | 'none';
 
 export interface ShopRow {
   /** what a click buys: `src:<id>`, `plan`, `noask`, `sub`; empty — not for sale */
@@ -100,17 +100,19 @@ const NECK_TEXT: Record<Neck, string> = L(
     tasks: 'узкое место: <b>задачи</b> — Клод всё сделал и ждёт работу',
     claude: 'узкое место: <b>Клод</b> — задачи копятся быстрее, чем он делает',
     you: 'узкое место: <b>ты</b> — Клод ждёт твоего «Да»',
+    power: 'узкое место: <b>энергия</b> — зиккурат даёт меньше, чем просят',
     none: '',
   },
   {
     tasks: 'bottleneck: <b>tasks</b> — Claude is done and waits for work',
     claude: 'bottleneck: <b>Claude</b> — tasks pile up faster than Claude closes them',
     you: 'bottleneck: <b>you</b> — Claude is waiting for your “Yes”',
+    power: 'bottleneck: <b>power</b> — the ziggurat gives less than is asked for',
     none: '',
   },
 );
 const PER_SECOND = L('в секунду', 'per second');
-const NECK_CELL: Record<Neck, string> = { tasks: 'in', claude: 'claude', you: 'you', none: '' };
+const NECK_CELL: Record<Neck, string> = { tasks: 'in', claude: 'claude', you: 'you', power: '', none: '' };
 
 /** Adds the terminal as the top layer of a 1920×1080 `.ui1080` container. */
 export function createTerminal(layer: HTMLElement): TerminalUi {

@@ -5,10 +5,12 @@ import farmData from '../src/data/balance/farms.json';
 import gradeData from '../src/data/balance/grades.json';
 import lineData from '../src/data/balance/lines.json';
 import managerData from '../src/data/balance/managers.json';
+import moduleData from '../src/data/balance/modules.json';
 import planData from '../src/data/balance/plans.json';
 import policeData from '../src/data/balance/police.json';
 import scaleData from '../src/data/balance/scales.json';
 import sourceData from '../src/data/balance/sources.json';
+import gridData from '../src/data/tuning/grid.json';
 import tuningData from '../src/data/tuning/pipeline.json';
 import { createEvents, stepEvents, takeEvent } from '../src/systems/events/events';
 import { managerPick } from '../src/systems/manager/manager';
@@ -17,12 +19,14 @@ import { createStrikes, stepStrikes } from '../src/systems/strikes/strikes';
 import type { Plan } from '../src/systems/plan/plan';
 import {
   backlogCap,
+  bonus,
   buyFarm,
   aimAt,
   buyBribe,
   buyGrade,
   buyLine,
   buyManager,
+  buyModule,
   buyNoAsk,
   buyPolice,
   buyScale,
@@ -31,13 +35,17 @@ import {
   buySubagent,
   claudeRate,
   createPipe,
+  demandOf,
   farmCost,
   farmPrice,
   finished,
   inflowOf,
+  isNight,
   keysNeeded,
   keysOf,
+  moduleCost,
   payOf,
+  peakOf,
   pressPipe,
   riot,
   riotShare,
@@ -49,6 +57,7 @@ import {
   unemploymentOf,
   type Farm,
   type Line,
+  type Module,
   type PipeConfig,
   type PipeState,
   type Source,
@@ -64,6 +73,8 @@ const cfg: PipeConfig = {
   managers: managerData,
   lines: lineData as Line[],
   police: policeData,
+  modules: moduleData as Module[],
+  grid: gridData,
   auto: autoData,
 };
 const DT = 1 / 60;
@@ -179,7 +190,7 @@ describe('pipeline', () => {
     pressPipe(s, cfg);
     expect(s.money - before).toBe(cfg.tuning.pay * cfg.grades[1].mult);
     expect(payOf(s, cfg)).toBeGreaterThan(junior);
-    s.money = 1e18;
+    s.money = 1e30;
     for (let i = 0; i < cfg.grades.length; i++) buyGrade(s, cfg);
     expect(s.grade).toBe(cfg.grades.length - 1); // the ladder ends
     expect(buyGrade(s, cfg)).toBe(false);
@@ -485,6 +496,79 @@ describe('pipeline', () => {
     expect(finished(s, cfg)).toBe(true);
     s.scale--;
     expect(finished(s, cfg)).toBe(false);
+  });
+
+  it('test_ziggurat_feeds_what_is_connected_and_a_shortage_dims_it', () => {
+    const s = createPipe(cfg);
+    s.noAsk = true;
+    s.scale = cfg.scales.length; // the ziggurat
+    s.money = 1e30;
+    const dark = cfg.sources.find((x) => x.id === 'dark')!;
+    expect(dark.draw).toBeGreaterThan(0);
+    for (let i = 0; i < 60 * (cfg.grid.swap + 1); i++) stepPipe(s, cfg, DT); // the day shift lies down
+    expect(s.crew).toBe(1);
+    const before = inflowOf(s, cfg);
+    expect(buySource(s, cfg, 'dark')).toBe(true);
+    stepPipe(s, cfg, DT);
+    expect(s.power).toBe(1); // the first tier is enough for the first consumer
+    expect(inflowOf(s, cfg)).toBeCloseTo(before + dark.inflow * (1 + bonus(s, cfg, 'inflow')), -3);
+    // more is connected than the baths can feed: everything connected works at a part of its strength
+    s.owned.dark = dark.max;
+    stepPipe(s, cfg, DT);
+    expect(demandOf(s, cfg)).toBeGreaterThan(peakOf(s, cfg));
+    expect(s.power).toBeCloseTo(peakOf(s, cfg) / demandOf(s, cfg));
+    expect(finished(s, cfg)).toBe(false);
+    // a tier and a better plug bring the power back; a discount of the modules is a perk like the others
+    const peak = peakOf(s, cfg);
+    expect(buyModule(s, cfg, 'tier')).toBe(true);
+    expect(peakOf(s, cfg)).toBeCloseTo(peak * 2);
+    expect(buyModule(s, cfg, 'plug')).toBe(true);
+    expect(peakOf(s, cfg)).toBeCloseTo(peak * 2 * cfg.modules.find((m) => m.id === 'plug')!.amount);
+    stepPipe(s, cfg, DT);
+    expect(s.power).toBe(1);
+    const tier = cfg.modules.find((m) => m.id === 'tier')!;
+    const price = moduleCost(s, cfg, tier);
+    s.owned.trains = cfg.sources.find((x) => x.id === 'trains')!.max;
+    expect(moduleCost(s, cfg, tier)).toBeLessThan(price);
+    s.modules.tier = tier.max!;
+    expect(buyModule(s, cfg, 'tier')).toBe(false); // the ziggurat has only so many tiers
+  });
+
+  it('test_night_needs_a_night_shift_or_what_the_accumulators_kept', () => {
+    const s = createPipe(cfg);
+    s.noAsk = true;
+    s.scale = cfg.scales.length;
+    s.money = 1e30;
+    const g = cfg.grid;
+    buySource(s, cfg, 'dark');
+    const night = (): void => {
+      s.hour = 0;
+      for (let i = 0; i < 60 * (g.day + g.swap + 1); i++) stepPipe(s, cfg, DT);
+    };
+    // only the day shift is paid: at night the baths are empty and what is connected stands still
+    expect(s.shifts).toBe(1);
+    night();
+    expect(isNight(s, cfg)).toBe(true);
+    expect(s.crew).toBe(0);
+    expect(s.power).toBe(0);
+    // an accumulator keeps the surplus of the day: the night starts lit
+    expect(buyModule(s, cfg, 'cell')).toBe(true);
+    s.hour = 0;
+    for (let i = 0; i < 60 * (g.day + 1); i++) stepPipe(s, cfg, DT);
+    expect(isNight(s, cfg)).toBe(true);
+    expect(s.charge).toBeGreaterThan(0);
+    expect(s.power).toBe(1);
+    // the night shift costs one more share of every task's pay and keeps the baths full
+    const pay = payOf(s, cfg);
+    s.shifts = 2;
+    expect(payOf(s, cfg)).toBeCloseTo((pay / (1 - g.wage)) * (1 - 2 * g.wage));
+    s.modules.cell = 0;
+    night();
+    expect(s.crew).toBe(1);
+    expect(s.power).toBe(1);
+    // before the ziggurat nobody is paid for lying down
+    s.scale--;
+    expect(payOf(s, cfg)).toBeCloseTo(pay / (1 - g.wage));
   });
 
   it('test_pipe_prices_grow_and_money_is_required', () => {

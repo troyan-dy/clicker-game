@@ -43,5 +43,10 @@
   "freed_1b": {"name": "Thanks, Everyone", "text": "A billion people are free from work"},
   "riot": {"name": "Luddites", "text": "A mob smashed the robots at the plant. The plant made new ones"},
   "police": {"name": "Order", "text": "The robot police have taken up guard at the factories"},
-  "street_10": {"name": "Everyone Is Free", "text": "No work is left on the planet for people"}
+  "street_10": {"name": "Everyone Is Free", "text": "No work is left on the planet for people"},
+  "zig": {"name": "Bright Future", "text": "The ziggurat is open: people have something to do again"},
+  "night": {"name": "Night Shift", "text": "You sleep, and the whole day is free"},
+  "cell": {"name": "Saved for the Night", "text": "The first accumulator: the day works for the night too"},
+  "zig_7": {"name": "Seven Tiers", "text": "The ziggurat is built to the top"},
+  "grid_8": {"name": "All Inclusive", "text": "Everything that asked for current is connected to the ziggurat"}
 }

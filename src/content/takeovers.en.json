@@ -36,5 +36,13 @@
   "build": "Done Yesterday construction handed over its sites yesterday. Inspectors are looking for the catch",
   "clinic": "The clinic front desks are smiling. Patients get scared and recover",
   "school": "In schools: teacher not found, grades up. The parent chats have gone quiet",
-  "farm": "Harvest.json farms brought in the harvest on schedule. The weather was notified in advance"
+  "farm": "Harvest.json farms brought in the harvest on schedule. The weather was notified in advance",
+  "dark": "The dark factories finally threw the switch. The lights stayed off: nobody is there to look",
+  "charge": "Every “Paw” charging station is live. The robot dogs queue in silence",
+  "cooling": "The datacenter chillers are at full power. Claude thinks two degrees cooler",
+  "lights": "The night cities are lit again. The residents watch the lights from their baths, on a stream",
+  "trains": "Trains without passengers are running on every line. No delays, no complaints",
+  "desal": "The desalination plants give water to the ziggurat, the ziggurat gives current to the plants. Economists give a standing ovation",
+  "thermo": "The planet thermostat is set to seventy degrees. The argument about the window is closed for good",
+  "archive": "The archive of consents is connected and full. Every “Yes” is kept in three copies; no “No” was found in the holdings"
 }

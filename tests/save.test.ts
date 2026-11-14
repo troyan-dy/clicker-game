@@ -4,10 +4,12 @@ import farmData from '../src/data/balance/farms.json';
 import gradeData from '../src/data/balance/grades.json';
 import lineData from '../src/data/balance/lines.json';
 import managerData from '../src/data/balance/managers.json';
+import moduleData from '../src/data/balance/modules.json';
 import planData from '../src/data/balance/plans.json';
 import policeData from '../src/data/balance/police.json';
 import scaleData from '../src/data/balance/scales.json';
 import sourceData from '../src/data/balance/sources.json';
+import gridData from '../src/data/tuning/grid.json';
 import tuningData from '../src/data/tuning/pipeline.json';
 import saveTuning from '../src/data/tuning/save.json';
 import type { Plan } from '../src/systems/plan/plan';
@@ -25,6 +27,7 @@ import {
   screenOf,
   type Farm,
   type Line,
+  type Module,
   type PipeConfig,
   type Source,
 } from '../src/systems/pipeline/pipeline';
@@ -40,6 +43,8 @@ const cfg: PipeConfig = {
   managers: managerData,
   lines: lineData as Line[],
   police: policeData,
+  modules: moduleData as Module[],
+  grid: gridData,
   auto: autoData,
 };
 
@@ -69,6 +74,14 @@ describe('save', () => {
     s.police = 2;
     s.aim.robodog = 'depot';
     s.owned.depot = 1.25; // robots are half-way through the second unit
+    // the ziggurat: three tiers, both shifts, the middle of the day, the accumulators half full
+    s.modules.tier = 3;
+    s.modules.cell = 2;
+    s.shifts = 2;
+    s.hour = 12.5;
+    s.crew = 0.4;
+    s.charge = 90;
+    s.power = 0.7;
     const meta = { legends: ['rust'], awards: ['first_yes', 'no_ask'], piles: 4, reports: 1, calls: 3, limits: 1, riots: 2, news: ['Первая новость', 'Вторая'], managerOff: true, auto: true };
     const json = packSave({ at: 123, state: s, feed: { shown: [1, 4], said: { yes: 2 } }, meta, won: false, seconds: 600 });
     const file = unpackSave(json, cfg)!;

@@ -1,5 +1,5 @@
 /**
- * The big screens — the city (3), the state (4), the planet (5), the street (6) — share one layout:
+ * The big screens — the city (3), the state (4), the planet (5), the street (6), the ziggurat (7) — share one layout:
  * a node in the middle (the previous screen shrunk, or the factory of the street), employers around
  * it, the farms that run the sessions next to it. Scene coordinates (1920×1080), nodes anchored at
  * their bottom centre, `h` — the height a node is drawn at, px.
@@ -27,6 +27,15 @@ export interface HubLayout {
   park?: { slots: readonly (readonly [number, number])[]; h: number; label: { x: number; y: number } };
   /** the previous screen does not shrink into the middle of this one: its globe unrolls into this flat map */
   unroll?: boolean;
+  /** the previous screen simply fades and this one appears in its place: the middle is something new */
+  fresh?: boolean;
+  /**
+   * The middle is a ziggurat (M28): coloured in tier by tier, the field darkens at night, a dial shows
+   * the hour, power runs to the lots. `steps` — how much of the picture's height stands with one tier, two, …
+   */
+  grid?: { steps: readonly number[] };
+  /** the node in the middle may be wider than the others */
+  homeWidth?: number;
 }
 
 const MID = { x: 670, y: 700 };
@@ -136,5 +145,28 @@ export const HUBS: Record<number, HubLayout> = {
       label: { x: 270, y: 776 },
     },
     unroll: true,
+  },
+  // the ziggurat: the tallest thing on the map stands in the middle, what it feeds stands around; the servers and the accumulators — in the far row
+  7: {
+    home: { key: 'ziggurat', x: 670, y: 872, h: 350 },
+    homeRadius: 205,
+    homeWidth: 400,
+    lots: {
+      dark: { key: 'darkfactory', x: 384, y: 700, h: 138 },
+      charge: { key: 'charger', x: 956, y: 700, h: 140 },
+      cooling: { key: 'datacenter', x: 384, y: 930, h: 122 },
+      lights: { key: 'cityblock', x: 956, y: 930, h: 150 },
+      trains: { key: 'train', x: 132, y: 700, h: 120 },
+      desal: { key: 'desal', x: 1208, y: 700, h: 140 },
+      thermo: { key: 'dish', x: 132, y: 930, h: 150 },
+      archive: { key: 'archive', x: 1208, y: 930, h: 160 },
+    },
+    farms: {
+      core: { key: 'racks', x: 384, y: 478, h: 132, ids: ['core'] },
+      cells: { key: 'cells', x: 956, y: 478, h: 128, ids: ['cell'] },
+    },
+    maxWidth: 185,
+    fresh: true,
+    grid: { steps: [0.19, 0.32, 0.45, 0.575, 0.7, 0.815, 1] },
   },
 };
