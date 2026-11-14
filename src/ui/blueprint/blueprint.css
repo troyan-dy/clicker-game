@@ -94,7 +94,7 @@
 .bl-tag.small {
   border-bottom: none;
   color: var(--dim);
-  font-size: 15px;
+  font-size: 16px;
 }
 .bl-tag.small b {
   color: var(--ink);
@@ -368,8 +368,8 @@
   opacity: 0.5;
 }
 .bl-extra {
-  margin-top: 16px;
-  font: 400 15px/1.5 'JetBrains Mono', monospace;
+  margin-top: 14px;
+  font: 400 16px/1.5 'JetBrains Mono', monospace;
   color: var(--dim);
 }
 .bl-extra p {

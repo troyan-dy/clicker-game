@@ -1,0 +1,3 @@
+A simple map of one fictional country seen from above, centred, filling most of the picture: an irregular landmass outline with a coastline, a few internal region borders drawn as dashed lines, three rivers, a small mountain range drawn as a row of tiny triangles. No cities, no labels, no text, no letters, no numbers, no compass, no frame.
+
+STYLE: a deadpan-serious technical drawing, like a map in an engineering report. Plain warm ivory paper background (#F0EEE6), completely empty around the country. Thin precise charcoal lines (#262624) of one fine, even weight. The land is filled with a flat pale sand (#D4A27F) at low intensity, rivers are thin dusty blue lines (#6A9BCC). No gradients, no shading, no shadows.

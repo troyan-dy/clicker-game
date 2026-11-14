@@ -1,0 +1,3 @@
+A simple isometric street plan of a city district seen from above, filling the whole picture: a regular grid of straight roads forming empty rectangular blocks, a few small roundabouts, one river crossing diagonally with two bridges. Only roads, blocks and the river — no buildings, no cars, no people, no trees. No text, no letters, no numbers, no frame.
+
+STYLE: a deadpan-serious technical drawing, like a planning diagram in an engineering report. Plain warm ivory paper background (#F0EEE6). Thin precise charcoal lines (#262624) of one fine, even weight for the road edges. The river is a flat pale dusty blue (#6A9BCC), the blocks stay the colour of the paper. No gradients, no shading, no shadows.
