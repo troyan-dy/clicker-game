@@ -575,7 +575,10 @@ export function stepPipe(
     job.left -= dt;
     if (job.left > 0) continue;
     s.jobs.splice(i, 1);
-    s.owned[job.id] = (s.owned[job.id] ?? 0) + 1;
+    const src = cfg.sources.find((x) => x.id === job.id);
+    const owned = s.owned[job.id] ?? 0;
+    if (!src || owned >= src.max) continue; // nothing is left to take there
+    s.owned[job.id] = owned + 1;
     out.done.push(job.id);
   }
 

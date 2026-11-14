@@ -456,13 +456,15 @@ export class GameScene extends Phaser.Scene {
   }
 
   /**
-   * Tuning only (`?state=city|gov|planet`): the game opens on a later screen as a player would
-   * arrive there — everything before it is taken, sessions keep up with the tasks, and there is
-   * money for the first purchases.
+   * Tuning only (`?state=city|gov|planet|street|finale`): the game opens on a later screen as a
+   * player would arrive there — everything before it is taken, sessions keep up with the tasks,
+   * and there is money for the first purchases. `finale` — the last screen with everything on it
+   * taken: the ending starts at once.
    */
-  private skipTo(screen: number): void {
+  private skipTo(to: number): void {
     const s = this.state;
     const cfg = this.cfg;
+    const screen = Math.min(to, 2 + cfg.scales.length);
     const free = (buy: () => boolean): boolean => {
       s.money = Number.MAX_VALUE;
       return buy();
@@ -491,6 +493,11 @@ export class GameScene extends Phaser.Scene {
     // money for the first purchases of this screen: units of its employers, or lines of its factory
     const first = [...cfg.sources.filter((x) => x.screen === screen && !x.made).map((x) => sourceCost(s, cfg, x)), ...cfg.lines.filter((l) => l.screen === screen).map((l) => lineCost(s, cfg, l))];
     s.money = Math.min(...first) * 3;
+    if (to > screen) {
+      // the ending: factories big enough to hold every trade, and every trade taken
+      for (const l of cfg.lines) s.lines[l.id] = 80;
+      for (const src of cfg.sources) if (src.made) s.owned[src.id] = src.max;
+    }
     this.openStage();
   }
 

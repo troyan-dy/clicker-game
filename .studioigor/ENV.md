@@ -32,7 +32,7 @@ VERIFIED: yes
 - редактора у веб-стека нет: весь проект — код в репозитории
 - гимы: `http://localhost:5173/?gym=<имя>` (agree — M01, hello — проверка окружения); `&debug=1` включает оверлей; клавиша P пишет настройки в `.studioigor/captures/tuning/` через dev-сервер
 - эскизы интерфейса: `node tools/shot.mjs <файл.html> <out.png>`
-- быстрый старт гима с большого экрана: `http://localhost:5173/?gym=agree&state=city|gov|planet|street` — всё прежнее куплено, деньги на первые покупки; клавиша M — полминуты дохода
+- быстрый старт гима с большого экрана: `http://localhost:5173/?gym=agree&state=city|gov|planet|street|finale` (finale — сразу карточка итогов и эпилог) — всё прежнее куплено, деньги на первые покупки; клавиша M — полминуты дохода
 
 ## Commands
 RUN: npm run dev -- --open
