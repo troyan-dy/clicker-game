@@ -27,6 +27,7 @@
 | A019 ND_Street | узлы | улица: супермаркет, кофейня, парикмахерская, стройка, такси, пиццерия с мопедами, ферма, поликлиника, школа, завод роботов | public/assets/img/nodes/*.webp, 10 шт | генерация (Codex), листы street_a…d | final |
 | A020 CH_Robots | персонажи | андроид и робособака: светлый корпус, голова — коралловый квадрат с двумя глазами (свой знак Клода) | android.webp, robodog.webp | генерация (Codex), лист street_d | final |
 | A021 CH_People | персонажи | люди без работы: три пикетчика с пустыми плакатами, шесть групп отдыхающих в парке (скамейка, шахматы, гамак, пикник, мольберт, рыбалка) | picket1–3.webp, rest_*.webp | генерация (Codex), листы street_e…g | final |
+| A022 CH_Bold | персонажи | фигурки людей и роботов для экрана: копии в 3 высоты показа, линии утолщены, тёмный контур по силуэту (PT-19: «не разглядеть»); исходники — art/gen/nodes/thin/ | person*, picket*, android, robodog, rest_* | обработка Pillow (scratchpad/bold_figures.py) | final |
 
 ## Strategy by category
 | category | source (pack / Blender / procedural / generation / user) | why | status |

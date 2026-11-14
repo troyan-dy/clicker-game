@@ -8,9 +8,9 @@ export type WalkerKind = 'person' | 'android' | 'robodog';
 
 /** the pictures a kind is drawn with, its height on the screen and its speed, px per second */
 const LOOK: Record<WalkerKind, { keys: readonly string[]; h: number; speed: number }> = {
-  person: { keys: ['node_person1', 'node_person2', 'node_person3'], h: 46, speed: 80 },
-  android: { keys: ['node_android'], h: 58, speed: 110 },
-  robodog: { keys: ['node_robodog'], h: 42, speed: 170 },
+  person: { keys: ['node_person1', 'node_person2', 'node_person3'], h: 62, speed: 80 },
+  android: { keys: ['node_android'], h: 78, speed: 110 },
+  robodog: { keys: ['node_robodog'], h: 58, speed: 170 },
 };
 const POOL = 36;
 

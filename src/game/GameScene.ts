@@ -1641,7 +1641,7 @@ export class GameScene extends Phaser.Scene {
     }
     // a placard of the picket, read out above the people at the door
     const at = this.slogan && HUBS[this.stage]?.lots[this.slogan.at];
-    if (this.slogan && at) tags.push({ x: at.x - 74, y: at.y - 96, mid: true, say: true, html: this.slogan.text });
+    if (this.slogan && at) tags.push({ x: at.x - 74, y: at.y - 118, mid: true, say: true, html: this.slogan.text });
     return tags;
   }
 

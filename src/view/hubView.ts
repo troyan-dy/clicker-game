@@ -15,7 +15,7 @@ const DOT_SPEED = 560; // px per second along a connector
 const DOTS = 80;
 const LAWN = 0xbcd1ca;
 const ROAD = 0xe4e0d3;
-const PICKET_H = 66; // a figure with a placard, px
+const PICKET_H = 86; // a figure with a placard, px
 const PICKETS = ['node_picket1', 'node_picket2', 'node_picket3'];
 const RESTS = ['node_rest_bench', 'node_rest_chess', 'node_rest_hammock', 'node_rest_picnic', 'node_rest_easel', 'node_rest_fishing'];
 const MASCOT = 'mascot';
@@ -246,7 +246,7 @@ export class HubView {
   private picket(lot: Lot, place: { x: number; y: number }, want: number): void {
     while (lot.pickets.length < want) {
       const n = lot.pickets.length;
-      const img = this.scene.add.image(place.x - 62 - n * 24, place.y + 6 + n * 5, PICKETS[this.rng.int(0, PICKETS.length - 1)]).setOrigin(0.5, 1);
+      const img = this.scene.add.image(place.x - 60 - n * 27, place.y + 8 + n * 5, PICKETS[this.rng.int(0, PICKETS.length - 1)]).setOrigin(0.5, 1);
       const scale = PICKET_H / img.height;
       this.root.add(img.setScale(scale).setAlpha(0));
       this.scene.tweens.add({ targets: img, alpha: 1, scale: { from: scale * 0.7, to: scale }, delay: 500 + n * 250, duration: 260, ease: 'Back.Out' });
@@ -262,8 +262,8 @@ export class HubView {
   private guard(lot: Lot, place: { x: number; y: number }, want: number): void {
     while (lot.dogs.length < want) {
       const n = lot.dogs.length;
-      const img = this.scene.add.image(place.x + 60 + n * 20, place.y + 8 + n * 5, 'node_robodog').setOrigin(0.5, 1).setFlipX(true);
-      const scale = 42 / img.height;
+      const img = this.scene.add.image(place.x + 62 + n * 26, place.y + 9 + n * 5, 'node_robodog').setOrigin(0.5, 1).setFlipX(true);
+      const scale = 54 / img.height;
       this.root.add(img.setScale(scale).setAlpha(0));
       this.scene.tweens.add({ targets: img, alpha: 1, delay: 900, duration: 250 });
       lot.dogs.push(img);
