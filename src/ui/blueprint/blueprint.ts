@@ -16,6 +16,17 @@ export interface BlueprintTag {
   /** a caption that sells: a click on it (or on the picture above it) buys `buy`; `can` — there is enough money */
   buy?: string;
   can?: boolean;
+  /** a request from an employer (M20): a dark bubble, a click answers the request with this number */
+  ev?: number;
+}
+
+/** Claude the manager at the top of the shop (M21): for hire, working or told to wait. */
+export interface ManagerStrip {
+  title: string;
+  note: string;
+  /** the price, or what he is doing */
+  right: string;
+  state: 'can' | 'poor' | 'on' | 'off';
 }
 
 /** Everything the blueprint's HTML layer shows. The UI reads it and decides nothing. */
@@ -35,6 +46,8 @@ export interface BlueprintModel {
   quip: string;
   /** where the remark appears: above the laptop of the blueprint or in the corner of a map */
   quipAt: 'desk' | 'corner';
+  /** nothing — this screen has no manager */
+  manager?: ManagerStrip;
   /** a pile of questions waiting for one «Да»: it takes the place of the remark */
   ask?: { text: string; worth: string; fill: number; legend: boolean };
 }
@@ -65,7 +78,7 @@ export function createBlueprint(layer: HTMLElement, over: HTMLElement): Blueprin
     <div class="bl-money"><b>$0</b><span></span></div>
     <div class="bl-neck"></div>
     <div class="bl-quip"><i></i><span></span><div class="bl-ask"><b></b><u><s></s></u></div></div>
-    <aside class="bl-shop"><div class="bl-shelves"></div><div class="bl-extra"></div></aside>
+    <aside class="bl-shop"><div class="bl-manager"></div><div class="bl-shelves"></div><div class="bl-extra"></div></aside>
     <div class="bl-news"><i>НОВОСТИ</i><span></span><em></em></div>
   </div></div>`,
   );
@@ -83,6 +96,7 @@ export function createBlueprint(layer: HTMLElement, over: HTMLElement): Blueprin
     neck: q('.bl-neck'),
     tags: overRoot.querySelector<HTMLElement>('.bl-tags')!,
     shelves: q('.bl-shelves'),
+    manager: q('.bl-manager'),
     news: q('.bl-news span'),
     hint: q('.bl-news em'),
   };
@@ -146,7 +160,7 @@ export function createBlueprint(layer: HTMLElement, over: HTMLElement): Blueprin
         m.tags
           .map(
             (t) =>
-              `<div class="bl-tag${t.hot ? ' hot' : ''}${t.small ? ' small' : ''}${t.mid ? ' mid' : ''}${t.buy ? ' act' : ''}${t.can ? ' can' : ''}"${t.buy ? ` data-row="${t.buy}"` : ''} style="left:${t.x}px;top:${t.y}px">${t.html}</div>`,
+              `<div class="bl-tag${t.hot ? ' hot' : ''}${t.small ? ' small' : ''}${t.mid ? ' mid' : ''}${t.buy ? ' act' : ''}${t.can ? ' can' : ''}${t.ev === undefined ? '' : ' ev'}"${t.buy ? ` data-row="${t.buy}"` : ''}${t.ev === undefined ? '' : ` data-ev="${t.ev}"`} style="left:${t.x}px;top:${t.y}px">${t.html}</div>`,
           )
           .join(''),
       );
@@ -160,6 +174,8 @@ export function createBlueprint(layer: HTMLElement, over: HTMLElement): Blueprin
         }
       }
       set('shelves', html);
+      const mg = m.manager;
+      set('manager', mg ? `<div class="bl-mgr ${mg.state}" data-row="manager"><i></i><b>${esc(mg.title)}</b><small>${esc(mg.note)}</small><span>${esc(mg.right)}</span></div>` : '');
       showMark();
     },
     flash(row, kind) {

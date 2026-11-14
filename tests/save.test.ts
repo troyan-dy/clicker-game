@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import autoData from '../src/data/balance/auto.json';
 import farmData from '../src/data/balance/farms.json';
 import gradeData from '../src/data/balance/grades.json';
+import managerData from '../src/data/balance/managers.json';
 import planData from '../src/data/balance/plans.json';
 import scaleData from '../src/data/balance/scales.json';
 import sourceData from '../src/data/balance/sources.json';
@@ -11,6 +12,7 @@ import type { Plan } from '../src/systems/plan/plan';
 import {
   buyFarm,
   buyGrade,
+  buyManager,
   buyNoAsk,
   buyPlan,
   buyScale,
@@ -32,6 +34,7 @@ const cfg: PipeConfig = {
   grades: gradeData,
   farms: farmData as Farm[],
   scales: scaleData,
+  managers: managerData,
   auto: autoData,
 };
 
@@ -47,13 +50,14 @@ function grown() {
   buyScale(s, cfg);
   buySource(s, cfg, 'vector');
   buyFarm(s, cfg, 'rack');
+  buyManager(s, cfg, 3);
   return s;
 }
 
 describe('save', () => {
   it('test_save_round_trip_keeps_the_whole_game', () => {
     const s = grown();
-    const meta = { legends: ['rust'], awards: ['first_yes', 'no_ask'], piles: 4, reports: 1, auto: true };
+    const meta = { legends: ['rust'], awards: ['first_yes', 'no_ask'], piles: 4, reports: 1, calls: 3, limits: 1, managerOff: true, auto: true };
     const json = packSave({ at: 123, state: s, feed: { shown: [1, 4], said: { yes: 2 } }, meta, won: false, seconds: 600 });
     const file = unpackSave(json, cfg)!;
     expect(file.state).toEqual(s);

@@ -61,6 +61,14 @@ export interface Farm {
   share?: number;
 }
 
+/** Claude the manager of one screen: a one-off hire. */
+export interface Manager {
+  screen: number;
+  name: string;
+  note: string;
+  price: number;
+}
+
 /** A step up in scale: a one-off purchase that pulls the camera back to the next screen. */
 export interface Scale {
   id: string;
@@ -100,6 +108,7 @@ export interface PipeConfig {
   farms: readonly Farm[];
   /** in the order they are bought: the city, the state, the planet */
   scales: readonly Scale[];
+  managers: readonly Manager[];
   auto: AutoConfig;
 }
 
@@ -123,6 +132,10 @@ export interface PipeState {
   surge: Record<string, number>;
   /** index in cfg.grades */
   grade: number;
+  /** screens that have a manager */
+  managers: number[];
+  /** seconds until the usage limit resets; 0 — Claude works */
+  limited: number;
   presses: number;
   wasted: number;
   /** tasks closed in the player's terminal / by subagents */
@@ -151,6 +164,8 @@ export function createPipe(cfg: PipeConfig): PipeState {
     farms: {},
     surge: {},
     grade: 0,
+    managers: [],
+    limited: 0,
     presses: 0,
     wasted: 0,
     closedHere: 0,
@@ -179,9 +194,14 @@ export function replacedOf(s: PipeState, cfg: PipeConfig): number {
   return n;
 }
 
-/** tasks per second Claude prepares in the player's terminal */
-export function claudeRate(s: PipeState, cfg: PipeConfig): number {
+/** tasks per second the plan gives one session */
+export function planRate(s: PipeState, cfg: PipeConfig): number {
   return cfg.plans[s.plan.index].rate;
+}
+
+/** tasks per second Claude prepares in the player's terminal right now: nothing while the usage limit is hit */
+export function claudeRate(s: PipeState, cfg: PipeConfig): number {
+  return s.limited > 0 ? 0 : planRate(s, cfg);
 }
 
 /** Claude sessions working besides the player's own: subagents and everything in the server farms */
@@ -251,6 +271,8 @@ export function stepPipe(
 ): { arrived: number; here: number; subagents: number } {
   const t = cfg.tuning;
   const out = { arrived: 0, here: 0, subagents: 0 };
+
+  if (s.limited > 0) s.limited = Math.max(0, s.limited - dt);
 
   // shortages ease off
   for (const f of cfg.farms) {
@@ -378,6 +400,14 @@ export function buyScale(s: PipeState, cfg: PipeConfig): boolean {
   const next = cfg.scales[s.scale];
   if (!next || !s.noAsk || !spend(s, next.price)) return false;
   s.scale++;
+  return true;
+}
+
+/** Hires Claude as the manager of `screen`. */
+export function buyManager(s: PipeState, cfg: PipeConfig, screen: number): boolean {
+  const m = cfg.managers.find((x) => x.screen === screen);
+  if (!m || s.managers.includes(screen) || !spend(s, m.price)) return false;
+  s.managers.push(screen);
   return true;
 }
 

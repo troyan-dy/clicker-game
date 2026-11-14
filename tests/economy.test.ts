@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import autoData from '../src/data/balance/auto.json';
 import farmData from '../src/data/balance/farms.json';
 import gradeData from '../src/data/balance/grades.json';
+import managerData from '../src/data/balance/managers.json';
 import planData from '../src/data/balance/plans.json';
 import scaleData from '../src/data/balance/scales.json';
 import sourceData from '../src/data/balance/sources.json';
@@ -39,6 +40,7 @@ const base: PipeConfig = {
   grades: gradeData,
   farms: farmData as Farm[],
   scales: scaleData,
+  managers: managerData,
   auto: autoData,
 };
 const FINGER = 5; // presses per second of a player who keeps mashing

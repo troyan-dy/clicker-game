@@ -124,6 +124,27 @@
   text-align: center;
   line-height: 1.35;
 }
+/* a request from an employer: a dark bubble with the time left to answer */
+.bl-tag.ev {
+  padding: 6px 12px 10px;
+  border: none;
+  border-radius: 8px;
+  outline: 1.5px solid var(--coral);
+  background: #262624;
+  color: #f0eee6;
+  font-size: 15px;
+  overflow: hidden;
+  pointer-events: auto;
+  cursor: pointer;
+}
+.bl-tag.ev u {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  height: 3px;
+  background: var(--coral);
+}
+
 /* a caption that sells: it and the picture above it are one button */
 .bl-tag.act {
   pointer-events: auto;
@@ -277,6 +298,70 @@
   background: var(--paper);
   pointer-events: auto;
 }
+/* Claude the manager: a dark strip above the shelves */
+.bl-mgr {
+  position: relative;
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  margin-bottom: 4px;
+  padding: 9px 16px 10px 48px;
+  border-radius: 10px;
+  background: #262624;
+  color: #f0eee6;
+  font: 400 16px 'JetBrains Mono', monospace;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.bl-mgr i {
+  position: absolute;
+  left: 16px;
+  top: 12px;
+  width: 20px;
+  height: 17px;
+  background: var(--coral);
+}
+.bl-mgr i::before,
+.bl-mgr i::after {
+  content: '';
+  position: absolute;
+  top: 5px;
+  width: 3px;
+  height: 5px;
+  background: #262624;
+}
+.bl-mgr i::before {
+  left: 5px;
+}
+.bl-mgr i::after {
+  right: 5px;
+}
+.bl-mgr b {
+  font-weight: 700;
+}
+.bl-mgr small {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: #87867f;
+  font-size: 14px;
+}
+.bl-mgr span {
+  color: #7cc68d;
+  font-weight: 700;
+}
+.bl-mgr.poor span,
+.bl-mgr.off span {
+  color: #87867f;
+}
+.bl-mgr.denied {
+  animation: bl-denied 0.24s ease-in-out;
+}
+.bl-mgr.bought {
+  animation: bl-bought 0.26s ease-out;
+}
+
 .bl-shop h2 {
   display: flex;
   align-items: baseline;
@@ -420,6 +505,12 @@
   font-size: 21px;
   white-space: nowrap;
 }
+.bl-news span {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 .bl-news i,
 .bl-news em {
   font: 400 16px 'JetBrains Mono', monospace;
@@ -430,5 +521,5 @@
   letter-spacing: 0.12em;
 }
 .bl-news em {
-  margin-left: auto;
+  flex: none;
 }

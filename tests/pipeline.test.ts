@@ -1,18 +1,23 @@
 import { describe, expect, it } from 'vitest';
+import { createRng } from '../src/core/rng';
 import autoData from '../src/data/balance/auto.json';
 import farmData from '../src/data/balance/farms.json';
 import gradeData from '../src/data/balance/grades.json';
+import managerData from '../src/data/balance/managers.json';
 import planData from '../src/data/balance/plans.json';
 import scaleData from '../src/data/balance/scales.json';
 import sourceData from '../src/data/balance/sources.json';
 import tuningData from '../src/data/tuning/pipeline.json';
+import { createEvents, stepEvents, takeEvent } from '../src/systems/events/events';
+import { managerPick } from '../src/systems/manager/manager';
 import type { Plan } from '../src/systems/plan/plan';
 import {
   backlogCap,
   buyFarm,
   buyGrade,
-  buyScale,
+  buyManager,
   buyNoAsk,
+  buyScale,
   buyPlan,
   buySource,
   buySubagent,
@@ -39,6 +44,7 @@ const cfg: PipeConfig = {
   grades: gradeData,
   farms: farmData as Farm[],
   scales: scaleData,
+  managers: managerData,
   auto: autoData,
 };
 const DT = 1 / 60;
@@ -201,6 +207,51 @@ describe('pipeline', () => {
     const capped = cfg.farms.find((f) => f.max)!;
     for (let i = 0; i < capped.max! + 3; i++) buyFarm(s, cfg, capped.id);
     expect(s.farms[capped.id]).toBe(capped.max); // nothing is sold above the limit
+  });
+
+  it('test_pipe_usage_limit_stops_every_session_until_it_resets', () => {
+    const s = rich();
+    buyNoAsk(s, cfg);
+    buySubagent(s, cfg);
+    s.limited = 5;
+    const start = s.money;
+    run(s, 4, 0);
+    expect(s.money).toBe(start); // nothing is closed while the limit is hit
+    expect(claudeRate(s, cfg)).toBe(0);
+    run(s, 4, 0);
+    expect(s.limited).toBe(0);
+    expect(s.money).toBeGreaterThan(start); // …and work goes on after the reset
+  });
+
+  it('test_manager_buys_only_what_is_needed_and_within_his_share', () => {
+    const s = rich();
+    buyNoAsk(s, cfg);
+    expect(buyManager(s, cfg, 2)).toBe(true);
+    expect(buyManager(s, cfg, 2)).toBe(false); // one manager per screen
+    expect(managerPick(s, cfg, 2, null, 0.3)).toBeNull(); // nothing is short: he keeps the money
+    expect(managerPick(s, cfg, 2, 'sessions', 0.3)).toBe('sub');
+    expect(managerPick(s, cfg, 2, 'tasks', 0.3)).toBe('src:freelance'); // the cheapest work on sale
+    s.money = 20;
+    expect(managerPick(s, cfg, 2, 'tasks', 0.3)).toBeNull(); // dearer than his share of the money
+    s.money = 1e12;
+    expect(managerPick(s, cfg, 3, 'tasks', 0.3)).toMatch(/^src:/);
+    expect(managerPick(s, cfg, 3, 'sessions', 0.3)).toBe('farm:rack');
+  });
+
+  it('test_events_ask_only_employers_the_player_works_for', () => {
+    const t = { every: [1, 1] as const, life: 3, worthSeconds: 4, max: 2 };
+    const st = createEvents(t);
+    const rng = createRng(7);
+    for (let i = 0; i < 600; i++) stepEvents(st, t, 1 / 60, [], 3, rng);
+    expect(st.list.length).toBe(0); // nobody to ask
+    for (let i = 0; i < 600; i++) stepEvents(st, t, 1 / 60, ['a', 'b', 'c'], 3, rng);
+    expect(st.list.length).toBeGreaterThan(0);
+    expect(st.list.length).toBeLessThanOrEqual(t.max);
+    expect(new Set(st.list.map((e) => e.at)).size).toBe(st.list.length); // one request per employer
+    const n = st.list.length;
+    expect(takeEvent(st, 0)).toBeDefined();
+    expect(st.list.length).toBe(n - 1);
+    expect(st.taken).toBe(1);
   });
 
   it('test_pipe_prices_grow_and_money_is_required', () => {

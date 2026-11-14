@@ -41,12 +41,18 @@ export interface SavedMeta {
   piles: number;
   /** morning reports taken */
   reports: number;
+  /** calls and inspections answered */
+  calls: number;
+  /** usage limits hit */
+  limits: number;
+  /** the manager is told to wait */
+  managerOff: boolean;
   /** after the ending Claude answers the piles of questions himself */
   auto: boolean;
 }
 
 export function freshMeta(): SavedMeta {
-  return { legends: [], awards: [], piles: 0, reports: 0, auto: false };
+  return { legends: [], awards: [], piles: 0, reports: 0, calls: 0, limits: 0, managerOff: false, auto: false };
 }
 
 export interface SaveFile {
@@ -93,6 +99,7 @@ export function restorePipe(cfg: PipeConfig, raw: unknown): PipeState {
   s.noAsk = r.noAsk === true;
   s.subagents = Math.floor(num(r.subagents, 0));
   s.grade = Math.floor(num(r.grade, 0, 0, cfg.grades.length - 1));
+  s.managers = Array.isArray(r.managers) ? cfg.managers.map((m) => m.screen).filter((n) => (r.managers as unknown[]).includes(n)) : [];
   // a step up in scale needs a terminal that agrees by itself
   s.scale = s.noAsk ? Math.floor(num(r.scale, 0, 0, cfg.scales.length)) : 0;
   s.presses = Math.floor(num(r.presses, 0));
@@ -132,7 +139,7 @@ export function unpackSave(json: string | null, cfg: PipeConfig): SaveFile | nul
     at: num(data.at, 0),
     state: restorePipe(cfg, data.state),
     feed: { shown: Array.isArray(feed.shown) ? feed.shown.filter((i): i is number => Number.isInteger(i)) : [], said },
-    meta: { legends: ids(meta.legends), awards: ids(meta.awards), piles: Math.floor(num(meta.piles, 0)), reports: Math.floor(num(meta.reports, 0)), auto: meta.auto === true },
+    meta: { legends: ids(meta.legends), awards: ids(meta.awards), piles: Math.floor(num(meta.piles, 0)), reports: Math.floor(num(meta.reports, 0)), calls: Math.floor(num(meta.calls, 0)), limits: Math.floor(num(meta.limits, 0)), managerOff: meta.managerOff === true, auto: meta.auto === true },
     won: data.won === true,
     seconds: num(data.seconds, 0),
   };
