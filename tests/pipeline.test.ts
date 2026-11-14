@@ -11,6 +11,7 @@ import sourceData from '../src/data/balance/sources.json';
 import tuningData from '../src/data/tuning/pipeline.json';
 import { createEvents, stepEvents, takeEvent } from '../src/systems/events/events';
 import { managerPick } from '../src/systems/manager/manager';
+import { createStrikes, stepStrikes } from '../src/systems/strikes/strikes';
 import type { Plan } from '../src/systems/plan/plan';
 import {
   backlogCap,
@@ -31,6 +32,8 @@ import {
   farmPrice,
   finished,
   inflowOf,
+  keysNeeded,
+  keysOf,
   payOf,
   pressPipe,
   sessionsOf,
@@ -293,12 +296,14 @@ describe('pipeline', () => {
     const work = inflowOf(s, cfg);
     const u = unemploymentOf(s, cfg);
     const t = cfg.tuning;
-    s.allowance = true;
-    // the allowance takes its share of the pay; the price itself falls less
-    expect(payOf(s, cfg)).toBeCloseTo(t.pay * (1 - t.slump * t.relief * u) * (1 - t.allowance));
+    s.allowance = 1;
+    // one step of the allowance takes its share of the pay and a third of the fall of the price
+    expect(payOf(s, cfg)).toBeCloseTo(t.pay * (1 - t.slump * u * (1 - 1 / t.allowanceLevels)) * (1 - t.allowance));
     run(s, t.ordersRise + 1, 0);
-    expect(inflowOf(s, cfg)).toBeCloseTo(work * (1 + t.orders * u)); // the more people are out of work, the more they order
-    s.allowance = false;
+    expect(inflowOf(s, cfg)).toBeCloseTo(work * (1 + (t.orders * u) / t.allowanceLevels)); // the more people are out of work, the more they order
+    s.allowance = t.allowanceLevels;
+    expect(inflowOf(s, cfg)).toBeCloseTo(work * (1 + t.orders * u)); // the top step: all the orders
+    s.allowance = 0;
     run(s, cfg.tuning.ordersFade + 1, 0);
     expect(inflowOf(s, cfg)).toBeCloseTo(work); // without the allowance the orders dry up
   });
@@ -314,12 +319,54 @@ describe('pipeline', () => {
     const u = unemploymentOf(s, cfg);
     expect(u).toBeGreaterThan(0.5);
     expect(payOf(s, cfg)).toBeCloseTo(full * (1 - cfg.tuning.slump * u));
-    s.allowance = true;
-    expect(payOf(s, cfg)).toBeCloseTo(full * (1 - cfg.tuning.slump * cfg.tuning.relief * u) * (1 - cfg.tuning.allowance));
+    s.allowance = cfg.tuning.allowanceLevels;
+    // the top step of the allowance: the price does not fall, the allowance takes its share
+    expect(payOf(s, cfg)).toBeCloseTo(full * (1 - cfg.tuning.allowance * cfg.tuning.allowanceLevels));
     // a new market: nobody is out of work there yet
     s.scale = 2;
-    s.allowance = false;
+    s.allowance = 0;
     expect(payOf(s, cfg)).toBeCloseTo(full);
+  });
+
+  it('test_strike_stops_the_tasks_of_an_employer_and_the_allowance_ends_it', () => {
+    const s = createPipe(cfg);
+    s.noAsk = true;
+    s.scale = 1;
+    s.owned.vector = 2;
+    s.owned.cats = 1;
+    const all = inflowOf(s, cfg);
+    s.strikes.push('cats');
+    expect(inflowOf(s, cfg)).toBeCloseTo(all - sourceInflow(cfg.sources.find((x) => x.id === 'cats')!, 1));
+    s.allowance = 1;
+    stepPipe(s, cfg, DT);
+    expect(s.strikes).toEqual([]);
+    // strikes begin only when enough people are out of work and nobody is paid
+    const t = { from: 0.15, every: [1, 1] as const, max: 2, priceSeconds: 6 };
+    const st = createStrikes(t);
+    const rng = createRng(7);
+    const hits = (u: number, paid: boolean, blocked: number): number => {
+      let n = 0;
+      for (let i = 0; i < 600; i++) if (stepStrikes(st, t, DT, u, paid, blocked, ['vector', 'cats'], rng)) n++;
+      return n;
+    };
+    expect(hits(0.1, false, 0)).toBe(0);
+    expect(hits(0.6, true, 0)).toBe(0);
+    expect(hits(0.6, false, 2)).toBe(0);
+    expect(hits(0.6, false, 0)).toBeGreaterThan(3);
+  });
+
+  it('test_next_screen_needs_employers_taken_whole', () => {
+    const s = createPipe(cfg);
+    s.noAsk = true;
+    s.scale = 1;
+    s.money = 1e30;
+    const need = keysNeeded(s, cfg);
+    expect(need).toBeGreaterThan(0);
+    expect(buyScale(s, cfg)).toBe(false); // money alone does not open the state
+    const city = cfg.sources.filter((x) => x.screen === 3);
+    for (const src of city.slice(0, need)) s.owned[src.id] = src.max;
+    expect(keysOf(s, cfg)).toBe(need);
+    expect(buyScale(s, cfg)).toBe(true);
   });
 
   it('test_bribe_lets_the_robot_dogs_in_and_a_pack_takes_a_unit_over_time', () => {

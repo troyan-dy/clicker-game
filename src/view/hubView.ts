@@ -34,6 +34,8 @@ export interface HubTopology {
   live: Record<string, boolean>;
   /** robot dogs that stand at an employer: the ones that took its jobs, and the pack that is taking the next ones */
   dogs: Record<string, number>;
+  /** employers whose door is blocked by a strike: the whole picket is there */
+  struck: Record<string, boolean>;
 }
 
 interface Route {
@@ -196,7 +198,7 @@ export class HubView {
       const lot = this.lots.get(id)!;
       const target = Math.min(1, t.floors[id] ?? 0);
       // those whose work was taken stand at the door: one, two when the whole building is gone
-      this.picket(lot, place, t.picket && target > 0 ? (target >= 1 ? 2 : 1) : 0);
+      this.picket(lot, place, t.struck[id] ? 4 : t.picket && target > 0 ? (target >= 1 ? 2 : 1) : 0);
       if (target >= 1 && !lot.flag) this.raiseFlag(lot, place, lot.target > 0);
       this.guard(lot, place, t.dogs[id] ?? 0);
       if (target === lot.target) continue;

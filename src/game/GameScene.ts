@@ -28,6 +28,7 @@ import feedData from '../data/tuning/feed.json';
 import limitData from '../data/tuning/limit.json';
 import managerTuning from '../data/tuning/manager.json';
 import peopleData from '../data/tuning/people.json';
+import strikeData from '../data/tuning/strikes.json';
 import saveData from '../data/tuning/save.json';
 import stackData from '../data/tuning/stack.json';
 import tuningData from '../data/tuning/pipeline.json';
@@ -36,6 +37,7 @@ import { createTuningPanel, type TuningPanel } from '../debug/tuningPanel';
 import { createEvents, stepEvents, takeEvent, type EventsTuning } from '../systems/events/events';
 import { createFeed, headline, say, stepFeed, tell, type FeedContent } from '../systems/feed/feed';
 import { managerPick } from '../systems/manager/manager';
+import { createStrikes, stepStrikes, type StrikeTuning } from '../systems/strikes/strikes';
 import type { Plan } from '../systems/plan/plan';
 import {
   aimAt,
@@ -60,6 +62,8 @@ import {
   gradeCost,
   inflowOf,
   jobOf,
+  keysNeeded,
+  keysOf,
   lineCost,
   locked,
   ordersOf,
@@ -128,6 +132,9 @@ const ROBOT_WORDS: Record<RobotKind, { many: string; of: string }> = {
 };
 const ROBOT_KINDS: readonly RobotKind[] = ['android', 'robodog'];
 const EVENTS: EventsTuning = { ...eventsData, every: [eventsData.every[0], eventsData.every[1]] };
+const STRIKES: StrikeTuning = { ...strikeData, every: [strikeData.every[0], strikeData.every[1]] };
+const STRUCK_FORMS = ['здание стоит', 'здания стоят', 'зданий стоят'] as const;
+const WHOLE_FORMS = ['здание', 'здания', 'зданий'] as const;
 const IDLE_AFTER = 12; // seconds without a «Да» while requests wait
 const NECK_AFTER = 14; // seconds the same bottleneck lasts before Claude mentions it
 const SESSION_FORMS = ['сессия', 'сессии', 'сессий'] as const;
@@ -154,7 +161,7 @@ function perSecond(n: number): string {
 declare global {
   interface Window {
     /** gym-only hooks for scripted captures */
-    __gym?: { buy(what: string): boolean; click(row: string): void; take(id: string): void; gift(dollars: number): void; away(hours: number): void; pile(legend: boolean): void; call(): void; limit(): void };
+    __gym?: { buy(what: string): boolean; click(row: string): void; take(id: string): void; strike(): void; gift(dollars: number): void; away(hours: number): void; pile(legend: boolean): void; call(): void; limit(): void };
   }
 }
 
@@ -262,6 +269,8 @@ export class GameScene extends Phaser.Scene {
   private sloganIn = 4;
   /** seconds until the next body walks from the factory to the employer it takes */
   private streamIn = 0;
+  /** the clock of the strikes: they come while nobody is paid an allowance */
+  private readonly strike = createStrikes(STRIKES);
   private neckKind: Neck = 'none';
   private neckFor = 0;
   private pressTimes: number[] = [];
@@ -341,6 +350,9 @@ export class GameScene extends Phaser.Scene {
       buy: (what) => this.buy(what),
       click: (row) => this.click(row),
       take: (id) => this.takeWhole(id),
+      strike: () => {
+        this.strike.wait = 0;
+      },
       gift: (dollars) => this.gift(dollars),
       away: (hours) => this.away(hours),
       pile: (legend) => this.forcePile(legend),
@@ -667,10 +679,33 @@ export class GameScene extends Phaser.Scene {
     // the allowance of the people left without work is a switch too
     if (row === 'ubi') {
       this.wake();
-      this.state.allowance = !this.state.allowance;
+      const s = this.state;
+      const struck = s.strikes.length > 0;
+      // a lever of a few steps: none → 10% → 20% → 30% → none
+      s.allowance = (s.allowance + 1) % (this.cfg.tuning.allowanceLevels + 1);
       playSound('ui');
-      this.say(this.state.allowance ? 'ubi:on' : 'ubi:off', true);
+      this.say(s.allowance === 0 ? 'ubi:off' : s.allowance > 1 ? 'ubi:more' : struck ? 'strike:over' : 'ubi:on', true);
       this.slogan = null;
+      this.saveGame();
+      return;
+    }
+    // a strike is settled with a one-off payment: the picket leaves the door
+    if (row.startsWith('settle:')) {
+      this.wake();
+      const s = this.state;
+      const id = row.slice(7);
+      if (!s.strikes.includes(id)) return;
+      const price = this.strikePrice();
+      if (s.money < price) {
+        this.paper.flash(row, 'denied');
+        playSound('waste');
+        return;
+      }
+      s.money -= price;
+      this.lastMoney -= price;
+      s.strikes = s.strikes.filter((x) => x !== id);
+      playSound('buy', 4);
+      this.say('strike:paid', true);
       this.saveGame();
       return;
     }
@@ -839,6 +874,7 @@ export class GameScene extends Phaser.Scene {
     this.owed = { in: 0, me: 0, sub: 0 };
     this.calls.list = []; // the requests stay on the screen that was left
     this.slogan = null;
+    this.state.strikes = []; // and so do the pickets
     const hub = this.hubs.get(next)!;
     hub.sync(this.hubTopology());
     if (dive) hub.emerge(350, 900);
@@ -1065,7 +1101,7 @@ export class GameScene extends Phaser.Scene {
             const target = outputOf(s, this.cfg, kind) > 0 ? targetOf(s, this.cfg, kind) : undefined;
             if (!target) continue;
             hub.arrive(target.id, kind);
-            if (this.rng.next() < 0.45) hub.leave(target.id, 1, s.allowance);
+            if (this.rng.next() < 0.45) hub.leave(target.id, 1, s.allowance > 0);
           }
         }
       }
@@ -1126,6 +1162,17 @@ export class GameScene extends Phaser.Scene {
       if (this.sloganIn <= 0) {
         this.sloganIn = this.rng.range(peopleData.sloganEvery[0], peopleData.sloganEvery[1]);
         if (this.stage >= 3 && !s.allowance && owners.length) this.slogan = { at: this.rng.pick(owners), text: this.rng.pick(PICKET), left: peopleData.sloganLife };
+      }
+
+      // a strike: nobody is paid and enough people are out of work — a picket blocks the door of an employer
+      const doors = this.stage >= 3 ? owners.filter((id) => !s.strikes.includes(id)) : [];
+      const hit = stepStrikes(this.strike, STRIKES, dt, unemploymentOf(s, this.cfg), s.allowance > 0, s.strikes.length, doors, this.rng);
+      if (hit) {
+        s.strikes.push(hit);
+        playSound('waste');
+        this.say('strike', true);
+        logEvent('strike');
+        this.saveGame();
       }
 
       // the usage limit: hit now and then, it resets by itself
@@ -1201,14 +1248,19 @@ export class GameScene extends Phaser.Scene {
     const top = Math.max(inflow, capacity, 1e-9);
     const limited = s.limited > 0;
     const short_ = limited || neck === 'claude';
-    const pct = Math.round(cfg.tuning.allowance * 100);
-    // from the city on there are people left without work: the more of them, the cheaper a task; an allowance keeps the price
+    // from the city on there are people left without work: the more of them, the cheaper a task; the allowance keeps the price
     const u = unemploymentOf(s, cfg);
     const drop = Math.round(slumpOf(s, cfg) * 100);
     const t = cfg.tuning;
-    // what the allowance would do to the income right now: the price it keeps and the orders it brings against what it costs
-    const paid = (1 - t.slump * t.relief * u) * (1 - t.allowance) * (neck === 'tasks' ? 1 + t.orders : 1);
-    const pays = paid > 1 - t.slump * u;
+    // what every step of the allowance would do to the income right now: the price it keeps and the orders it brings against what it costs
+    const gain = (step: number): number => {
+      const r = step / t.allowanceLevels;
+      return (1 - t.slump * u * (1 - r)) * (1 - t.allowance * step) * (neck === 'tasks' ? 1 + t.orders * r * u : 1);
+    };
+    let best = 0;
+    for (let step = 1; step <= t.allowanceLevels; step++) if (gain(step) > gain(best) + 0.005) best = step;
+    const pct = (step: number): number => Math.round(t.allowance * step * 100);
+    const now = s.allowance ? `пособие ${pct(s.allowance)}%` : 'пособия нет';
     const people: MeterRow[] =
       this.stage >= 3
         ? [
@@ -1216,23 +1268,34 @@ export class GameScene extends Phaser.Scene {
               label: 'ЛЮДИ',
               value: `${Math.round(u * 100)}%`,
               fill: u,
-              hot: s.allowance !== pays,
-              note: s.allowance
-                ? pays
-                  ? `цена −${drop}% · заказы +${perSecond(ordersOf(s, cfg))} · клик: отмена`
-                  : `пособие ${pct}% не окупается · клик: отмена`
-                : `без работы · цена −${drop}% · клик: пособие ${pct}%`,
+              // the lever stands on the wrong step: the line says which one pays best
+              hot: best !== s.allowance,
+              note:
+                best !== s.allowance
+                  ? `${now} · цена −${drop}% · лучше ${best ? `${pct(best)}%` : 'без него'}`
+                  : s.allowance
+                    ? `${now} · цена −${drop}% · заказы +${perSecond(ordersOf(s, cfg))}`
+                    : `без работы · цена −${drop}% · клик: пособие`,
               row: 'ubi',
             },
           ]
         : [];
+    const struck = s.strikes.length;
     return [
       {
         label: 'ЗАДАЧИ',
         value: perSecond(inflow),
         fill: inflow / top,
-        hot: neck === 'tasks' && !done,
-        note: done ? 'здесь взято всё' : neck === 'tasks' ? `мало — ${needTasks}` : short_ ? '' : 'поровну — можно просить повышение',
+        hot: struck > 0 || (neck === 'tasks' && !done),
+        note: struck
+          ? `забастовка: ${struck} ${plural(struck, STRUCK_FORMS)} — см. «ЛЮДИ»`
+          : done
+            ? 'здесь взято всё'
+            : neck === 'tasks'
+              ? `мало — ${needTasks}`
+              : short_
+                ? ''
+                : 'поровну — можно просить повышение',
       },
       {
         label: 'СЕССИИ',
@@ -1272,7 +1335,7 @@ export class GameScene extends Phaser.Scene {
     if (this.stage === 2) this.view.leave(id, count);
     else if (this.stage >= 3) {
       const hub = this.hubs.get(this.stage)!;
-      hub.leave(id, count, this.state.allowance);
+      hub.leave(id, count, this.state.allowance > 0);
       // the first picket: Claude points at the line of the table that deals with it
       if (!this.state.allowance && !this.feed.said.picket) this.say('picket', true);
     }
@@ -1300,7 +1363,9 @@ export class GameScene extends Phaser.Scene {
     // the park fills up as the work is taken — while the allowance is paid; without it the people stand with placards
     const slots = HUBS[this.stage]?.park?.slots.length ?? 0;
     const rest = s.allowance && total ? Math.ceil((slots * taken) / total) : 0;
-    return { floors, farms: s.farms, picket: !s.allowance, rest, live, dogs };
+    const struck: Record<string, boolean> = {};
+    for (const id of s.strikes) struck[id] = true;
+    return { floors, farms: s.farms, picket: !s.allowance, rest, live, dogs, struck };
   }
 
   /** the employers of a big screen with something left to take, the cheapest next unit first */
@@ -1410,7 +1475,12 @@ export class GameScene extends Phaser.Scene {
   private scaleShelf(): ShopShelf[] {
     const next = this.cfg.scales[this.state.scale];
     if (!next) return [];
-    return [{ title: SCALE_SHELF[this.state.scale], hot: false, bonus: this.off('scale'), rows: [this.row(next.name, next.note, '', 'scale', scaleCost(this.state, this.cfg))] }];
+    const row = this.row(next.name, next.note, '', 'scale', scaleCost(this.state, this.cfg));
+    // the next screen opens with keys: employers of this one taken whole
+    const need = keysNeeded(this.state, this.cfg);
+    const have = keysOf(this.state, this.cfg);
+    const rows: ShopRow[] = have < need ? [{ ...row, state: 'off', sub: `сначала возьми целиком ${need} ${plural(need, WHOLE_FORMS)}: взято ${have}` }] : [row];
+    return [{ title: SCALE_SHELF[this.state.scale], hot: false, bonus: this.off('scale'), rows }];
   }
 
   private terminalShelves(neck: Neck): ShopShelf[] {
@@ -1448,13 +1518,15 @@ export class GameScene extends Phaser.Scene {
     const t = HUB_TEXT[this.stage];
     const cheaper = this.off('grades', 'повышения: скидка');
     const upgrades: ShopShelf = { title: cheaper ? 'УЛУЧШЕНИЯ' : 'УЛУЧШЕНИЯ · быстрее и дороже', hot: false, bonus: cheaper, rows: [...this.planRows(false), ...this.gradeRows()] };
-    const rest: ShopShelf[] = [{ title: t.farms, hot: neck === 'claude', bonus: this.off('farms'), rows: this.farmRows() }, upgrades, ...this.scaleShelf()];
+    // a shelf with a discount drops the second half of its title: the header stays on one line
+    const farmsOff = this.off('farms');
+    const rest: ShopShelf[] = [{ title: farmsOff ? t.farms.split(' · ')[0] : t.farms, hot: neck === 'claude', bonus: farmsOff, rows: this.farmRows() }, upgrades, ...this.scaleShelf()];
     const employers = `${t.employers} · ${taken} из ${total}`;
     // the street: the trades are taken over by robots — the shop sells the lines that make them
     if (this.cfg.lines.some((l) => l.screen === this.stage)) {
       return [
         { title: `${t.employers} · заменено ${taken} из ${total}`, hot: false, rows: this.aimRows() },
-        { title: 'ЗАВОД · больше роботов', hot: neck === 'tasks' && taken < total, bonus: this.off('farms'), rows: this.lineRows() },
+        { title: farmsOff ? 'ЗАВОД' : 'ЗАВОД · больше роботов', hot: neck === 'tasks' && taken < total, bonus: farmsOff, rows: this.lineRows() },
         ...rest,
       ];
     }
@@ -1561,10 +1633,21 @@ export class GameScene extends Phaser.Scene {
       const left = Math.ceil((e.left / EVENTS.life) * 12) / 12;
       tags.push({ x: p.x, y: p.y - p.h + 12, mid: true, ev: i, html: `${lines[e.kind] ?? ''}<u style="width:${Math.round(left * 100)}%"></u>` });
     });
+    // a strike: the door is blocked until the player settles it — or starts paying the allowance
+    const price = this.strikePrice();
+    for (const id of this.state.strikes) {
+      const p = this.placeOf(id);
+      if (p) tags.push({ x: p.x, y: p.y - p.h * 0.62, mid: true, alarm: true, buy: `settle:${id}`, can: this.state.money >= price, html: `Забастовка: вход перекрыт<br><b>договориться · $${short(price)}</b>` });
+    }
     // a placard of the picket, read out above the people at the door
     const at = this.slogan && HUBS[this.stage]?.lots[this.slogan.at];
     if (this.slogan && at) tags.push({ x: at.x - 74, y: at.y - 96, mid: true, say: true, html: this.slogan.text });
     return tags;
+  }
+
+  /** what it costs to settle one strike: a few seconds of the income */
+  private strikePrice(): number {
+    return Math.max(1, Math.floor(this.flowIncome() * STRIKES.priceSeconds));
   }
 
   /** the line under the money: the grade and what one task pays */
@@ -1576,7 +1659,7 @@ export class GameScene extends Phaser.Scene {
     // what moves the price besides the grade is said next to it: the perks of whole employers, unemployment, the allowance
     const perks = Math.round(bonus(s, this.cfg, 'pay') * 100);
     const drop = Math.round(slumpOf(s, this.cfg) * 100);
-    const why = `${perks ? ` · здания +${perks}%` : ''}${drop ? ` · безработица −${drop}%` : ''}${s.allowance ? ` · пособие −${Math.round(this.cfg.tuning.allowance * 100)}%` : ''}`;
+    const why = `${perks ? ` · здания +${perks}%` : ''}${drop ? ` · безработица −${drop}%` : ''}${s.allowance ? ` · пособие −${Math.round(this.cfg.tuning.allowance * s.allowance * 100)}%` : ''}`;
     // the grade is named while nothing else moves the price; on the planet the share of the provider's revenue stands in for it
     if (why) return `${pay}${why}`;
     return share > 0 && this.stage < STREET ? `${pay} · твоя доля в выручке Anthropic: ${share}%` : `${this.cfg.grades[s.grade].name.toLowerCase()}: ${pay}`;
@@ -1651,6 +1734,11 @@ export class GameScene extends Phaser.Scene {
       if (!lot) continue;
       // the third line is what the whole employer gives: pale until it is earned, coral once it works
       const perk = src.perk ? `<i${owned >= src.max ? ' class="on"' : ''}>★ ${src.perk.text}</i>` : '';
+      if (s.strikes.includes(src.id)) {
+        // the door is blocked: nothing comes from here, the bubble above asks for a settlement
+        tags.push({ x: lot.x, y: lot.y + 4, mid: true, small: true, html: `${src.tag}<br><b class="bad">забастовка · задач нет</b>${perk}` });
+        continue;
+      }
       if (owned >= src.max) {
         tags.push({ x: lot.x, y: lot.y + 4, mid: true, small: true, html: `${src.tag} · целиком<br><b>+${short(sourceInflow(src, owned))}/с</b>${perk}` });
         continue;
@@ -1715,7 +1803,11 @@ export class GameScene extends Phaser.Scene {
       quip: this.feed.quip,
       quipAt: 'corner',
       ask: this.pile(),
-      hint: `${t.place}: ${taken} из ${total} ${t.floor[2]} · ${this.stage >= STREET ? 'людей без работы' : 'заменено программистов'}: ${short(replacedOf(s, cfg))}`,
+      // while the keys to the next screen are missing, the corner counts them
+      hint:
+        keysOf(s, cfg) < keysNeeded(s, cfg)
+          ? `${t.place}: ${taken} из ${total} ${t.floor[2]} · целиком ${keysOf(s, cfg)} из ${keysNeeded(s, cfg)} — ключи к следующему экрану`
+          : `${t.place}: ${taken} из ${total} ${t.floor[2]} · ${this.stage >= STREET ? 'людей без работы' : 'заменено программистов'}: ${short(replacedOf(s, cfg))}`,
     });
   }
 

@@ -141,6 +141,8 @@ export interface Scale {
   name: string;
   note: string;
   price: number;
+  /** employers of the screen it is bought on that must be taken whole first: the keys to the next screen */
+  needs?: number;
 }
 
 export interface AutoConfig {
@@ -161,17 +163,17 @@ export interface PipeTuning {
   shareBase: number;
   /** the share is counted once this many steps up in scale are bought */
   shareFrom: number;
-  /** the people left without work (M24): the part of every task's pay the allowance takes */
+  /** the people left without work (M24): the part of every task's pay one step of the allowance takes */
   allowance: number;
-  /** …the extra tasks they order while it is paid, as a share of the inflow — when everybody is out of work */
+  /** …how many steps the allowance has above «none»; at the top step the price of a task does not fall at all */
+  allowanceLevels: number;
+  /** …the extra tasks they order at the top step, as a share of the inflow — when everybody is out of work */
   orders: number;
   /** …seconds for the orders to grow to full / to dry up without the allowance */
   ordersRise: number;
   ordersFade: number;
-  /** the part of a task's price lost when everybody on the screen's market is out of work */
+  /** the part of a task's price lost when everybody on the screen's market is out of work and no allowance is paid */
   slump: number;
-  /** …the part of that loss that stays when the allowance is paid: people who are paid do not undercut */
-  relief: number;
   /** finished tasks that can wait for a «Да»; Claude pauses above this */
   readyMax: number;
   /** «Да» that can be given in advance */
@@ -216,8 +218,10 @@ export interface PipeState {
   managers: number[];
   /** seconds until the usage limit resets; 0 — Claude works */
   limited: number;
-  /** the player pays an allowance to the people left without work */
-  allowance: boolean;
+  /** the step of the allowance the player pays to the people left without work: 0 — none */
+  allowance: number;
+  /** employers whose door is blocked by a strike: no tasks come from there */
+  strikes: string[];
   /** 0..1: how much of their orders the people place now */
   orders: number;
   /** employers whose bribe is paid: robot dogs may work there instead of people */
@@ -258,7 +262,8 @@ export function createPipe(cfg: PipeConfig): PipeState {
     grade: 0,
     managers: [],
     limited: 0,
-    allowance: false,
+    allowance: 0,
+    strikes: [],
     orders: 0,
     bribed: {},
     jobs: [],
@@ -295,13 +300,13 @@ export function discount(s: PipeState, cfg: PipeConfig, kind: PerkKind): number 
 /** tasks per second the employers bring, before the orders of the people */
 export function workOf(s: PipeState, cfg: PipeConfig): number {
   let sum = 0;
-  for (const src of cfg.sources) sum += sourceInflow(src, s.owned[src.id] ?? 0);
+  for (const src of cfg.sources) if (!s.strikes.includes(src.id)) sum += sourceInflow(src, s.owned[src.id] ?? 0);
   return sum * (1 + bonus(s, cfg, 'inflow'));
 }
 
 /** tasks per second the people left without work order: they have the time, and the allowance; the more of them, the more orders */
 export function ordersOf(s: PipeState, cfg: PipeConfig): number {
-  return workOf(s, cfg) * cfg.tuning.orders * s.orders * unemploymentOf(s, cfg);
+  return workOf(s, cfg) * cfg.tuning.orders * reliefOf(s, cfg) * s.orders * unemploymentOf(s, cfg);
 }
 
 /** tasks per second coming in: the employers and the orders of the people */
@@ -416,15 +421,31 @@ export function unemploymentOf(s: PipeState, cfg: PipeConfig): number {
   return all > 0 ? Math.min(1, out / all) : 0;
 }
 
-/** the share of a task's price lost to the competition for the jobs that are left; the allowance keeps most of it */
+/** how far the allowance goes: 0 — none is paid, 1 — the top step */
+export function reliefOf(s: PipeState, cfg: PipeConfig): number {
+  return Math.min(1, s.allowance / cfg.tuning.allowanceLevels);
+}
+
+/** the share of a task's price lost to the competition for the jobs that are left; every step of the allowance takes a part of it off */
 export function slumpOf(s: PipeState, cfg: PipeConfig): number {
-  return cfg.tuning.slump * unemploymentOf(s, cfg) * (s.allowance ? cfg.tuning.relief : 1);
+  return cfg.tuning.slump * unemploymentOf(s, cfg) * (1 - reliefOf(s, cfg));
 }
 
 /** dollars one closed task pays: the grade and the perks, less what unemployment and the allowance take */
 export function payOf(s: PipeState, cfg: PipeConfig): number {
   const base = cfg.tuning.pay * cfg.grades[s.grade].mult * (1 + bonus(s, cfg, 'pay'));
-  return base * (1 - slumpOf(s, cfg)) * (s.allowance ? 1 - cfg.tuning.allowance : 1);
+  return base * (1 - slumpOf(s, cfg)) * (1 - cfg.tuning.allowance * s.allowance);
+}
+
+/** employers of the current screen taken whole: the keys to the next one */
+export function keysOf(s: PipeState, cfg: PipeConfig): number {
+  const screen = screenOf(s);
+  return cfg.sources.filter((x) => x.screen === screen && whole(s, x)).length;
+}
+
+/** how many of them the next step up in scale asks for */
+export function keysNeeded(s: PipeState, cfg: PipeConfig): number {
+  return cfg.scales[s.scale]?.needs ?? 0;
 }
 
 /** the pack of robot dogs at work at an employer, if there is one */
@@ -518,8 +539,10 @@ export function stepPipe(
   }
 
   // the people left without work order tasks while the allowance is paid; without it the orders dry up
-  if (s.allowance) s.orders = Math.min(1, s.orders + dt / t.ordersRise);
+  if (s.allowance > 0) s.orders = Math.min(1, s.orders + dt / t.ordersRise);
   else s.orders = Math.max(0, s.orders - dt / t.ordersFade);
+  // …and nobody who is paid stands in a doorway
+  if (s.allowance > 0 && s.strikes.length) s.strikes = [];
 
   // tasks arrive
   const cap = backlogCap(s, cfg);
@@ -671,7 +694,7 @@ export function buyFarm(s: PipeState, cfg: PipeConfig, id: string): boolean {
 
 /** The next step up in scale; the first one needs a terminal that agrees by itself. */
 export function buyScale(s: PipeState, cfg: PipeConfig): boolean {
-  if (!cfg.scales[s.scale] || !s.noAsk || !spend(s, scaleCost(s, cfg))) return false;
+  if (!cfg.scales[s.scale] || !s.noAsk || keysOf(s, cfg) < keysNeeded(s, cfg) || !spend(s, scaleCost(s, cfg))) return false;
   s.scale++;
   return true;
 }

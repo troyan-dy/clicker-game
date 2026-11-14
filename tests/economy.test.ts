@@ -26,6 +26,8 @@ import {
   finished,
   inflowOf,
   jobOf,
+  keysNeeded,
+  keysOf,
   lineCost,
   locked,
   payOf,
@@ -79,8 +81,23 @@ function play(seconds: number, cfg: PipeConfig = base): { t: number; what: strin
       untilPress += 1 / FINGER;
     }
     if (i % 30 !== 0) continue; // the bot shops twice a second
-    // the allowance pays off once enough people are out of work: it keeps the price of a task
-    s.allowance = unemploymentOf(s, cfg) > 0.31;
+    // the step of the allowance that pays best right now: what it keeps of the price and what it brings in orders against what it costs
+    {
+      const u = unemploymentOf(s, cfg);
+      const tun = cfg.tuning;
+      const short = inflowOf(s, cfg) < claudeRate(s, cfg) + subagentRate(s, cfg);
+      let best = 0;
+      let top = 0;
+      for (let l = 0; l <= tun.allowanceLevels; l++) {
+        const r = l / tun.allowanceLevels;
+        const gain = (1 - tun.slump * u * (1 - r)) * (1 - tun.allowance * l) * (short ? 1 + tun.orders * r * u : 1);
+        if (gain > top + 1e-9) {
+          top = gain;
+          best = l;
+        }
+      }
+      s.allowance = best;
+    }
 
     const inflow = inflowOf(s, cfg);
     const hands = s.noAsk ? Infinity : FINGER;
@@ -89,9 +106,17 @@ function play(seconds: number, cfg: PipeConfig = base): { t: number; what: strin
     // the next step up in scale: bought as soon as it costs less than a minute of income, or when this screen is done
     const scale = cfg.scales[s.scale];
     const left = cfg.sources.some((x) => x.screen === screen && (s.owned[x.id] ?? 0) < x.max);
-    if (screen >= 2 && scale && (scale.price <= income * 60 || (screen >= 3 && !left))) {
+    const keys = keysOf(s, cfg) >= keysNeeded(s, cfg);
+    if (screen >= 2 && scale && keys && (scale.price <= income * 60 || (screen >= 3 && !left))) {
       if (buyScale(s, cfg)) log.push({ t, what: `МАСШТАБ: ${scale.name} → экран ${screenOf(s)}, $${s.money.toFixed(0)}` });
       continue; // saving for it
+    }
+    // the next screen is affordable but its keys are missing: finish the employer that is closest to whole
+    if (screen >= 3 && scale && !keys && scale.price <= income * 60) {
+      const rest = (x: Source): number => (x.max - (s.owned[x.id] ?? 0)) * (locked(s, x) ? bribeCost(s, cfg, x) : sourceCost(s, cfg, x));
+      const near = cfg.sources.filter((x) => x.screen === screen && !x.made && !jobOf(s, x.id) && (s.owned[x.id] ?? 0) < x.max).sort((a, b) => rest(a) - rest(b))[0];
+      if (near && (locked(s, near) ? buyBribe(s, cfg, near.id) : buySource(s, cfg, near.id))) log.push({ t, what: `к целому: ${near.name} → $${s.money.toFixed(0)}` });
+      continue;
     }
     // a promotion that pays back within a minute and a half is taken first (promotions are sold on the blueprint)
     const grade = cfg.grades[s.grade + 1];

@@ -60,7 +60,7 @@ function grown() {
 describe('save', () => {
   it('test_save_round_trip_keeps_the_whole_game', () => {
     const s = grown();
-    s.allowance = true;
+    s.allowance = 2;
     s.orders = 0.5;
     s.bribed.exchange = true;
     s.lines.dogs = 3;

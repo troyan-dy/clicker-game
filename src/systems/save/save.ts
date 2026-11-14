@@ -99,7 +99,9 @@ export function restorePipe(cfg: PipeConfig, raw: unknown): PipeState {
   s.noAsk = r.noAsk === true;
   s.subagents = Math.floor(num(r.subagents, 0));
   s.grade = Math.floor(num(r.grade, 0, 0, cfg.grades.length - 1));
-  s.allowance = r.allowance === true;
+  // older saves kept the allowance as a switch
+  s.allowance = r.allowance === true ? 1 : Math.floor(num(r.allowance, 0, 0, cfg.tuning.allowanceLevels));
+  s.strikes = s.allowance > 0 || !Array.isArray(r.strikes) ? [] : cfg.sources.map((x) => x.id).filter((id) => (r.strikes as unknown[]).includes(id));
   s.orders = num(r.orders, 0, 0, 1);
   s.managers = Array.isArray(r.managers) ? cfg.managers.map((m) => m.screen).filter((n) => (r.managers as unknown[]).includes(n)) : [];
   // a step up in scale needs a terminal that agrees by itself

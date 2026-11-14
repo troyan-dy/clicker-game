@@ -1,1 +1,1 @@
-{ "pay": 2, "backlogMax": 20, "readyMax": 8, "buffer": 1, "startMoney": 50, "backlogSeconds": 1, "shareBase": 20, "shareFrom": 3, "allowance": 0.1, "orders": 0.25, "ordersRise": 8, "ordersFade": 40, "slump": 0.5, "relief": 0.4 }
+{ "pay": 2, "backlogMax": 20, "readyMax": 8, "buffer": 1, "startMoney": 50, "backlogSeconds": 1, "shareBase": 20, "shareFrom": 3, "allowance": 0.1, "orders": 0.75, "ordersRise": 8, "ordersFade": 40, "slump": 0.7, "allowanceLevels": 3 }

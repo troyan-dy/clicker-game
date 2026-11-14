@@ -306,6 +306,26 @@
   right: 8px;
 }
 
+/* a strike at the door: the bubble is coral and asks for a settlement */
+.bl-tag.ev.alarm {
+  background: var(--coral);
+  color: #1f1e1d;
+  outline-color: #262624;
+  line-height: 1.35;
+  text-align: center;
+}
+.bl-tag.ev.alarm b,
+.bl-tag.ev.alarm.can b {
+  color: #1f1e1d;
+}
+.bl-tag.ev.act::before {
+  display: none;
+}
+/* what is wrong with an employer, in its caption */
+.bl-tag.small b.bad {
+  color: var(--coral);
+}
+
 /* a caption that sells: it and the picture above it are one button */
 .bl-tag.act {
   pointer-events: auto;
