@@ -875,6 +875,11 @@ export class GameScene extends Phaser.Scene {
     this.calls.list = []; // the requests stay on the screen that was left
     this.slogan = null;
     this.state.strikes = []; // and so do the pickets
+    // a new market: nobody is out of work there yet, an allowance would be paid for nothing
+    if (this.state.allowance > 0) {
+      this.state.allowance = 0;
+      this.toTell.push('Новый рынок: без работы здесь пока никто не остался. Пособие я выключил — включите, когда появятся.');
+    }
     const hub = this.hubs.get(next)!;
     hub.sync(this.hubTopology());
     if (dive) hub.emerge(350, 900);
@@ -962,7 +967,8 @@ export class GameScene extends Phaser.Scene {
 
   /** «Да всем»: the whole pile of questions is approved at once. Returns false when there is no pile. */
   private approvePile(): boolean {
-    if (this.stack.fill <= 0) return false;
+    // a pile is taken whole: a key pressed too early answers the calls and nudges Claude, the pile keeps growing
+    if (this.stack.fill < 1) return false;
     const legend = this.legend;
     const worth = stackWorth(this.stack, stackData, this.flowIncome()) * (legend ? stackData.legendMult : 1) * (1 + bonus(this.state, this.cfg, 'stack'));
     takeStack(this.stack, stackData);
@@ -1129,7 +1135,7 @@ export class GameScene extends Phaser.Scene {
     if (!hadPile && this.stack.fill > 0) {
       // now and then the pile is a legendary ticket; those not collected yet come first
       const fresh = LEGENDS.filter((l) => !this.meta.legends.includes(l.id));
-      this.legend = this.rng.next() < stackData.legendChance ? this.rng.pick(fresh.length ? fresh : LEGENDS) : null;
+      this.legend = this.rng.next() < stackData.legendChance + bonus(s, this.cfg, 'legend') ? this.rng.pick(fresh.length ? fresh : LEGENDS) : null;
       this.question = this.legend ? this.legend.ask : this.rng.pick(QUESTIONS);
     }
 

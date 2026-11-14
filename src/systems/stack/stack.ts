@@ -39,9 +39,9 @@ export function stepStack(k: StackState, t: StackTuning, dt: number, active: boo
   if (k.wait <= 0) k.fill = Math.min(1, Math.max(dt, 0.001) / t.fillSeconds);
 }
 
-/** dollars the pile pays right now; `income` — dollars per second of the whole conveyor */
+/** dollars the pile pays once it is full — it is taken only then; `income` — dollars per second of the whole conveyor */
 export function stackWorth(k: StackState, t: StackTuning, income: number): number {
-  return Math.floor(income * t.worthSeconds * k.fill);
+  return k.fill > 0 ? Math.floor(income * t.worthSeconds) : 0;
 }
 
 /** One «Да» for everything: the pile is gone, the next one is a while away. */

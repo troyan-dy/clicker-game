@@ -14,7 +14,7 @@ import { buyNextPlan, type Plan, type PlanState } from '../plan/plan';
 
 /**
  * What an employer gives once it is taken whole (M23). «Plus» kinds add up: pay, inflow, rate,
- * sessions, calls, stack, surge, squads, lines. «Off» kinds multiply what is left: farms, sources, grades, scale, limit.
+ * sessions, calls, stack, legend, surge, squads, lines. «Off» kinds multiply what is left: farms, sources, grades, scale, limit.
  */
 export type PerkKind =
   | 'pay'
@@ -23,6 +23,7 @@ export type PerkKind =
   | 'sessions'
   | 'calls'
   | 'stack'
+  | 'legend'
   | 'surge'
   | 'squads'
   | 'lines'
@@ -174,6 +175,8 @@ export interface PipeTuning {
   ordersFade: number;
   /** the part of a task's price lost when everybody on the screen's market is out of work and no allowance is paid */
   slump: number;
+  /** discounts of one kind never leave less than this part of a price, however many employers give them */
+  discountFloor: number;
   /** finished tasks that can wait for a «Да»; Claude pauses above this */
   readyMax: number;
   /** «Да» that can be given in advance */
@@ -290,11 +293,16 @@ export function bonus(s: PipeState, cfg: PipeConfig, kind: PerkKind): number {
   return sum;
 }
 
-/** what is left of a price or a wait after the perks of one kind: 10% and 20% off give 0.72 */
+/**
+ * What is left of a price or a wait after the perks of one kind: 10% and 20% off give 0.72, but never
+ * less than the floor. The next step up in scale is made cheaper only by the employers of the screen
+ * it is bought on; a wait (the usage limit) may go down to nothing.
+ */
 export function discount(s: PipeState, cfg: PipeConfig, kind: PerkKind): number {
+  const here = kind === 'scale' ? screenOf(s) : 0;
   let left = 1;
-  for (const src of cfg.sources) if (src.perk?.kind === kind && whole(s, src)) left *= 1 - src.perk.value;
-  return Math.max(0, left);
+  for (const src of cfg.sources) if (src.perk?.kind === kind && whole(s, src) && (!here || src.screen === here)) left *= 1 - src.perk.value;
+  return Math.max(kind === 'limit' ? 0 : cfg.tuning.discountFloor, left);
 }
 
 /** tasks per second the employers bring, before the orders of the people */

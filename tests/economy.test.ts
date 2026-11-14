@@ -8,8 +8,14 @@ import planData from '../src/data/balance/plans.json';
 import scaleData from '../src/data/balance/scales.json';
 import sourceData from '../src/data/balance/sources.json';
 import tuningData from '../src/data/tuning/pipeline.json';
+import eventsData from '../src/data/tuning/events.json';
+import stackData from '../src/data/tuning/stack.json';
+import { createRng } from '../src/core/rng';
+import { createEvents, stepEvents, takeEvent } from '../src/systems/events/events';
 import type { Plan } from '../src/systems/plan/plan';
+import { createStack, stackWorth, stepStack, takeStack } from '../src/systems/stack/stack';
 import {
+  bonus,
   bribeCost,
   buyBribe,
   buyFarm,
@@ -31,6 +37,7 @@ import {
   lineCost,
   locked,
   payOf,
+  planRate,
   pressPipe,
   screenOf,
   sessionsOf,
@@ -58,9 +65,14 @@ const base: PipeConfig = {
 };
 const FINGER = 5; // presses per second of a player who keeps mashing
 
+const EVENTS = { ...eventsData, every: [eventsData.every[0], eventsData.every[1]] as const };
+/** an average player: takes a full pile of questions after a few seconds, answers most of the calls */
+const PLAYER = { pileDelay: 6, callTake: 0.7, callDelay: 2 };
+
 /**
- * A bot that always buys what removes the current bottleneck — the pace of the first minutes
- * in numbers. Prints the purchase log; fails if the opening drags.
+ * A bot that always buys what removes the current bottleneck and plays the active part as an
+ * average player does — piles of «Да всем», legendary tickets, calls, paid exactly as the scene
+ * pays them. Prints the purchase log; fails if the opening drags.
  */
 function play(seconds: number, cfg: PipeConfig = base): { t: number; what: string }[] {
   const s = createPipe(cfg);
@@ -68,6 +80,13 @@ function play(seconds: number, cfg: PipeConfig = base): { t: number; what: strin
   const dt = 1 / 60;
   let untilPress = 0;
   let won = false;
+  const rng = createRng(7);
+  const stack = createStack(stackData);
+  const calls = createEvents(EVENTS);
+  const skipped = new WeakSet<object>();
+  let legend = false;
+  let fullFor = 0;
+  const flowIncome = (): number => Math.min(inflowOf(s, cfg), planRate(s, cfg) * (1 + cfg.auto.subagent.share * sessionsOf(s, cfg))) * payOf(s, cfg);
   for (let i = 0; i < seconds * 60; i++) {
     const t = i / 60;
     stepPipe(s, cfg, dt);
@@ -79,6 +98,30 @@ function play(seconds: number, cfg: PipeConfig = base): { t: number; what: strin
     if (untilPress <= 0) {
       pressPipe(s, cfg);
       untilPress += 1 / FINGER;
+    }
+    // the active part: a full pile is taken after a few seconds, most calls are answered
+    const hadPile = stack.fill > 0;
+    stepStack(stack, stackData, dt, s.noAsk);
+    if (!hadPile && stack.fill > 0) legend = rng.next() < stackData.legendChance + bonus(s, cfg, 'legend');
+    if (stack.fill >= 1 && (fullFor += dt) >= PLAYER.pileDelay) {
+      s.money += stackWorth(stack, stackData, flowIncome()) * (legend ? stackData.legendMult : 1) * (1 + bonus(s, cfg, 'stack'));
+      takeStack(stack, stackData);
+      fullFor = 0;
+    }
+    if (screenOf(s) >= 2) {
+      const at = screenOf(s);
+      const owners = cfg.sources.filter((x) => (at >= 3 ? x.screen === at : x.screen <= at) && (s.owned[x.id] ?? 0) > 0).map((x) => x.id);
+      stepEvents(calls, EVENTS, dt, owners, 3, rng);
+      for (let k = calls.list.length - 1; k >= 0; k--) {
+        const e = calls.list[k];
+        if (e.left > EVENTS.life - PLAYER.callDelay || skipped.has(e)) continue;
+        if (rng.next() >= PLAYER.callTake) {
+          skipped.add(e);
+          continue;
+        }
+        takeEvent(calls, k);
+        s.money += Math.floor(flowIncome() * EVENTS.worthSeconds * (1 + bonus(s, cfg, 'calls')));
+      }
     }
     if (i % 30 !== 0) continue; // the bot shops twice a second
     // the step of the allowance that pays best right now: what it keeps of the price and what it brings in orders against what it costs

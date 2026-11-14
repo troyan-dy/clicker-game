@@ -105,11 +105,13 @@ describe('save', () => {
     expect(waited.dollars).toBe(0);
 
     const s = grown();
-    const hour = offlineReport(s, cfg, saveTuning, 3600)!;
+    // the sessions work for a while and then fall asleep: the absences here are parts of that while
+    const cap = saveTuning.offlineCapHours * 3600;
+    const hour = offlineReport(s, cfg, saveTuning, cap / 4)!;
     expect(hour.waited).toBe(false);
     expect(hour.tasks).toBeGreaterThan(0);
     expect(hour.dollars).toBe(hour.tasks * payOf(s, cfg));
-    const two = offlineReport(s, cfg, saveTuning, 7200)!;
+    const two = offlineReport(s, cfg, saveTuning, cap / 2)!;
     expect(two.tasks).toBeGreaterThanOrEqual(hour.tasks * 2 - 1);
     const week = offlineReport(s, cfg, saveTuning, 7 * 24 * 3600)!;
     expect(week.seconds).toBe(saveTuning.offlineCapHours * 3600); // the sessions do not wait forever

@@ -180,7 +180,8 @@ export function createBlueprint(layer: HTMLElement, over: HTMLElement): Blueprin
       const said = m.ask?.text ?? m.quip;
       if (said) set('quip', esc(said), quipText);
       if (m.ask) {
-        set('askWorth', `Enter — Да всем · +$${esc(m.ask.worth)}`, askWorth);
+        // the pile is taken whole: until then it only says what it will pay
+        set('askWorth', m.ask.fill >= 1 ? `Enter — Да всем · +$${esc(m.ask.worth)}` : `вопросы копятся · +$${esc(m.ask.worth)}`, askWorth);
         askBar.style.width = `${Math.round(m.ask.fill * 100)}%`;
       }
       quip.className = `bl-quip ${m.quipAt}${said ? ' on' : ''}${m.ask ? ' ask' : ''}${m.ask?.legend ? ' legend' : ''}`;
