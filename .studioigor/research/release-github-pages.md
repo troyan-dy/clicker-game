@@ -44,6 +44,7 @@
 - сразу после `gh repo edit --visibility public` первый `git push` ответил «Repository is disabled» — повтор через несколько секунд прошёл
 - Pages включён через `gh api -X POST repos/troyan-dy/clicker-game/pages` (ветка gh-pages, папка `/`), сборка заняла меньше минуты
 - адрес: https://troyan-dy.github.io/clicker-game/
+- 1.1.0: репозиторий переименован (`gh repo rename yes-driven-development`), адрес сайта сменился сразу на https://troyan-dy.github.io/yes-driven-development/, старый отвечает 404 (Pages не перенаправляет); `git remote set-url origin …`, затем `python tools/publish.py` — сборка Pages заняла меньше минуты; сохранения игроков целы: хранилище браузера общее для всего troyan-dy.github.io
 
 ## Рекомендации
 - версия в меню и тег `v1.0.0`
