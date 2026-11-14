@@ -35,9 +35,13 @@ The game starts in a terminal. Every step up in scale pulls the camera back, and
     <td><img src="docs/img/en/5-planet.webp" alt="Screen 5, the planet"><br><sub><b>5 · Planet.</b> Bribes open the doors, packs of robot dogs take the jobs.</sub></td>
     <td><img src="docs/img/en/6-factory.webp" alt="Screen 6, the planet as a factory"><br><sub><b>6 · Planet-factory.</b> Androids take over manual labor. The people go to the park.</sub></td>
   </tr>
+  <tr>
+    <td><img src="docs/img/en/7-towers.webp" alt="Screen 7, the Sleeping Quarter"><br><sub><b>7 · Sleeping Quarter.</b> The robots are short of electricity. People line up to lie in capsules and give power.</sub></td>
+    <td><img src="docs/img/en/8-belt.webp" alt="Screen 8, Earth on the grid"><br><sub><b>8 · Earth on the grid.</b> A cable circles the planet, and the same towers rise in every region.</sub></td>
+  </tr>
 </table>
 
-<p align="center"><img src="docs/img/en/scale.webp" alt="The game in numbers: six screens from a terminal to a planet-factory, the price of each step from $500 to $54T, about 50 minutes to the ending, 1 key, 42 employers, 45 awards, 15 legendary tickets, 80 news headlines, 3.43 billion people freed from work" width="100%"></p>
+<p align="center"><img src="docs/img/en/scale.webp" alt="The game in numbers: eight screens from a terminal to a cable around Earth, the price of each step from $500 to $1Qi, about an hour to the ending, 1 key, 42 employers, 63 awards, 15 legendary tickets, 107 news headlines, 3.46 billion people asleep in capsules" width="100%"></p>
 
 ## Languages
 

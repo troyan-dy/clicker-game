@@ -6,25 +6,28 @@
     <link rel="stylesheet" href="../concepts/fonts.css" />
     <link rel="stylesheet" href="readme.css" />
     <style>
-      /* six screens, each one a node in the middle of the next */
-      .steps { display: grid; grid-template-columns: repeat(6, 1fr); margin-top: 34px; }
+      /* eight screens, each one a node in the middle of the next */
+      .steps { display: grid; grid-template-columns: repeat(8, 1fr); margin-top: 34px; }
       .step { text-align: center; }
-      .step .pic { height: 178px; display: flex; align-items: flex-end; justify-content: center; }
-      .step .pic img { max-height: 170px; max-width: 190px; }
-      .step i { display: block; margin-top: 14px; font: 400 19px 'JetBrains Mono', monospace; color: var(--coral); font-style: normal; letter-spacing: 0.1em; }
-      .step b { display: block; font-size: 32px; font-weight: 600; line-height: 1.2; }
-      .step span { display: block; margin-top: 2px; font-size: 22px; color: var(--dim); }
+      .step .pic { height: 150px; display: flex; align-items: flex-end; justify-content: center; }
+      .step .pic img { max-height: 142px; max-width: 156px; }
+      /* the two dark screens have no node picture of their own: a tower of capsules and the planet with its lights out */
+      .step .tower { width: 104px; height: 142px; clip-path: polygon(13% 0, 87% 0, 100% 100%, 0 100%); background: radial-gradient(ellipse 6.5px 9px at 50% 50%, #f3b199 0 36%, #e2613a 40% 94%, transparent 100%) 0 5px / 20.8px 24px, #2a2927; }
+      .step .earth { width: 142px; height: 142px; border-radius: 50%; background: url(../../public/assets/img/nodes/earth_dark.webp) 50% 49% / auto 150.5px; }
+      .step i { display: block; margin-top: 12px; font: 400 17px 'JetBrains Mono', monospace; color: var(--coral); font-style: normal; letter-spacing: 0.1em; }
+      .step b { display: block; font-size: 25px; font-weight: 600; line-height: 1.2; }
+      .step span { display: block; margin-top: 3px; padding: 0 6px; font-size: 18px; line-height: 1.25; color: var(--dim); }
       /* the price of each step up, on the border between two screens */
-      .ups { position: relative; height: 112px; margin-top: 26px; border-top: 2px solid var(--ink); }
-      .up { position: absolute; top: -19px; width: 236px; margin-left: -118px; text-align: center; }
-      .up b { display: inline-block; padding: 3px 14px 5px; background: var(--card); border: 1.5px solid var(--ink); border-radius: 9px; font: 700 22px 'JetBrains Mono', monospace; color: var(--money); }
-      .up span { display: block; margin-top: 8px; font-size: 20px; line-height: 1.25; color: #4a4946; }
+      .ups { position: relative; height: 104px; margin-top: 26px; border-top: 2px solid var(--ink); }
+      .up { position: absolute; top: -17px; width: 180px; margin-left: -90px; text-align: center; }
+      .up b { display: inline-block; padding: 3px 10px 5px; background: var(--card); border: 1.5px solid var(--ink); border-radius: 9px; font: 700 18px 'JetBrains Mono', monospace; color: var(--money); }
+      .up span { display: block; margin-top: 7px; font-size: 17px; line-height: 1.25; color: #4a4946; }
       /* how long each screen lasts: one bar, direct labels */
       .time { margin-top: 20px; }
       .time .head { display: flex; align-items: baseline; gap: 16px; }
       .time .head b { font-size: 30px; font-weight: 600; }
       .bar { display: flex; gap: 3px; height: 46px; margin-top: 12px; }
-      .bar div { display: flex; align-items: center; justify-content: center; background: #dcd8cb; font: 400 19px 'JetBrains Mono', monospace; color: var(--ink); white-space: nowrap; }
+      .bar div { display: flex; align-items: center; justify-content: center; background: #dcd8cb; font: 400 17px 'JetBrains Mono', monospace; color: var(--ink); white-space: nowrap; }
       .bar div:first-child { border-radius: 6px 0 0 6px; }
       .bar div:last-child { border-radius: 0 6px 6px 0; background: var(--coral); color: #fff; font-weight: 700; }
       /* the game in a row of numbers */
@@ -65,19 +68,29 @@
           <div class="pic"><img src="../../public/assets/img/nodes/robofactory.webp" /></div>
           <i>06</i><b data-en="Planet-factory" data-ru="Планета-цех"></b><span data-en="10 industries, by hand" data-ru="10 отраслей, руками"></span>
         </div>
+        <div class="step">
+          <div class="pic"><div class="tower"></div></div>
+          <i>07</i><b data-en="Towers" data-ru="Башни"></b><span data-en="sleepers give power" data-ru="спящие дают ток"></span>
+        </div>
+        <div class="step">
+          <div class="pic"><div class="earth"></div></div>
+          <i>08</i><b data-en="Belt" data-ru="Пояс"></b><span data-en="a cable around Earth" data-ru="кабель вокруг Земли"></span>
+        </div>
       </div>
 
       <div class="ups">
-        <div class="up" style="left: 16.667%"><b>$500</b><span data-en="“Yes, and don’t ask again”" data-ru="«Да, и больше не спрашивай»"></span></div>
-        <div class="up" style="left: 33.333%"><b data-en="$260,000" data-ru="$260 000"></b><span data-en="register an LLC" data-ru="открыть ООО"></span></div>
-        <div class="up" style="left: 50%"><b data-en="$540M" data-ru="$540 млн"></b><span data-en="win a government contract" data-ru="выиграть госконтракт"></span></div>
-        <div class="up" style="left: 66.667%"><b data-en="$120B" data-ru="$120 млрд"></b><span data-en="a deal with Anthropic" data-ru="договор с Anthropic"></span></div>
-        <div class="up" style="left: 83.333%"><b data-en="$54T" data-ru="$54 трлн"></b><span data-en="buy Boston Mechanics" data-ru="купить «Бостон Механикс»"></span></div>
+        <div class="up" style="left: 12.5%"><b>$500</b><span data-en="“Yes, and don’t ask again”" data-ru="«Да, и больше не спрашивай»"></span></div>
+        <div class="up" style="left: 25%"><b data-en="$260,000" data-ru="$260 000"></b><span data-en="register an LLC" data-ru="открыть ООО"></span></div>
+        <div class="up" style="left: 37.5%"><b data-en="$540M" data-ru="$540 млн"></b><span data-en="win a government contract" data-ru="выиграть госконтракт"></span></div>
+        <div class="up" style="left: 50%"><b data-en="$120B" data-ru="$120 млрд"></b><span data-en="a deal with Anthropic" data-ru="договор с Anthropic"></span></div>
+        <div class="up" style="left: 62.5%"><b data-en="$54T" data-ru="$54 трлн"></b><span data-en="buy Boston Mechanics" data-ru="купить «Бостон Механикс»"></span></div>
+        <div class="up" style="left: 75%"><b data-en="$25Qa" data-ru="$25 квдрлн"></b><span data-en="“Bright Future”: one capsule" data-ru="«Светлое будущее»: одна капсула"></span></div>
+        <div class="up" style="left: 87.5%"><b data-en="$1Qi" data-ru="$1 квнтлн"></b><span data-en="“Standard Design”: towers everywhere" data-ru="«Типовой проект»: башни везде"></span></div>
       </div>
 
       <div class="time">
         <div class="head">
-          <b data-en="About 50 minutes to the ending" data-ru="Около 50 минут до финала"></b>
+          <b data-en="About an hour to the ending" data-ru="Около часа до финала"></b>
           <span class="mono dim" style="font-size: 19px" data-en="minutes on each screen" data-ru="минут на каждом экране"></span>
         </div>
         <div class="bar">
@@ -86,18 +99,20 @@
           <div style="flex: 10" data-en="03 · 10 min" data-ru="03 · 10 мин"></div>
           <div style="flex: 10" data-en="04 · 10 min" data-ru="04 · 10 мин"></div>
           <div style="flex: 10" data-en="05 · 10 min" data-ru="05 · 10 мин"></div>
-          <div style="flex: 10" data-en="06 · 10 min · the ending" data-ru="06 · 10 мин · финал"></div>
+          <div style="flex: 10" data-en="06 · 10 min" data-ru="06 · 10 мин"></div>
+          <div style="flex: 8" data-en="07 · 8 min" data-ru="07 · 8 мин"></div>
+          <div style="flex: 9" data-en="08 · the ending" data-ru="08 · финал"></div>
         </div>
       </div>
 
       <div class="tiles">
         <div class="tile cardbox"><b>1</b><span data-en="key:<br>“Yes”" data-ru="клавиша:<br>«Да»"></span></div>
-        <div class="tile cardbox"><b>6</b><span data-en="screens, one<br>inside another" data-ru="экранов, один<br>внутри другого"></span></div>
+        <div class="tile cardbox"><b>8</b><span data-en="screens, one<br>inside another" data-ru="экранов, один<br>внутри другого"></span></div>
         <div class="tile cardbox"><b>42</b><span data-en="employers<br>to take over" data-ru="работодателя,<br>и все ваши"></span></div>
-        <div class="tile cardbox"><b>45</b><span data-en="dry<br>awards" data-ru="сухих<br>грамот"></span></div>
+        <div class="tile cardbox"><b>63</b><span data-en="dry<br>awards" data-ru="сухие<br>грамоты"></span></div>
         <div class="tile cardbox"><b>15</b><span data-en="legendary<br>tickets" data-ru="легендарных<br>тикетов"></span></div>
-        <div class="tile cardbox"><b>80</b><span data-en="news<br>headlines" data-ru="заголовков<br>новостей"></span></div>
-        <div class="tile cardbox m"><b data-en="3.43B" data-ru="3,43"></b><span data-en="people freed<br>from work" data-ru="млрд человек<br>без работы"></span></div>
+        <div class="tile cardbox"><b>107</b><span data-en="news<br>headlines" data-ru="заголовков<br>новостей"></span></div>
+        <div class="tile cardbox m"><b data-en="3.46B" data-ru="3,46"></b><span data-en="people asleep<br>in capsules" data-ru="млрд человек<br>спят в капсулах"></span></div>
       </div>
     </div>
     <script src="readme.js"></script>

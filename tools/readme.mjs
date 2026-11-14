@@ -3,7 +3,7 @@
 //   node tools/readme.mjs          everything
 //   node tools/readme.mjs art      only the drawn pages (art/readme/*.html)
 //   node tools/readme.mjs shots    only the game frames (needs `npm run build:gym` first)
-// The game frames come from one scripted tour of the six screens (tools/inputs/tour.json):
+// The game frames come from one scripted tour of the eight screens (tools/inputs/tour.json):
 // a frame is taken every 2 s, FRAMES says which of them is which screen.
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
@@ -13,7 +13,7 @@ import { chromium } from 'playwright';
 
 const LANGS = ['en', 'ru'];
 const ART = ['hero', 'pipeline', 'scale'];
-const FRAMES = { '1-terminal': 4, '2-desk': 10, '3-city': 17, '4-state': 24, '5-planet': 32, '6-factory': 41 };
+const FRAMES = { '1-terminal': 4, '2-desk': 10, '3-city': 17, '4-state': 24, '5-planet': 32, '6-factory': 41, '7-towers': 55, '8-belt': 68 };
 const QUALITY = 0.9;
 const what = process.argv[2] ?? 'all';
 
@@ -60,8 +60,8 @@ if (what !== 'art') {
     const dir = `.studioigor/captures/readme/${lang}`;
     const run = spawnSync(
       process.execPath,
-      ['tools/capture.mjs', '--dir', 'dist-gym', '--url', `/?lang=${lang}`, '--out', dir, '--duration', '84', '--every', '2', '--width', '1600', '--height', '900',
-        '--inputs', 'tools/inputs/tour.json', '--wait-for', 'window.__GAME__?.ready', '--seed', '7', '--timeout', '240'],
+      ['tools/capture.mjs', '--dir', 'dist-gym', '--url', `/?lang=${lang}`, '--out', dir, '--duration', '140', '--every', '2', '--width', '1600', '--height', '900',
+        '--inputs', 'tools/inputs/tour.json', '--wait-for', 'window.__GAME__?.ready', '--seed', '7', '--timeout', '400'],
       { stdio: 'inherit' },
     );
     if (run.status !== 0) process.exit(run.status ?? 1);

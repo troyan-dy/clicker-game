@@ -31,5 +31,18 @@
   {"t": 57.0, "eval": "window.__gym.click('ubi'); window.__gym.call()"},
 
   {"t": 68.0, "eval": "window.__gym.gift(1e17); window.__gym.take('exchange'); window.__gym.take('shipping'); window.__gym.take('satnet'); window.__gym.take('games'); window.__gym.buy('grade'); window.__gym.buy('grade'); window.__gym.buy('scale')"},
-  {"t": 69.5, "eval": "window.__gym.gift(6e16); window.__gym.buy('line:android'); window.__gym.buy('line:android'); window.__gym.buy('line:android'); window.__gym.buy('line:android'); window.__gym.buy('line:dogs'); window.__gym.buy('line:dogs'); window.__gym.buy('line:dogs'); window.__gym.buy('line:dogs'); window.__gym.buy('farm:chips'); window.__gym.buy('police'); window.__gym.click('ubi'); window.__gym.fleet(30); window.__gym.take('checkout'); window.__gym.take('courier')"}
+  {"t": 69.5, "eval": "window.__gym.gift(6e16); window.__gym.buy('line:android'); window.__gym.buy('line:android'); window.__gym.buy('line:android'); window.__gym.buy('line:android'); window.__gym.buy('line:dogs'); window.__gym.buy('line:dogs'); window.__gym.buy('line:dogs'); window.__gym.buy('line:dogs'); window.__gym.buy('farm:chips'); window.__gym.buy('police'); window.__gym.click('ubi'); window.__gym.fleet(30); window.__gym.take('checkout'); window.__gym.take('courier')"},
+
+  {"t": 84.0, "eval": "window.__gym.fleet(80); for (const id of ['checkout','coffee','courier','taxi','barber','depot','build','clinic','school','farm']) window.__gym.take(id)"},
+  {"t": 86.0, "eval": "window.__gym.gift(3e16); window.__gym.buy('scale')"},
+  {"t": 99.0, "eval": "window.__gym.press()"},
+  {"t": 100.5, "eval": "(() => { const g = window.__gym; g.gift(5e17); for (let i = 0; i < 12; i++) g.buy('mod:block'); for (let i = 0; i < 5; i++) g.buy('mod:hire'); g.buy('net:copies'); g.buy('net:copies'); })()"},
+  {"t": 102.0, "eval": "window.__gym.fill()"},
+
+  {"t": 114.0, "eval": "(() => { const g = window.__gym; g.gift(1e19); for (let i = 0; i < 7; i++) g.buy('mod:block'); for (let i = 0; i < 3; i++) g.buy('mod:hire'); g.fill(); })()"},
+  {"t": 115.0, "eval": "window.__gym.gift(3e18); window.__gym.buy('scale')"},
+  {"t": 124.0, "eval": "(() => { const g = window.__gym; g.gift(4e19); g.buy('mod:span'); g.buy('mod:node'); g.buy('mod:span'); g.buy('mod:node'); g.buy('net:halls'); })()"},
+  {"t": 127.0, "eval": "(() => { const g = window.__gym; g.gift(4e19); g.buy('mod:span'); g.buy('mod:node'); g.buy('mod:node'); g.buy('mod:span'); g.buy('mod:node'); })()"},
+  {"t": 130.0, "eval": "(() => { const g = window.__gym; g.gift(8e19); g.buy('mod:span'); g.buy('mod:node'); g.buy('mod:node'); g.buy('mod:thread'); g.buy('net:halls'); })()"},
+  {"t": 132.5, "eval": "window.__gym.press()"}
 ]
