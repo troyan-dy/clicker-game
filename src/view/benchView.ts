@@ -11,6 +11,9 @@ const LAWN = 0xbcd1ca;
 const CRUST = 0xd4a27f;
 const CRUMB = 0xf3e6cf;
 const SLICE = 'slice';
+/** the same slice lying flat on the grass: a square seen at the angle of the whole picture, with its thickness */
+const SLICE_FLAT = 'slice_flat';
+const CRUST_SIDE = 0xb98a63;
 /** the bench with the player on it: where it stands and how tall it is drawn, px */
 const BENCH = { x: 905, y: 546, h: 390 };
 /** the hand with the slice, as a part of the picture's width and height from its top left corner */
@@ -67,6 +70,9 @@ interface Slice {
   y1: number;
   t: number;
   dur: number;
+  /** how many half-turns it makes in the air, and which way it leans */
+  turns: number;
+  spin: number;
   /** what happens when it lands */
   land: (() => void) | null;
 }
@@ -101,6 +107,32 @@ export class BenchView {
       g.lineStyle(2, INK, 1).strokeRect(1, 1, 28, 28);
       g.generateTexture(SLICE, 30, 30);
       g.destroy();
+      // lying down: a rhombus two to one, the crust showing as a thin side below it
+      const f = scene.make.graphics({}, false);
+      const path = (pts: readonly (readonly [number, number])[], close: boolean): void => {
+        f.beginPath();
+        f.moveTo(pts[0][0], pts[0][1]);
+        for (const [x, y] of pts.slice(1)) f.lineTo(x, y);
+        if (close) f.closePath();
+      };
+      const rhomb = (w: number, h: number): [number, number][] => [
+        [22, 12 - h],
+        [22 + w, 12],
+        [22, 12 + h],
+        [22 - w, 12],
+      ];
+      path([[2, 12], [22, 22], [42, 12], [42, 16], [22, 26], [2, 16]], true);
+      f.fillStyle(CRUST_SIDE, 1).fillPath();
+      path([[2, 12], [2, 16], [22, 26], [42, 16], [42, 12]], false);
+      f.lineStyle(2, INK, 1).strokePath();
+      path(rhomb(20, 10), true);
+      f.fillStyle(CRUST, 1).fillPath();
+      path(rhomb(14, 7), true);
+      f.fillStyle(CRUMB, 1).fillPath();
+      path(rhomb(20, 10), true);
+      f.lineStyle(2, INK, 1).strokePath();
+      f.generateTexture(SLICE_FLAT, 44, 28);
+      f.destroy();
     }
     this.root = scene.add.container(0, 0).setAlpha(0).setVisible(false);
     const lawn = scene.add.graphics();
@@ -123,7 +155,7 @@ export class BenchView {
     for (let i = 0; i < SLICES; i++) {
       const img = scene.add.image(0, 0, SLICE).setVisible(false);
       this.root.add(img);
-      this.slices.push({ img, live: false, flying: false, x0: 0, y0: 0, x1: 0, y1: 0, t: 0, dur: 1, land: null });
+      this.slices.push({ img, live: false, flying: false, x0: 0, y0: 0, x1: 0, y1: 0, t: 0, dur: 1, turns: 3, spin: 1, land: null });
     }
   }
 
@@ -243,12 +275,18 @@ export class BenchView {
       if (!s.flying) continue;
       s.t += dt / s.dur;
       const u = Math.min(1, s.t);
-      // an arc: the slice is thrown up and comes down flat
+      // an arc: the slice is thrown up, tumbles end over end, and comes down flat on the grass
       s.img.x = s.x0 + (s.x1 - s.x0) * u;
       s.img.y = s.y0 + (s.y1 - s.y0) * u - Math.sin(Math.PI * u) * 120;
-      s.img.setAngle(u < 1 ? s.img.angle + 600 * dt : 0);
+      if (u < 0.82) {
+        // seen edge-on and face-on in turn: that is what a tumbling slice looks like
+        s.img.setAngle(s.spin * u * 40);
+        s.img.setScale(1, Math.max(0.16, Math.abs(Math.cos(u * Math.PI * s.turns))));
+      } else if (s.img.texture.key !== SLICE_FLAT) s.img.setTexture(SLICE_FLAT).setAngle(0).setScale(1);
       if (u < 1) continue;
       s.flying = false;
+      // it lands with a small hop and settles
+      this.scene.tweens.add({ targets: s.img, y: s.img.y - 5, scaleY: 0.86, duration: 70, yoyo: true });
       const land = s.land;
       s.land = null;
       land?.();
@@ -291,7 +329,9 @@ export class BenchView {
     slice.y1 = to[1];
     slice.t = 0;
     slice.dur = this.rng.range(0.42, 0.56);
-    slice.img.setPosition(x, y).setScale(1).setAngle(0).setAlpha(1).setVisible(true);
+    slice.turns = this.rng.int(2, 4);
+    slice.spin = this.rng.next() < 0.5 ? -1 : 1;
+    slice.img.setTexture(SLICE).setPosition(x, y).setScale(1).setAngle(0).setAlpha(1).setVisible(true);
     return slice;
   }
 
@@ -315,7 +355,8 @@ export class BenchView {
     const i = this.queue.indexOf(bird);
     if (i >= 0) this.queue.splice(i, 1);
     img.setAngle(0).setTexture(look.fly ?? look.stand).setScale(bird.scale).setFlipX(true);
-    bird.carry?.img.setScale(0.8).setAngle(0);
+    this.scene.tweens.killTweensOf(bird.carry?.img ?? []);
+    bird.carry?.img.setTexture(SLICE).setScale(0.8).setAngle(0);
     const walks = bird.kind === 'duck';
     this.scene.tweens.add({
       targets: img,
