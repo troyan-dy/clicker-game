@@ -1,0 +1,127 @@
+{
+  "title": "Да, Клод — что получилось",
+  "subtitle": "Автопилот 2026-11-14: пять экранов одного конвейера задач, от терминала до планеты",
+  "question": "Что переделать? Отметь экраны, к которым есть замечания, и напиши, что именно",
+  "mode": "multi",
+  "options": [
+    {
+      "id": "start",
+      "title": "Заставка и терминал",
+      "text": "Запуск — карточка «Да, Клод», одно нажатие до игры. Первый экран: Клод готовит запрос, любая клавиша — «Да».",
+      "media": [
+        {
+          "src": "..\\..\\captures\\final\\flow\\frame_000.png",
+          "caption": "заставка",
+          "source": "",
+          "credit": "game capture",
+          "license": "own",
+          "generated": false
+        },
+        {
+          "src": "..\\..\\captures\\polish\\first60\\02-after\\frame_007.png",
+          "caption": "терминал, 35-я секунда",
+          "source": "",
+          "credit": "game capture",
+          "license": "own",
+          "generated": false
+        }
+      ],
+      "palette": [],
+      "tags": [],
+      "pros": [],
+      "cons": []
+    },
+    {
+      "id": "blueprint",
+      "title": "Чертёж",
+      "text": "«Да, и больше не спрашивай» отводит камеру: работы, сабагенты, повышения, стопка вопросов «Да всем».",
+      "media": [
+        {
+          "src": "..\\..\\captures\\final\\flow\\frame_025.png",
+          "caption": "чертёж и стопка вопросов",
+          "source": "",
+          "credit": "game capture",
+          "license": "own",
+          "generated": false
+        }
+      ],
+      "palette": [],
+      "tags": [],
+      "pros": [],
+      "cons": []
+    },
+    {
+      "id": "city",
+      "title": "Город",
+      "text": "«Открыть ООО»: 12 компаний, серверы у стола, сетка улиц; здание можно нанять кликом.",
+      "media": [
+        {
+          "src": "..\\..\\captures\\polish\\visual\\02-backdrops\\frame_000.png",
+          "caption": "город: 4 из 12",
+          "source": "",
+          "credit": "game capture",
+          "license": "own",
+          "generated": false
+        }
+      ],
+      "palette": [],
+      "tags": [],
+      "pros": [],
+      "cons": []
+    },
+    {
+      "id": "state",
+      "title": "Государство",
+      "text": "«Выиграть госконтракт»: 8 ведомств, дефицит видеокарт Nvidia, карта страны.",
+      "media": [
+        {
+          "src": "..\\..\\captures\\polish\\visual\\02-backdrops\\frame_003.png",
+          "caption": "государство: 8 из 8",
+          "source": "",
+          "credit": "game capture",
+          "license": "own",
+          "generated": false
+        }
+      ],
+      "palette": [],
+      "tags": [],
+      "pros": [],
+      "cons": []
+    },
+    {
+      "id": "planet",
+      "title": "Планета и финал",
+      "text": "«Эксклюзивный договор с Anthropic»: 8 операций, доля в выручке до 100%, карточка итогов.",
+      "media": [
+        {
+          "src": "..\\..\\captures\\final\\gym\\frame_019.png",
+          "caption": "планета",
+          "source": "",
+          "credit": "game capture",
+          "license": "own",
+          "generated": false
+        },
+        {
+          "src": "..\\..\\captures\\final\\flow\\frame_040.png",
+          "caption": "финал",
+          "source": "",
+          "credit": "game capture",
+          "license": "own",
+          "generated": false
+        },
+        {
+          "src": "..\\..\\captures\\final\\flow\\frame_049.png",
+          "caption": "утренний отчёт",
+          "source": "",
+          "credit": "game capture",
+          "license": "own",
+          "generated": false
+        }
+      ],
+      "palette": [],
+      "tags": [],
+      "pros": [],
+      "cons": []
+    }
+  ]
+}

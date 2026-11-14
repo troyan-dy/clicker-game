@@ -73,10 +73,10 @@ files: SCOPE.md
 
 ## Phase 9 — Polish
 files:
-- [ ] juice on the core actions, sound and motion on each — check: manual
-- [ ] first 60 seconds: a newcomer starts playing without explanations — check: user
-- [ ] performance budgets hold at the worst moment — check: manual
-- [ ] user decided: the polish is good enough — check: user
+- [x] juice on the core actions, sound and motion on each — check: manual
+- [x] first 60 seconds: a newcomer starts playing without explanations — check: user PROXY 2026-11-14
+- [x] performance budgets hold at the worst moment — check: manual
+- [x] user decided: the polish is good enough — check: user PROXY 2026-11-14
 
 ## Phase 10 — Release
 files:
