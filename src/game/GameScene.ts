@@ -32,9 +32,9 @@ import { HUBS } from '../data/layout/hubs';
 import benchData from '../data/tuning/bench.json';
 import eventsData from '../data/tuning/events.json';
 import feedData from '../data/tuning/feed.json';
-import internData from '../data/tuning/intern.json';
+import { activeBackgroundSeconds, advanceBackground, backgroundWork, collectMorning, elapsedMs, frameRemainder, missedBackgroundFrames, morningDuration, restoredWin, resumeOffline } from './logic/background';
 import limitData from '../data/tuning/limit.json';
-import managerTuning from '../data/tuning/manager.json';
+import { canInvite, managerClock, managerOnDuty, transitionOffer } from './logic/transitions';
 import peopleData from '../data/tuning/people.json';
 import riotData from '../data/tuning/riots.json';
 import strikeData from '../data/tuning/strikes.json';
@@ -120,7 +120,7 @@ import {
   type RobotKind,
   type Source,
 } from '../systems/pipeline/pipeline';
-import { applyOffline, freshMeta, NEWS_KEPT, offlineReport, packSave, unpackSave, type OfflineReport } from '../systems/save/save';
+import { freshMeta, NEWS_KEPT, packSave, unpackSave, type OfflineReport } from '../systems/save/save';
 import { createStack, stepStack } from '../systems/stack/stack';
 import type { BenchUi } from '../ui/bench/bench';
 import type { BlueprintTag, BlueprintUi, ManagerStrip, MeterRow } from '../ui/blueprint/blueprint';
@@ -506,13 +506,13 @@ export class GameScene extends Phaser.Scene {
     if (this.supersededSave || document.hidden) return;
     if (this.backgroundAt !== null) {
       // A visible second window still renders normally. Only missed frames need a catch-up.
-      const elapsedMs = Math.max(0, Date.now() - this.backgroundAt);
-      if (elapsedMs > 250) {
+      const now = Date.now();
+      if (missedBackgroundFrames(this.backgroundAt, now, false)) {
         this.settleBackground();
         deltaMs = 0;
       } else {
-        this.backgroundAt += elapsedMs;
-        deltaMs = elapsedMs;
+        deltaMs = elapsedMs(this.backgroundAt, now);
+        this.backgroundAt += deltaMs;
       }
     }
     if (this.internReplay) {
@@ -530,11 +530,7 @@ export class GameScene extends Phaser.Scene {
     } else if (this.meta.intern && !this.paused && !this.card.open) {
       this.paper.laptop.show(this.meta.intern.elapsed, this.meta.intern.credit);
     } else this.paper.laptop.hide();
-    this.acc = this.paused ? 0 : this.acc + Math.min(deltaMs / 1000, 0.25) * (this.slow ? 0.25 : 1);
-    while (this.acc >= STEP) {
-      this.step(STEP);
-      this.acc -= STEP;
-    }
+    this.acc = frameRemainder(this.acc, deltaMs, this.paused, this.slow, STEP, dt => this.step(dt));
     // the ending: nothing is earned or bought, but the figures on the desk still walk
     if (this.cine) {
       this.view.step(Math.min(deltaMs / 1000, 0.05));
@@ -561,7 +557,7 @@ export class GameScene extends Phaser.Scene {
       this.backgroundAt = Date.now();
       if (!this.paused) this.saveGame();
       this.backgroundTimer = window.setInterval(() => {
-        if (this.backgroundAt !== null && (document.hidden || Date.now() - this.backgroundAt > 250)) this.settleBackground();
+        if (missedBackgroundFrames(this.backgroundAt, Date.now(), document.hidden)) this.settleBackground();
         if (this.sinceSave >= saveData.autosaveSeconds) this.saveGame();
       }, 1000);
       return;
@@ -577,37 +573,28 @@ export class GameScene extends Phaser.Scene {
     if (this.backgroundAt === null) return;
     if (this.saving && this.backgroundSaveChanged()) return;
     const now = Date.now();
-    const elapsed = Math.max(0, (now - this.backgroundAt) / 1000);
+    const elapsed = elapsedMs(this.backgroundAt, now) / 1000;
     this.backgroundAt = Math.max(now, this.backgroundAt);
-    if (!elapsed || this.paused || this.frozen || this.supersededSave || this.cine || this.credits.rolling) return;
-    let remaining = elapsed * (this.slow ? 0.25 : 1);
-    const managed = this.state.managers.includes(this.stage) && !this.meta.managerOff && !this.onBench;
-    // Sleeping browsers may return hours in one tick. Replan after a purchase and skip ahead while saving.
-    let interval = managed ? managerTuning.period : remaining;
-    while (remaining > 0) {
-      const dt = Math.min(remaining, interval);
+    const active = activeBackgroundSeconds(elapsed, {
+      paused: this.paused, frozen: this.frozen, superseded: this.supersededSave,
+      cinematic: this.cine, creditsRolling: this.credits.rolling,
+    }, this.slow);
+    if (!active) return;
+    advanceBackground(active, managerOnDuty(this.state, this.stage, this.meta, this.onBench), dt => {
       this.backgroundProduction(dt);
       this.seconds += dt;
-      interval = this.stepManager(dt) ? managerTuning.period : interval * 2;
-      remaining -= dt;
-    }
+      return this.stepManager(dt);
+    });
     this.sinceSave += elapsed;
     this.lastMoney = this.state.money;
   }
 
   private backgroundProduction(dt: number): void {
     const incident = this.meta.intern;
-    const work = (seconds: number, down = false) => {
+    backgroundWork(dt, incident?.elapsed, (seconds, down) => {
       for (const id of stepBackgroundWork(this.state, this.cfg, seconds, down)) this.unitDone(id);
-    };
-    if (incident) {
-      const before = Math.min(dt, Math.max(0, internData.routeSeconds - incident.elapsed));
-      const throughOutage = Math.min(dt, Math.max(0, internData.routeSeconds + internData.closedSeconds - incident.elapsed));
-      work(before);
-      work(throughOutage - before, true);
-      work(dt - throughOutage);
-      this.stepIntern(dt);
-    } else work(dt);
+    });
+    if (incident) this.stepIntern(dt);
   }
 
   private saveGame(): void {
@@ -652,7 +639,7 @@ export class GameScene extends Phaser.Scene {
     this.meta = file.meta;
     this.selfPlay = file.meta.auto;
     // a save finished before the last screen existed is not finished any more: the ending is ahead again
-    this.won = file.won && this.state.scale >= this.cfg.scales.length;
+    this.won = restoredWin(file, this.cfg);
     this.seconds = file.seconds;
     this.park.thrown = file.meta.bread;
     this.park.fed = file.meta.fed;
@@ -660,9 +647,7 @@ export class GameScene extends Phaser.Scene {
     this.park.auto = file.meta.benchAuto;
     this.openStage();
     if (this.won && this.meta.atBench) this.enterBench(true);
-    const awaySeconds = Math.max(0, (Date.now() - file.at) / 1000);
-    this.pendingReport = offlineReport(this.state, this.cfg, saveData, awaySeconds);
-    this.state.limited = Math.max(0, this.state.limited - awaySeconds);
+    this.pendingReport = resumeOffline(this.state, this.cfg, file.at, Date.now());
     return true;
   }
 
@@ -1104,12 +1089,7 @@ export class GameScene extends Phaser.Scene {
 
   /** The morning report: what the sessions did while the game was closed. One answer: «Да». */
   private morning(report: OfflineReport): void {
-    const h = Math.floor(report.seconds / 3600);
-    const m = Math.floor((report.seconds % 3600) / 60);
-    const hours = `${h} ${L('ч', 'h')}`;
-    const minutes = `${m} ${L('мин', 'min')}`;
-    const away = h && m ? `${hours} ${minutes}` : h ? hours : minutes;
-    const capped = report.seconds >= saveData.offlineCapHours * 3600;
+    const { away, capped } = morningDuration(report.seconds, L('ч', 'h'), L('мин', 'min'));
     const tasks = this.count(report.tasks, TASK_FORMS);
     const money = `<b>$${short(report.dollars)}</b>`;
     const lines = report.waited
@@ -1124,9 +1104,7 @@ export class GameScene extends Phaser.Scene {
     const options = [{ label: YES, note: report.waited ? '' : L('забрать', 'collect') }];
     this.card.show({ head: L('claude — утренний отчёт', 'claude — morning report'), title: L('Пока вас не было', 'While you were away'), lines, options }, () => {
       this.wake();
-      applyOffline(this.state, report);
-      this.meta.reports++;
-      this.lastMoney += report.dollars; // not this second's income
+      this.lastMoney = collectMorning(this.state, this.meta, report, this.lastMoney);
       if (report.dollars > 0) playSound('buy');
       this.say('back', true);
       this.saveGame();
@@ -2647,31 +2625,23 @@ export class GameScene extends Phaser.Scene {
 
   /** Ask once per stage. If postponed, the same purchase remains available in the shop. */
   private stepManager(dt: number): boolean {
-    if (!this.state.managers.includes(this.stage) || this.meta.managerOff || this.meta.intern || this.state.limited > 0 || this.onBench) return false;
-    this.sinceManager += dt;
-    if (this.sinceManager < managerTuning.period) return false;
-    this.sinceManager = 0;
+    const timer = managerClock(this.sinceManager, dt, this.state, this.stage, this.meta, this.onBench);
+    this.sinceManager = timer.elapsed;
+    if (!timer.due) return false;
     this.managerDecision = this.inviteTransition() ? null : planManager(this.state, this.cfg);
     return this.managerDecision?.affordable ? this.buy(this.managerDecision.key, true) : false;
   }
 
   private inviteTransition(): boolean {
-    const s = this.state;
-    let action = 'scale';
-    const next = this.cfg.scales[s.scale];
-    let name = next?.name;
-    let price = scaleCost(s, this.cfg);
-    if (this.onWorld) {
-      const ark = this.cfg.modules.find(m => m.kind === 'ark');
-      if (!ark || (s.modules[ark.id] ?? 0) >= moduleRoom(s, this.cfg, ark)) return false;
-      action = 'mod:' + ark.id;
-      name = ark.name;
-      price = moduleCost(s, ark);
-    } else if (!next || !scaleReady(s, this.cfg)) return false;
-    if (!name || s.money < price) return false;
+    const offer = transitionOffer(this.state, this.cfg, this.onWorld);
+    if (!offer) return false;
+    const { name, price, action } = offer;
     const key = 'manager-ready-' + this.stage;
-    if (this.feed.said[key] || this.card.open || this.cine || this.departing || this.won
-      || this.meta.intern || this.calls.list.length || this.standupReplyUntil > this.clock) return true;
+    if (!canInvite({
+      alreadyAsked: !!this.feed.said[key], openCard: this.card.open, cinematic: this.cine,
+      departing: this.departing, won: this.won, incident: !!this.meta.intern,
+      calls: this.calls.list.length, replyUntil: this.standupReplyUntil, clock: this.clock,
+    })) return true;
     this.card.show({
       head: L('Клод — переход', 'Claude — next stage'), title: name,
       lines: [L(`Всё готово. На счёте есть $${short(price)}. Подтверждаете?`, `Everything is ready. We have $${short(price)}. Proceed?`)],
