@@ -1,7 +1,8 @@
+import { resolveUprising, startUsageLimit, toggleManager } from './logic/management';
 import { automaticWork, chooseEnding, enterMarket, finaleAction } from './logic/stages';
 import { networkDials, nextBlock, revenuePerGW, towerFacilities, towerPower, underpowered, worldPower } from './logic/power';
 import { benchBottleneck, bestAllowance, farmSessions, fleetReadings, globeReadings, hubReadings, labShown, roundedPopulation, staffingProgress, towerReadings } from './logic/readings';
-import { approveStack, buyUsage, cycleAllowance, flowIncome, limitClock, limitOffer, pickLegend, pileWorth, rewardCall, settleStrike, strikePrice } from './logic/actions';
+import { approveStack, buyUsage, cycleAllowance, flowIncome, limitClock, pickLegend, pileWorth, rewardCall, settleStrike, strikePrice } from './logic/actions';
 import { towerBottleneck, workBottleneck, worldBottleneck } from './logic/bottlenecks';
 import { boughtInShortage, buyOnStage, employersOnOffer, onSale, planOnSale, surgeMultiplier } from './logic/market';
 import { chooseBird, completeEmployers, cycleLine, earnAwards, hasAcquired, pickIncomingSource, statistic } from './logic/progress';
@@ -95,7 +96,6 @@ import {
   policeCost,
   pressPipe,
   replacedOf,
-  riot,
   riotShare,
   scaleCost,
   scaleReady,
@@ -1222,9 +1222,8 @@ export class GameScene extends Phaser.Scene {
       return;
     }
     // a hired manager is a switch: a click tells him to wait or to go on
-    if (row === 'manager' && this.state.managers.includes(this.stage)) {
+    if (row === 'manager' && toggleManager(this.state, this.meta, this.stage)) {
       this.wake();
-      this.meta.managerOff = !this.meta.managerOff;
       playSound('ui');
       this.saveGame();
       return;
@@ -1328,15 +1327,14 @@ export class GameScene extends Phaser.Scene {
   /** The crowd has reached the factories (M27): a part of the working robots is broken, the police takes its share off. */
   private riotHits(): void {
     const s = this.state;
-    const lost = riot(s, this.cfg, riotShare(s, this.cfg, RIOTS.share));
+    const { lost, index } = resolveUprising(s, this.cfg, this.meta, RIOTS.share);
     playSound('waste');
     const broken = short(Math.round(lost));
     this.paper.toast(
       L('Восстание луддитов', 'Luddite uprising'),
       L(`сломано роботов: ${broken}${s.police ? ' · робополиция отбила часть' : ''}`, `robots broken: ${broken}${s.police ? ' · the robot police fought off a part' : ''}`),
     );
-    headline(this.feed, feedData, RIOT_NEWS[this.meta.riots % RIOT_NEWS.length]);
-    this.meta.riots++;
+    headline(this.feed, feedData, RIOT_NEWS[index % RIOT_NEWS.length]);
     this.say('riot:hit', true);
     logEvent('riot');
     this.saveGame();
@@ -1490,10 +1488,8 @@ export class GameScene extends Phaser.Scene {
   /** Claude hits the usage limit (M22): every session stops until it resets — or until more usage is bought. */
   private hitLimit(): void {
     const s = this.state;
-    const { price, wait } = limitOffer(s, this.cfg);
-    s.limited = wait;
-    this.limitIn = this.rng.range(limitData.every[0], limitData.every[1]);
-    this.meta.limits++;
+    const { price, wait, nextIn } = startUsageLimit(s, this.cfg, this.meta, this.rng);
+    this.limitIn = nextIn;
     this.limitCard = true;
     playSound('waste');
     logEvent('limit');
