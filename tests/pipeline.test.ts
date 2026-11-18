@@ -542,7 +542,8 @@ describe('pipeline', () => {
     s.lines.android = 1;
     const line = cfg.lines.find((l) => l.id === 'android')!;
     // one line holds as many robots as it can replace: what it makes a second over the share that breaks a second
-    for (let i = 0; i < 60 * 1500; i++) stepPipe(s, cfg, 1 / 30);
+    // Run the same 50 minutes in one-second ticks. The balance point is independent of tick size.
+    for (let second = 0; second < 3000; second++) stepPipe(s, cfg, 1);
     const held = robotsOf(s, cfg, 'android');
     expect(held).toBeGreaterThan((line.rate / cfg.tuning.wear) * 0.97);
     expect(held).toBeLessThanOrEqual(line.rate / cfg.tuning.wear + 1);

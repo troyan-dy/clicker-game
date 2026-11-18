@@ -6,6 +6,7 @@ import { answerCall, approveStack, buyUsage, cycleAllowance, flowIncome, limitCl
 import { towerBottleneck, workBottleneck, worldBottleneck } from './logic/bottlenecks';
 import { boughtInShortage, buyOnStage, employersOnOffer, onSale, planOnSale, surgeMultiplier } from './logic/market';
 import { chooseBird, completeEmployers, cycleLine, earnAwards, hasAcquired, pickIncomingSource, statistic } from './logic/progress';
+import { addedSessionRate, discountPercent, marketProgress, pileRequests, promotedPay, relativeFill, shortagePercent, worldExpansion } from './logic/shopReadings';
 import Phaser from 'phaser';
 import { approvePending, openVolunteerGate, routePress, settleIntern, signResearch } from './logic/approval';
 import { refuseFeeding, toggleFeeding, tossSlice } from './logic/parkActions';
@@ -88,7 +89,6 @@ import {
   ordersOf,
   outputOf,
   payOf,
-  planRate,
   podsOf,
   quartered,
   reachOf,
@@ -111,7 +111,6 @@ import {
   subagentRate,
   targetOf,
   unemploymentOf,
-  wantedOf,
   wireOf,
   whole,
   type Module,
@@ -2084,7 +2083,6 @@ export class GameScene extends Phaser.Scene {
     const cfg = this.cfg;
     const inflow = inflowOf(s, cfg);
     const capacity = claudeRate(s, cfg) + subagentRate(s, cfg); // nothing while the limit is hit
-    const top = Math.max(inflow, capacity, 1e-9);
     const limited = s.limited > 0;
     const short_ = limited || neck === 'claude';
     // from the city on there are people left without work: the more of them, the cheaper a task; the allowance keeps the price
@@ -2120,7 +2118,7 @@ export class GameScene extends Phaser.Scene {
       {
         label: L('ЗАДАЧИ', 'TASKS'),
         value: perSecond(inflow),
-        fill: inflow / top,
+        fill: relativeFill(inflow, capacity),
         hot: struck > 0 || (neck === 'tasks' && !done),
         note: struck
           ? `${L('забастовка', 'strike')}: ${struck} ${plural(struck, STRUCK_FORMS)} — ${L('см. «ЛЮДИ»', 'see “PEOPLE”')}`
@@ -2135,7 +2133,7 @@ export class GameScene extends Phaser.Scene {
       {
         label: L('СЕССИИ', 'SESSIONS'),
         value: perSecond(capacity),
-        fill: capacity / top,
+        fill: relativeFill(capacity, inflow),
         hot: short_,
         note: limited ? `${L('лимит · сброс через', 'limit · resets in')} ${this.limitClock()}` : neck === 'claude' ? `${SCARCE} — ${needSessions}` : this.count(sessionsOf(s, cfg) + 1, SESSION_FORMS),
       },
@@ -2162,7 +2160,7 @@ export class GameScene extends Phaser.Scene {
         value: gw(asks),
         fill: asks / top,
         hot: neck === 'net' || neck === 'you',
-        note: neck === 'you' ? t.you : neck === 'net' ? t.netShort : s.asleep >= wantedOf(s, cfg) - cfg.grid.unit * 0.5 ? t.netFull : t.netAsks(short(this.perGw())),
+        note: neck === 'you' ? t.you : neck === 'net' ? t.netShort : !underpowered(s, cfg, false) ? t.netFull : t.netAsks(short(this.perGw())),
       },
     ];
   }
@@ -2187,7 +2185,7 @@ export class GameScene extends Phaser.Scene {
       {
         label: L('РОБОТЫ', 'ROBOTS'),
         value: short(Math.round(working)),
-        fill: made / Math.max(made, broken, 1e-9),
+        fill: relativeFill(made, broken),
         hot: short_ !== null,
         note: short_
           ? L(`${ROBOT_WORDS[short_].of} ломается больше, чем делается`, `${ROBOT_WORDS[short_].many} break faster than they are made`)
@@ -2202,8 +2200,8 @@ export class GameScene extends Phaser.Scene {
 
   /** what the perks of whole employers take off the prices of a kind, as a shelf says it; nothing — no discount yet */
   private off(kind: 'farms' | 'sources' | 'grades' | 'scale', what = L('скидка', 'discount')): string | undefined {
-    const left = discount(this.state, this.cfg, kind);
-    return left < 0.995 ? `${what} ${Math.round((1 - left) * 100)}%` : undefined;
+    const saving = discountPercent(discount(this.state, this.cfg, kind));
+    return saving ? `${what} ${saving}%` : undefined;
   }
 
   /** kinds of work on sale: the terminal sells the first ones, the blueprint all four */
@@ -2267,8 +2265,8 @@ export class GameScene extends Phaser.Scene {
     const more = 1 + bonus(s, this.cfg, 'lines');
     return this.cfg.lines.filter((l) => l.screen === this.stage).map((l) => {
       const owned = s.lines[l.id] ?? 0;
-      const surge = surgeMultiplier(s, l.id);
-      const note = surge > 1.02 ? `${L('дефицит', 'shortage')} +${Math.round((surge - 1) * 100)}%, ${COOLING}` : l.note;
+      const markup = shortagePercent(surgeMultiplier(s, l.id));
+      const note = markup ? `${L('дефицит', 'shortage')} +${markup}%, ${COOLING}` : l.note;
       return this.row(l.name, `+${short(l.rate * more)} ${ROBOT_WORDS[l.kind].of}${PER_S} · ${note}`, owned ? `×${owned}` : '', `line:${l.id}`, lineCost(s, this.cfg, l));
     });
   }
@@ -2302,17 +2300,16 @@ export class GameScene extends Phaser.Scene {
 
   private farmRows(): ShopRow[] {
     const s = this.state;
-    const perSession = planRate(s, this.cfg) * this.cfg.auto.subagent.share;
     return this.cfg.farms.filter((f) => f.screen === this.stage).map((f) => {
       const owned = s.farms[f.id] ?? 0;
       // a farm with a ceiling says how much of it is taken in the note
       const count = owned && !f.max ? `×${owned}` : '';
       const of = f.max ? `${owned} ${OF} ${f.max} · ` : '';
       if (owned >= (f.max ?? Infinity)) return { buy: '', title: f.name, sub: L('выкуплено всё', 'all bought up'), count: `×${owned}`, price: '', state: 'owned' };
-      const surge = surgeMultiplier(s, f.id);
+      const markup = shortagePercent(surgeMultiplier(s, f.id));
       // a shortage is said in the row itself: the price has gone up and will come down
-      const note = surge > 1.02 ? `${L('дефицит', 'shortage')}: +${Math.round((surge - 1) * 100)}% ${L('к цене', 'to the price')}, ${COOLING}` : f.note;
-      return this.row(f.name, `+${flowText(f.sessions * perSession)}${PER_S} · ${of}${note}`, count, `farm:${f.id}`, farmCost(s, this.cfg, f));
+      const note = markup ? `${L('дефицит', 'shortage')}: +${markup}% ${L('к цене', 'to the price')}, ${COOLING}` : f.note;
+      return this.row(f.name, `+${flowText(addedSessionRate(s, this.cfg, f.sessions))}${PER_S} · ${of}${note}`, count, `farm:${f.id}`, farmCost(s, this.cfg, f));
     });
   }
 
@@ -2377,7 +2374,7 @@ export class GameScene extends Phaser.Scene {
     const cur = this.cfg.grades[this.state.grade];
     const next = this.cfg.grades[this.state.grade + 1];
     if (!next) return [{ buy: '', title: cur.name, sub: L('выше некуда', 'nowhere higher to go'), count: TOP, price: '', state: 'owned' }];
-    const pay = payText((payOf(this.state, this.cfg) / cur.mult) * next.mult);
+    const pay = payText(promotedPay(this.state, this.cfg, next.mult));
     // long titles of the late grades do not fit after «Повышение:»
     const title = next.name.length > 12 ? next.name : `${L('Повышение', 'Promotion')}: ${gradeWord(next.name)}`;
     return [this.row(title, `$${pay} ${PER_TASK} · ${next.note}`, '', 'grade', gradeCost(this.state, this.cfg))];
@@ -2419,7 +2416,7 @@ export class GameScene extends Phaser.Scene {
     const a = this.cfg.auto;
     const sub = this.row(
       a.subagent.name,
-      `+${tasksPhrase(planRate(s, this.cfg) * a.subagent.share)}${PER_S} · ${a.subagent.note}`,
+      `+${tasksPhrase(addedSessionRate(s, this.cfg, 1))}${PER_S} · ${a.subagent.note}`,
       s.subagents ? `×${s.subagents}` : '',
       'sub',
       subagentPrice(this.cfg, s.subagents),
@@ -2489,7 +2486,7 @@ export class GameScene extends Phaser.Scene {
   /** the pile of questions as Claude's card shows it; nothing when there is no pile */
   private pile(): { text: string; worth: string; fill: number; legend: boolean } | undefined {
     if (this.stack.fill <= 0) return undefined;
-    const asking = Math.max(1, Math.round(this.stack.fill * (sessionsOf(this.state, this.cfg) + 1)));
+    const asking = pileRequests(this.stack.fill, sessionsOf(this.state, this.cfg));
     return {
       text: `${this.legend ? L('Легендарный тикет', 'Legendary ticket') : this.count(asking, ASKING_FORMS)}: ${L(`«${this.question}»`, `“${this.question}”`)}`,
       worth: short(pileWorth(this.state, this.cfg, this.stack, !!this.legend)),
@@ -2668,13 +2665,9 @@ export class GameScene extends Phaser.Scene {
     } else if (s.jobs.length) home += `<br><b>${L('стай в пути', 'packs on the way')}: ${s.jobs.length}</b>`;
     const tags: BlueprintTag[] = [{ x: layout.home.x, y: layout.home.y + 4, mid: true, small: true, html: home }];
     // the map sells itself: a caption and the building above it buy the next unit of that employer
-    let taken = 0;
-    let total = 0;
+    const { taken, total } = marketProgress(s, employers, factory);
     for (const src of employers) {
       const owned = s.owned[src.id] ?? 0;
-      // the trades of the street are counted whole: robots take them little by little
-      taken += factory ? (owned >= src.max ? 1 : 0) : owned;
-      total += factory ? 1 : src.max;
       const lot = layout.lots[src.id];
       if (!lot) continue;
       // the third line is what the whole employer gives: pale until it is earned, coral once it works
@@ -2861,7 +2854,6 @@ export class GameScene extends Phaser.Scene {
   private drawWorld(): void {
     const s = this.state;
     const cfg = this.cfg;
-    const g = cfg.grid;
     const w = cfg.world;
     const t = WORLD;
     const neck = s.limited > 0 ? 'none' : this.neck();
@@ -2869,13 +2861,13 @@ export class GameScene extends Phaser.Scene {
     const owned = (kind: Module['kind']): number => s.modules[mod(kind).id] ?? 0;
     const spans = owned('span');
     const nodes = nodesOf(s, cfg);
-    const all = w.regions.reduce((n, x) => n + x, 0);
     const reach = reachOf(s, cfg);
 
     const tags: BlueprintTag[] = [];
     // the regions the cable has reached: how many of their nodes stand; the one the next node goes to sells it
     const nodeCost = moduleCost(s, mod('node'));
     const canNode = owned('node') < moduleRoom(s, cfg, mod('node'));
+    const expansion = worldExpansion(s, cfg, spans, nodes, canNode);
     w.regions.forEach((slots, r) => {
       if (routeRegion(s.cableRoute, r) < reach) {
         const [x, y] = this.globe.regionSpot(r);
@@ -2897,11 +2889,11 @@ export class GameScene extends Phaser.Scene {
     else if (chip) tags.push({ x: ix, y: iy, mid: true, small: true, html: TOWERS.inventing(chip.name, Math.floor(labOf(s, cfg) * 100)) });
     // the map sells the span that is laid next: where it leads
     const spanCost = moduleCost(s, mod('span'));
-    const destination = t.to[routeRegion(s.cableRoute, Math.min(spans + 1, w.regions.length)) - 1];
+    const destination = t.to[expansion.destination - 1];
     let spanRows: ShopRow[];
     if (spans === 0) {
       const routes = [
-        { region: SIBERIA, buy: 'route:siberia', note: t.siberianPilot(gw(w.node * g.watt)) },
+        { region: SIBERIA, buy: 'route:siberia', note: t.siberianPilot(gw(expansion.nodePower)) },
         { region: EAST_ASIA, buy: 'route:eastasia', note: t.eastSites(w.regions[EAST_ASIA], Math.round((1 - (mod('node').eastSitePrice ?? 1)) * 100)) },
       ];
       spanRows = routes.map(({ region, buy, note }) => {
@@ -2916,17 +2908,17 @@ export class GameScene extends Phaser.Scene {
         tags.push({ x: span[0], y: span[1], mid: true, small: true, buy: `mod:${mod('span').id}`, can: s.money >= spanCost, html: `${t.span(destination)}<br><b>$${short(spanCost)}</b>` });
       }
       let benefit = spans >= w.regions.length - 1 ? t.ringNote : t.spanNote;
-      if (spans === 1 && s.cableRoute === 'eastasia') benefit = t.siberianPilot(gw(w.node * g.watt));
-      spanRows = [this.worldRow('span', mod('span').name, `${destination} · ${Math.min(spans + 1, w.regions.length)} ${OF} ${w.regions.length} · ${benefit}`, '', t.spansDone)];
+      if (spans === 1 && s.cableRoute === 'eastasia') benefit = t.siberianPilot(gw(expansion.nodePower));
+      spanRows = [this.worldRow('span', mod('span').name, `${destination} · ${expansion.nextSpan} ${OF} ${w.regions.length} · ${benefit}`, '', t.spansDone)];
     }
     const [mx, my] = this.globe.marsSpot();
     tags.push({ x: mx, y: my, mid: true, small: true, html: t.mars(owned('ark') > 0 && (!this.departing || this.landed) ? this.people(w.node) : '0') });
 
-    const add = `+${this.people(w.node)} ${TOWERS.places} · +${gw(w.node * g.watt)}`;
-    const crew = s.cableRoute === 'eastasia' && spans === 1 && nodes >= w.regions[0] && canNode ? ` · ${t.eastCrew}` : '';
+    const add = `+${this.people(w.node)} ${TOWERS.places} · +${gw(expansion.nodePower)}`;
+    const crew = expansion.eastCrew ? ` · ${t.eastCrew}` : '';
     const wire = wireOf(s, cfg);
     const shelves: ShopShelf[] = [
-      { title: t.shelves.nodes, hot: neck === 'pods' && canNode, rows: [this.worldRow('node', mod('node').name, `${add} · ${t.ofNodes(Math.min(all, nodes + 1), all)}${crew}`, '', t.nodesDone)] },
+      { title: t.shelves.nodes, hot: neck === 'pods' && canNode, rows: [this.worldRow('node', mod('node').name, `${add} · ${t.ofNodes(expansion.nextNode, expansion.allSites)}${crew}`, '', t.nodesDone)] },
       {
         title: t.shelves.cable,
         hot: neck === 'wire' || (neck === 'pods' && owned('node') >= moduleRoom(s, cfg, mod('node'))),
