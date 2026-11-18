@@ -53,7 +53,10 @@ English and Russian. The game takes the language of the browser; the last line o
 npm install
 npm run dev      # the game at http://localhost:5173/
 npm run build    # the build in dist/
+npm run test:coverage  # unit tests and the 100% game logic coverage check
 ```
+
+Changes reach `master` through a pull request. GitHub checks the tests, 100% game logic coverage per file, and the build. After merge, those checks run on `master` before GitHub Pages updates the live game at the same URL.
 
 The pictures of this page are made from the game itself: `npm run build:gym && node tools/readme.mjs`.
 

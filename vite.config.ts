@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { defineConfig, type Plugin } from 'vite';
+import type { Plugin } from 'vite';
+import { defineConfig } from 'vitest/config';
 
 /** Dev only: the gym's P key posts the tuning panel values here; they land next to the captures. */
 function tuningDump(): Plugin {
@@ -46,6 +47,21 @@ export default defineConfig(({ mode }) => ({
   // relative paths: the build must run from any folder of a site or a storefront iframe
   base: './',
   server: { port: 5173 },
+  test: {
+    coverage: {
+      provider: 'v8',
+      include: ['src/**/*.ts'],
+      // New modules enter the check automatically. The scene and view adapters drive Phaser, DOM and CSS.
+      exclude: [
+        '**/*.d.ts', 'src/main.ts', 'src/game/GameScene.ts', 'src/debug/**', 'src/gyms/**',
+        'src/data/palette.ts', // colours for the HelloScene graphics demo
+        'src/ui/{hud,scale,bench/bench,blueprint/blueprint,card/card,credits/credits,intern/intern,terminal/terminal}.ts',
+        'src/view/{benchView,blueprintView,globeView,HelloScene,hubView,nodeTextures,squares,towerView,walkers}.ts',
+      ],
+      reporter: ['text', 'json', 'json-summary'],
+      thresholds: { perFile: true, lines: 100, functions: 100, statements: 100, branches: 100 },
+    },
+  },
   build: { chunkSizeWarningLimit: 2500 },
   define: {
     // gyms, quick starts, cheat keys, scripted hooks: everywhere but in the release

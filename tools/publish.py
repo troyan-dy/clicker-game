@@ -1,34 +1,32 @@
-# Publishes the release build to GitHub Pages: dist/ goes to the gh-pages branch of origin as plain files.
-# A separate throwaway repository is used on purpose: no .gitattributes there, so pictures are not LFS pointers
-# (Pages does not resolve them). Run from the project root, only when the user asked to publish.
+"""Repeat the Pages deployment of the current GitHub master through the normal release checks."""
+import json
 import os
-import shutil
+from pathlib import Path
 import subprocess
 import sys
-import tempfile
 
-ROOT = os.getcwd()
-
-
-def sh(*cmd, cwd=ROOT):
-    r = subprocess.run(cmd, cwd=cwd, capture_output=True, text=True, encoding="utf-8")
-    if r.returncode != 0:
-        print("FAILED:", " ".join(cmd), "\n", (r.stdout + r.stderr).strip()[-600:])
-        sys.exit(1)
-    return r.stdout.strip()
+ROOT = Path(__file__).resolve().parents[1]
 
 
-npm = "npm.cmd" if os.name == "nt" else "npm"
-sh(npm, "run", "build")
-remote = sh("git", "remote", "get-url", "origin")
-commit = sh("git", "rev-parse", "--short", "HEAD")
-name, email = sh("git", "config", "user.name"), sh("git", "config", "user.email")
-tmp = tempfile.mkdtemp(prefix="pages-")
-site = os.path.join(tmp, "site")
-shutil.copytree(os.path.join(ROOT, "dist"), site)
-open(os.path.join(site, ".nojekyll"), "w").close()
-sh("git", "init", "-q", "-b", "gh-pages", cwd=site)
-sh("git", "add", "-A", cwd=site)
-sh("git", "-c", f"user.name={name}", "-c", f"user.email={email}", "commit", "-q", "-m", f"build of {commit}", cwd=site)
-sh("git", "push", "-f", remote, "gh-pages", cwd=site)
-print(f"gh-pages <- dist of {commit}: {sum(len(f) for _, _, f in os.walk(site))} files")
+def main():
+    npm = "npm.cmd" if os.name == "nt" else "npm"
+    subprocess.run([npm, "run", "test:coverage"], cwd=ROOT, check=True)
+    result = subprocess.check_output(
+        [
+            "gh", "api", "--method", "POST", "-H", "X-GitHub-Api-Version: 2026-03-10",
+            "repos/{owner}/{repo}/actions/workflows/pages.yml/dispatches", "-f", "ref=master",
+        ],
+        cwd=ROOT,
+    )
+    run = json.loads(result)
+    print(run["html_url"], flush=True)
+    subprocess.run(
+        ["gh", "run", "watch", str(run["workflow_run_id"]), "--exit-status"], cwd=ROOT, check=True,
+    )
+
+
+if __name__ == "__main__":
+    try:
+        main()
+    except subprocess.CalledProcessError as error:
+        sys.exit(error.returncode)

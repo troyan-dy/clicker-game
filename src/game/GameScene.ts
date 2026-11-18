@@ -1,12 +1,23 @@
+import { resolveUprising, startUsageLimit, toggleManager } from './logic/management';
+import { automaticWork, chooseEnding, enterMarket, finaleAction } from './logic/stages';
+import { networkDials, nextBlock, revenuePerGW, towerFacilities, towerPower, underpowered, worldPower } from './logic/power';
+import { benchBottleneck, bestAllowance, farmSessions, fleetReadings, globeReadings, hubReadings, labShown, roundedPopulation, staffingProgress, towerReadings } from './logic/readings';
+import { answerCall, approveStack, buyUsage, cycleAllowance, flowIncome, limitClock, pickLegend, pileWorth, settleStrike, strikePrice } from './logic/actions';
+import { towerBottleneck, workBottleneck, worldBottleneck } from './logic/bottlenecks';
+import { boughtInShortage, buyOnStage, employersOnOffer, onSale, planOnSale, surgeMultiplier } from './logic/market';
+import { chooseBird, completeEmployers, cycleLine, earnAwards, hasAcquired, pickIncomingSource, statistic } from './logic/progress';
 import Phaser from 'phaser';
+import { approvePending, openVolunteerGate, routePress, settleIntern, signResearch } from './logic/approval';
+import { refuseFeeding, toggleFeeding, tossSlice } from './logic/parkActions';
+import { createGameConfig } from './logic/config';
 import { AWARDS } from '../content/awards';
 import { BENCH } from '../content/bench';
 import { CALLS, STANDUP } from '../content/calls';
 import { CREDITS, CREDITS_END, CREDITS_NOTES, MOTTO, TAGLINE, TITLE } from '../content/credits';
 import { LEGENDS, type Legend } from '../content/legends';
-import { words } from '../content/names';
 import { NEWS } from '../content/news';
-import { PICKET } from '../content/picket';
+import { advanceCalls, advancePlacard, callOwners, limitDue, streetRiot, streetStrike } from './logic/events';
+import { advanceChat, bottleneckRemark, idleAtTerminal, nextShift, parkIdle, parkNews, recordStory, rememberNews, smoothIncome, smoothReading, towerStories, waitAtGate, worldStories } from './logic/stories';
 import { QUIPS } from '../content/quips';
 import { EPILOGUE, FINALE, HUB_TEXT, RIOT_NEWS, SCALE_SHELF, SCREEN_DONE } from '../content/screens';
 import { TAKEOVERS } from '../content/takeovers';
@@ -19,61 +30,38 @@ import { setMusicOn, startMusic } from '../core/music';
 import type { Rng } from '../core/rng';
 import { loadSettings, saveSettings } from '../core/settings';
 import { playSound, setSoundOn, unlockSound } from '../core/sound';
-import autoData from '../data/balance/auto.json';
-import chipData from '../data/balance/chips.json';
-import farmData from '../data/balance/farms.json';
-import gradeData from '../data/balance/grades.json';
-import lineData from '../data/balance/lines.json';
-import managerData from '../data/balance/managers.json';
-import moduleData from '../data/balance/modules.json';
-import netData from '../data/balance/net.json';
-import planData from '../data/balance/plans.json';
-import policeData from '../data/balance/police.json';
-import scaleData from '../data/balance/scales.json';
-import sourceData from '../data/balance/sources.json';
 import { BP, deskScreen } from '../data/layout/blueprint';
 import { HUBS } from '../data/layout/hubs';
 import benchData from '../data/tuning/bench.json';
 import eventsData from '../data/tuning/events.json';
 import feedData from '../data/tuning/feed.json';
-import gridData from '../data/tuning/grid.json';
-import internData from '../data/tuning/intern.json';
-import worldData from '../data/tuning/world.json';
+import { activeBackgroundSeconds, advanceBackground, backgroundWork, collectMorning, elapsedMs, frameRemainder, missedBackgroundFrames, morningDuration, restoredWin, resumeOffline } from './logic/background';
 import limitData from '../data/tuning/limit.json';
-import managerTuning from '../data/tuning/manager.json';
-import peopleData from '../data/tuning/people.json';
+import { SAVE_KEY, SaveOwnership } from './logic/saveOwnership';
+import { answerTransition, canInvite, managerClock, managerOnDuty, transitionOffer } from './logic/transitions';
 import riotData from '../data/tuning/riots.json';
 import strikeData from '../data/tuning/strikes.json';
 import saveData from '../data/tuning/save.json';
 import stackData from '../data/tuning/stack.json';
-import tuningData from '../data/tuning/pipeline.json';
 import { createOverlay, type Overlay } from '../debug/overlay';
 import { createTuningPanel, type TuningPanel } from '../debug/tuningPanel';
-import { birdRate, createBench, refuseBird, stepBench, throwBread } from '../systems/bench/bench';
-import { createEvents, stepEvents, takeEvent, type EventsTuning } from '../systems/events/events';
+import { birdRate, createBench, stepBench } from '../systems/bench/bench';
+import { createEvents, type EventsTuning } from '../systems/events/events';
 import { createFeed, headline, say, stepFeed, tell, type FeedContent } from '../systems/feed/feed';
-import { laptopPhase, startIncident, stepIncident } from '../systems/intern/incident';
+import { laptopPhase } from '../systems/intern/incident';
 import { INTERN_REPORT } from '../ui/intern/intern';
 import { planManager, type ManagerDecision } from '../systems/manager/manager';
-import { createRiots, stepRiots, type RiotTuning } from '../systems/riots/riots';
-import { createStrikes, stepStrikes, type StrikeTuning } from '../systems/strikes/strikes';
-import type { Plan } from '../systems/plan/plan';
+import { createRiots, type RiotTuning } from '../systems/riots/riots';
+import { createStrikes, type StrikeTuning } from '../systems/strikes/strikes';
 import {
   aimAt,
   backlogCap,
-  blocksOf,
   bonus,
   bribeCost,
-  buyBribe,
   buyFarm,
   buyGrade,
-  buyLine,
-  buyManager,
-  buyModule,
-  buyNet,
   buyNoAsk,
   buyPlan,
-  buyPolice,
   buyScale,
   buySource,
   buySubagent,
@@ -83,8 +71,6 @@ import {
   discount,
   farmCost,
   fedOf,
-  finished,
-  flowOf,
   gradeCost,
   housed,
   inflowOf,
@@ -110,9 +96,7 @@ import {
   policeCost,
   pressPipe,
   replacedOf,
-  riot,
   riotShare,
-  robotsOf,
   scaleCost,
   scaleReady,
   screenOf,
@@ -125,30 +109,23 @@ import {
   stepBackgroundWork,
   subagentPrice,
   subagentRate,
-  supplyOf,
-  takeChip,
   targetOf,
   unemploymentOf,
   wantedOf,
   wireOf,
-  wearOf,
   whole,
-  type Chip,
-  type Farm,
-  type Line,
   type Module,
-  type PipeConfig,
   type PipeState,
   type RobotKind,
   type Source,
 } from '../systems/pipeline/pipeline';
-import { applyOffline, freshMeta, NEWS_KEPT, offlineReport, packSave, unpackSave, type OfflineReport } from '../systems/save/save';
-import { createStack, stackWorth, stepStack, takeStack } from '../systems/stack/stack';
-import type { BenchNeck, BenchUi } from '../ui/bench/bench';
+import { freshMeta, packSave, unpackSave, type OfflineReport } from '../systems/save/save';
+import { createStack, stepStack } from '../systems/stack/stack';
+import type { BenchUi } from '../ui/bench/bench';
 import type { BlueprintTag, BlueprintUi, ManagerStrip, MeterRow } from '../ui/blueprint/blueprint';
 import type { CardUi } from '../ui/card/card';
 import type { CreditsSpec, CreditsUi } from '../ui/credits/credits';
-import { LOCALE, PER_S, plural, short } from '../ui/format';
+import { LOCALE, PER_S, plural, short, gradeWord, planTitle, payText, gw, flowText, perSecond } from '../ui/format';
 import {
   tasksPhrase,
   TERMINAL_SPOTS,
@@ -224,31 +201,15 @@ const COOLING = L('остывает', 'cooling off');
 const TOP = L('максимум', 'max');
 const REPLACED = L('заменено программистов', 'programmers replaced');
 const UPGRADES_FULL = L('УЛУЧШЕНИЯ · быстрее и дороже', 'UPGRADES · faster and pricier');
-const planTitle = (name: string): string => L(`Тариф ${name}`, `${name} plan`);
-/** a grade in the middle of a line: Russian writes it small, English keeps «CTO» and «Team Lead» as they are */
-const gradeWord = (name: string): string => (LANG === 'en' ? name : name.toLowerCase());
 /** what the sessions ask about when they pile up their questions */
 const QUESTIONS = TICKETS.flatMap((t) => t.asks);
-const SAVE_KEY = 'da-klod-save';
 const MONEY_SPOT: Rect = { x: BP.money.x - 80, y: BP.money.y - 20, w: 160, h: 40 };
 /** a big screen shrinks to this share of its size when it becomes a node of the next one */
 const HUB_SHRINK = 0.14;
 const fmt1 = new Intl.NumberFormat(LOCALE, { maximumFractionDigits: 1 });
 const fmt2 = new Intl.NumberFormat(LOCALE, { maximumFractionDigits: 2 });
-/** gigawatts, after a number: «0,8 ГВт», «240 ГВт» */
-const gw = (n: number): string => `${n < 100 ? fmt1.format(n) : short(Math.round(n))}${L(' ГВт', ' GW')}`;
-/** the pay for a task: whole dollars from a hundred up — it drifts with unemployment, and «879,9 → 880» would change the width of the line */
-const payText = (n: number): string => (n >= 100 ? short(Math.round(n)) : fmt1.format(n));
 
-/** «3,75 задачи», «26 задач», «34 600 задач», «1,2 млн задач» */
-function flowText(perSec: number): string {
-  return perSec < 1000 ? tasksPhrase(Math.round(perSec * 100) / 100) : `${short(Math.round(perSec))} ${L('задач', 'tasks')}`;
-}
 
-/** «3,8/с», «3 913/с», «1,2 млн/с» */
-function perSecond(n: number): string {
-  return `${n < 1000 ? fmt1.format(n) : short(Math.round(n))}${PER_S}`;
-}
 
 declare global {
   interface Window {
@@ -290,23 +251,7 @@ export class GameScene extends Phaser.Scene {
   private readonly demo: string;
   private readonly settings = loadSettings();
   // own copies of the data: the tuning panel edits them live, the mechanic reads them every step
-  private readonly cfg: PipeConfig = {
-    tuning: { ...tuningData },
-    plans: (planData as Plan[]).map((p) => ({ ...p, ...words('plans', p.id) })),
-    sources: (sourceData as Source[]).map((s) => ({ ...s, ...words('sources', s.id), perk: s.perk && { ...s.perk, ...words('perks', s.id) } })),
-    grades: gradeData.map((g) => ({ ...g, ...words('grades', g.id) })),
-    farms: (farmData as Farm[]).map((f) => ({ ...f, ...words('farms', f.id) })),
-    scales: scaleData.map((x) => ({ ...x, ...words('scales', x.id) })),
-    managers: managerData.map((m) => ({ ...m, ...words('managers', m.screen) })),
-    lines: (lineData as Line[]).map((l) => ({ ...l, ...words('lines', l.id) })),
-    police: { ...policeData, ...words('police', 'police') },
-    modules: (moduleData as Module[]).map((m) => ({ ...m, ...words('modules', m.id) })),
-    net: netData.map((p) => ({ ...p, ...words('net', p.id) })),
-    chips: (chipData as Chip[]).map((c) => ({ ...c, ...words('chips', c.id) })),
-    grid: { ...gridData },
-    world: { ...worldData },
-    auto: { noAsk: { ...autoData.noAsk, ...words('auto', 'noAsk') }, subagent: { ...autoData.subagent, ...words('auto', 'subagent') } },
-  };
+  private readonly cfg = createGameConfig();
   private state!: PipeState;
   private view!: BlueprintView;
   private readonly hubs = new Map<number, HubView>();
@@ -341,8 +286,7 @@ export class GameScene extends Phaser.Scene {
   private paused = false;
   private backgroundAt: number | null = null;
   private backgroundTimer?: number;
-  private supersededSave = false;
-  private lastSavedJson: string | null = null;
+  private readonly saveOwnership = new SaveOwnership(() => localStorage);
   /** a saved game was opened */
   private resumed = false;
   /** what the sessions did while the game was closed; shown after the title card */
@@ -368,8 +312,6 @@ export class GameScene extends Phaser.Scene {
   /** awards earned but not announced yet */
   private toTell: string[] = [];
   private sinceAwards = 0;
-  /** after the ending Claude may press «Да всем» himself (M13) */
-  private selfPlay = false;
   /** a placard of the picket being read out: at which employer, what it says, seconds left */
   private slogan: { at: string; text: string; left: number } | null = null;
   private sloganIn = 4;
@@ -521,7 +463,7 @@ export class GameScene extends Phaser.Scene {
     });
     window.addEventListener('storage', event => {
       // A second game tab has taken over. Never overwrite its newer progress.
-      if (this.saving && this.backgroundAt !== null && (event.key === SAVE_KEY || event.key === null)) this.supersededSave = true;
+      this.saveOwnership.storageChanged(event.key, this.saving, this.backgroundAt !== null);
     });
     syncVisibility();
     if (__TOOLS__) window.__gym = {
@@ -556,16 +498,16 @@ export class GameScene extends Phaser.Scene {
   }
 
   update(_time: number, deltaMs: number): void {
-    if (this.supersededSave || document.hidden) return;
+    if (this.saveOwnership.superseded || document.hidden) return;
     if (this.backgroundAt !== null) {
       // A visible second window still renders normally. Only missed frames need a catch-up.
-      const elapsedMs = Math.max(0, Date.now() - this.backgroundAt);
-      if (elapsedMs > 250) {
+      const now = Date.now();
+      if (missedBackgroundFrames(this.backgroundAt, now, false)) {
         this.settleBackground();
         deltaMs = 0;
       } else {
-        this.backgroundAt += elapsedMs;
-        deltaMs = elapsedMs;
+        deltaMs = elapsedMs(this.backgroundAt, now);
+        this.backgroundAt += deltaMs;
       }
     }
     if (this.internReplay) {
@@ -583,11 +525,7 @@ export class GameScene extends Phaser.Scene {
     } else if (this.meta.intern && !this.paused && !this.card.open) {
       this.paper.laptop.show(this.meta.intern.elapsed, this.meta.intern.credit);
     } else this.paper.laptop.hide();
-    this.acc = this.paused ? 0 : this.acc + Math.min(deltaMs / 1000, 0.25) * (this.slow ? 0.25 : 1);
-    while (this.acc >= STEP) {
-      this.step(STEP);
-      this.acc -= STEP;
-    }
+    this.acc = frameRemainder(this.acc, deltaMs, this.paused, this.slow, STEP, dt => this.step(dt));
     // the ending: nothing is earned or bought, but the figures on the desk still walk
     if (this.cine) {
       this.view.step(Math.min(deltaMs / 1000, 0.05));
@@ -614,7 +552,7 @@ export class GameScene extends Phaser.Scene {
       this.backgroundAt = Date.now();
       if (!this.paused) this.saveGame();
       this.backgroundTimer = window.setInterval(() => {
-        if (this.backgroundAt !== null && (document.hidden || Date.now() - this.backgroundAt > 250)) this.settleBackground();
+        if (missedBackgroundFrames(this.backgroundAt, Date.now(), document.hidden)) this.settleBackground();
         if (this.sinceSave >= saveData.autosaveSeconds) this.saveGame();
       }, 1000);
       return;
@@ -622,90 +560,58 @@ export class GameScene extends Phaser.Scene {
     window.clearInterval(this.backgroundTimer);
     this.settleBackground();
     this.backgroundAt = null;
-    if (this.supersededSave) window.location.reload();
-    else if (!this.paused) this.saveGame();
+    const action = this.saveOwnership.onFocus(this.paused);
+    if (action === 'reload') window.location.reload();
+    else if (action === 'save') this.saveGame();
   }
 
   private settleBackground(): void {
     if (this.backgroundAt === null) return;
-    if (this.saving && this.backgroundSaveChanged()) return;
+    if (this.saving && this.saveOwnership.checkForTakeover()) return;
     const now = Date.now();
-    const elapsed = Math.max(0, (now - this.backgroundAt) / 1000);
+    const elapsed = elapsedMs(this.backgroundAt, now) / 1000;
     this.backgroundAt = Math.max(now, this.backgroundAt);
-    if (!elapsed || this.paused || this.frozen || this.supersededSave || this.cine || this.credits.rolling) return;
-    let remaining = elapsed * (this.slow ? 0.25 : 1);
-    const managed = this.state.managers.includes(this.stage) && !this.meta.managerOff && !this.onBench;
-    // Sleeping browsers may return hours in one tick. Replan after a purchase and skip ahead while saving.
-    let interval = managed ? managerTuning.period : remaining;
-    while (remaining > 0) {
-      const dt = Math.min(remaining, interval);
+    const active = activeBackgroundSeconds(elapsed, {
+      paused: this.paused, frozen: this.frozen, superseded: this.saveOwnership.superseded,
+      cinematic: this.cine, creditsRolling: this.credits.rolling,
+    }, this.slow);
+    if (!active) return;
+    advanceBackground(active, managerOnDuty(this.state, this.stage, this.meta, this.onBench), dt => {
       this.backgroundProduction(dt);
       this.seconds += dt;
-      interval = this.stepManager(dt) ? managerTuning.period : interval * 2;
-      remaining -= dt;
-    }
+      return this.stepManager(dt);
+    });
     this.sinceSave += elapsed;
     this.lastMoney = this.state.money;
   }
 
   private backgroundProduction(dt: number): void {
     const incident = this.meta.intern;
-    const work = (seconds: number, down = false) => {
+    backgroundWork(dt, incident?.elapsed, (seconds, down) => {
       for (const id of stepBackgroundWork(this.state, this.cfg, seconds, down)) this.unitDone(id);
-    };
-    if (incident) {
-      const before = Math.min(dt, Math.max(0, internData.routeSeconds - incident.elapsed));
-      const throughOutage = Math.min(dt, Math.max(0, internData.routeSeconds + internData.closedSeconds - incident.elapsed));
-      work(before);
-      work(throughOutage - before, true);
-      work(dt - throughOutage);
-      this.stepIntern(dt);
-    } else work(dt);
+    });
+    if (incident) this.stepIntern(dt);
   }
 
   private saveGame(): void {
     this.sinceSave = 0;
-    if (!this.saving || this.frozen || this.supersededSave) return;
-    try {
-      if (this.backgroundAt !== null && this.backgroundSaveChanged()) return;
+    this.saveOwnership.write(this.saving, this.frozen, this.backgroundAt !== null, () => {
       const feed = { shown: this.feed.shown, said: this.feed.said };
-      const json = packSave({ at: Date.now(), state: this.state, feed, meta: this.meta, won: this.won, seconds: this.seconds });
-      localStorage.setItem(SAVE_KEY, json);
-      this.lastSavedJson = json;
-    } catch {
-      // private mode or a full disk: the game goes on without saving
-    }
-  }
-
-  /** Storage events can be delayed while this page is frozen. Check the last write before catching up. */
-  private backgroundSaveChanged(): boolean {
-    try {
-      if (localStorage.getItem(SAVE_KEY) !== this.lastSavedJson) this.supersededSave = true;
-    } catch {
-      // Storage can be disabled; the open tab can still earn in memory.
-    }
-    return this.supersededSave;
+      return packSave({ at: Date.now(), state: this.state, feed, meta: this.meta, won: this.won, seconds: this.seconds });
+    });
   }
 
   /** Opens a saved game on the screen it was left at. Returns false when there is nothing to open. */
   private loadGame(): boolean {
-    if (!this.saving) return false;
-    let json: string | null;
-    try {
-      json = localStorage.getItem(SAVE_KEY);
-      this.lastSavedJson = json;
-    } catch {
-      return false;
-    }
+    const json = this.saveOwnership.read(this.saving);
     const file = unpackSave(json, this.cfg);
     if (!file) return false;
     this.state = file.state;
     this.feed.shown = file.feed.shown;
     this.feed.said = file.feed.said;
     this.meta = file.meta;
-    this.selfPlay = file.meta.auto;
     // a save finished before the last screen existed is not finished any more: the ending is ahead again
-    this.won = file.won && this.state.scale >= this.cfg.scales.length;
+    this.won = restoredWin(file, this.cfg);
     this.seconds = file.seconds;
     this.park.thrown = file.meta.bread;
     this.park.fed = file.meta.fed;
@@ -713,9 +619,7 @@ export class GameScene extends Phaser.Scene {
     this.park.auto = file.meta.benchAuto;
     this.openStage();
     if (this.won && this.meta.atBench) this.enterBench(true);
-    const awaySeconds = Math.max(0, (Date.now() - file.at) / 1000);
-    this.pendingReport = offlineReport(this.state, this.cfg, saveData, awaySeconds);
-    this.state.limited = Math.max(0, this.state.limited - awaySeconds);
+    this.pendingReport = resumeOffline(this.state, this.cfg, file.at, Date.now());
     return true;
   }
 
@@ -1029,8 +933,7 @@ export class GameScene extends Phaser.Scene {
     );
     const options = [{ label: YES }, { label: YES_FOREVER }, { label: NO, note: NOT_ON_PLAN, off: true }];
     this.card.show({ head: L('claude — итоги', 'claude — results'), title: L('Работать больше некому', 'Nobody is left to work'), lines, options }, (i) => {
-      this.selfPlay = i === 1;
-      this.meta.auto = this.selfPlay;
+      chooseEnding(this.meta, i);
       this.saveGame();
       this.epilogue();
     });
@@ -1157,12 +1060,7 @@ export class GameScene extends Phaser.Scene {
 
   /** The morning report: what the sessions did while the game was closed. One answer: «Да». */
   private morning(report: OfflineReport): void {
-    const h = Math.floor(report.seconds / 3600);
-    const m = Math.floor((report.seconds % 3600) / 60);
-    const hours = `${h} ${L('ч', 'h')}`;
-    const minutes = `${m} ${L('мин', 'min')}`;
-    const away = h && m ? `${hours} ${minutes}` : h ? hours : minutes;
-    const capped = report.seconds >= saveData.offlineCapHours * 3600;
+    const { away, capped } = morningDuration(report.seconds, L('ч', 'h'), L('мин', 'min'));
     const tasks = this.count(report.tasks, TASK_FORMS);
     const money = `<b>$${short(report.dollars)}</b>`;
     const lines = report.waited
@@ -1177,9 +1075,7 @@ export class GameScene extends Phaser.Scene {
     const options = [{ label: YES, note: report.waited ? '' : L('забрать', 'collect') }];
     this.card.show({ head: L('claude — утренний отчёт', 'claude — morning report'), title: L('Пока вас не было', 'While you were away'), lines, options }, () => {
       this.wake();
-      applyOffline(this.state, report);
-      this.meta.reports++;
-      this.lastMoney += report.dollars; // not this second's income
+      this.lastMoney = collectMorning(this.state, this.meta, report, this.lastMoney);
       if (report.dollars > 0) playSound('buy');
       this.say('back', true);
       this.saveGame();
@@ -1289,11 +1185,9 @@ export class GameScene extends Phaser.Scene {
     if (row === 'ubi') {
       this.wake();
       const s = this.state;
-      const struck = s.strikes.length > 0;
-      // a lever of a few steps: none → 10% → 20% → 30% → none
-      s.allowance = (s.allowance + 1) % (this.cfg.tuning.allowanceLevels + 1);
+      const remark = cycleAllowance(s, this.cfg.tuning.allowanceLevels);
       playSound('ui');
-      this.say(s.allowance === 0 ? 'ubi:off' : s.allowance > 1 ? 'ubi:more' : struck ? 'strike:over' : 'ubi:on', true);
+      this.say(remark, true);
       this.slogan = null;
       this.saveGame();
       return;
@@ -1303,16 +1197,15 @@ export class GameScene extends Phaser.Scene {
       this.wake();
       const s = this.state;
       const id = row.slice(7);
-      if (!s.strikes.includes(id)) return;
       const price = this.strikePrice();
-      if (s.money < price) {
+      const outcome = settleStrike(s, id, price);
+      if (outcome === 'absent') return;
+      if (outcome === 'poor') {
         this.paper.flash(row, 'denied');
         playSound('waste');
         return;
       }
-      s.money -= price;
       this.lastMoney -= price;
-      s.strikes = s.strikes.filter((x) => x !== id);
       playSound('buy', 4);
       this.say('strike:paid', true);
       this.saveGame();
@@ -1329,9 +1222,8 @@ export class GameScene extends Phaser.Scene {
       return;
     }
     // a hired manager is a switch: a click tells him to wait or to go on
-    if (row === 'manager' && this.state.managers.includes(this.stage)) {
+    if (row === 'manager' && toggleManager(this.state, this.meta, this.stage)) {
       this.wake();
-      this.meta.managerOff = !this.meta.managerOff;
       playSound('ui');
       this.saveGame();
       return;
@@ -1347,7 +1239,7 @@ export class GameScene extends Phaser.Scene {
 
   /** what this screen sells: a big screen deals only in its own employers */
   private onSale(src: Source): boolean {
-    return this.stage >= 3 ? src.screen === this.stage : src.screen <= this.stage;
+    return onSale(this.stage, src);
   }
 
   /** `quiet` — the manager buys: a soft tick instead of the fanfare, no remark */
@@ -1357,35 +1249,8 @@ export class GameScene extends Phaser.Scene {
     const s = this.state;
     const cfg = this.cfg;
     const before = s.money;
-    const surged = (what.startsWith('farm:') || what.startsWith('line:')) && (s.surge[what.slice(5)] ?? 1) > 1.3; // bought in a shortage
-    let ok = false;
-    if (what.startsWith('src:')) {
-      const src = cfg.sources.find((x) => x.id === what.slice(4));
-      ok = !!src && this.onSale(src) && buySource(s, cfg, src.id);
-    } else if (what.startsWith('farm:')) {
-      const farm = cfg.farms.find((x) => x.id === what.slice(5));
-      ok = !!farm && farm.screen === this.stage && buyFarm(s, cfg, farm.id);
-    } else if (what.startsWith('line:')) {
-      const line = cfg.lines.find((x) => x.id === what.slice(5));
-      ok = !!line && line.screen === this.stage && buyLine(s, cfg, line.id);
-    } else if (what.startsWith('bribe:')) {
-      const src = cfg.sources.find((x) => x.id === what.slice(6));
-      ok = !!src && this.onSale(src) && buyBribe(s, cfg, src.id);
-    } else if (what === 'route:siberia' || what === 'route:eastasia') {
-      ok = !quiet && this.onWorld && buyModule(s, cfg, 'span', what === 'route:siberia' ? 'siberia' : 'eastasia');
-    } else if (what.startsWith('mod:')) {
-      // what the towers are built of is sold at the towers, what the planet is girdled with — on the planet
-      const m = cfg.modules.find((x) => x.id === what.slice(4));
-      ok = !!m && (m.screen ?? cfg.grid.screen) === this.stage && buyModule(s, cfg, m.id);
-    } else if (what.startsWith('net:')) ok = this.dim && buyNet(s, cfg, what.slice(4));
-    else if (what === 'police') ok = this.stage === cfg.police.screen && buyPolice(s, cfg);
-    else if (what === 'plan') ok = buyPlan(s, cfg);
-    else if (what === 'noask') ok = this.stage === 1 && buyNoAsk(s, cfg);
-    else if (what === 'sub') ok = this.stage === 2 && buySubagent(s, cfg);
-    else if (what === 'grade') ok = this.stage >= 2 && buyGrade(s, cfg);
-    else if (what === 'scale') ok = this.stage >= 2 && buyScale(s, cfg);
-    else if (what === 'manager') ok = this.stage >= 2 && buyManager(s, cfg, this.stage);
-    if (!ok) return false;
+    const surged = boughtInShortage(s, what); // bought in a shortage
+    if (!buyOnStage(s, cfg, this.stage, what, quiet)) return false;
     this.lastMoney -= before - s.money; // a purchase is not negative income
     if (!unattended) {
       if (quiet) playSound('auto');
@@ -1462,15 +1327,14 @@ export class GameScene extends Phaser.Scene {
   /** The crowd has reached the factories (M27): a part of the working robots is broken, the police takes its share off. */
   private riotHits(): void {
     const s = this.state;
-    const lost = riot(s, this.cfg, riotShare(s, this.cfg, RIOTS.share));
+    const { lost, index } = resolveUprising(s, this.cfg, this.meta, RIOTS.share);
     playSound('waste');
     const broken = short(Math.round(lost));
     this.paper.toast(
       L('Восстание луддитов', 'Luddite uprising'),
       L(`сломано роботов: ${broken}${s.police ? ' · робополиция отбила часть' : ''}`, `robots broken: ${broken}${s.police ? ' · the robot police fought off a part' : ''}`),
     );
-    headline(this.feed, feedData, RIOT_NEWS[this.meta.riots % RIOT_NEWS.length]);
-    this.meta.riots++;
+    headline(this.feed, feedData, RIOT_NEWS[index % RIOT_NEWS.length]);
     this.say('riot:hit', true);
     logEvent('riot');
     this.saveGame();
@@ -1487,8 +1351,7 @@ export class GameScene extends Phaser.Scene {
     logEvent(`whole_${src.id}`);
     // the last employer of a screen: the world notices that this kind of work is over
     const done = SCREEN_DONE[src.screen];
-    if (done && !this.feed.said[`done${src.screen}`] && this.cfg.sources.every((x) => x.screen !== src.screen || whole(this.state, x))) {
-      this.feed.said[`done${src.screen}`] = 1;
+    if (done && completeEmployers(this.state, this.cfg, src.screen, this.feed.said)) {
       headline(this.feed, feedData, done.news);
       this.toTell.push(done.quip);
     }
@@ -1500,17 +1363,7 @@ export class GameScene extends Phaser.Scene {
 
   /** whether the player owns what a news line is about */
   private has(id: string): boolean {
-    const s = this.state;
-    if (id === 'plan') return s.plan.index > 0;
-    if (id === 'sub') return s.subagents > 0;
-    if (id === 'grade') return s.grade > 0;
-    // the first job is there from the start: news about a source mean one that was bought
-    const src = this.cfg.sources.find((x) => x.id === id);
-    if (this.cfg.modules.some((m) => m.id === id)) return (s.modules[id] ?? 0) > 0;
-    if (this.cfg.net.some((dial) => dial.id === id)) return (s.net[id] ?? 0) > 0;
-    const chip = this.cfg.chips.findIndex((c) => c.id === id);
-    if (chip >= 0) return s.chips > chip;
-    return (s.owned[id] ?? 0) > (src?.start ?? 0) || (s.farms[id] ?? 0) > 0;
+    return hasAcquired(this.state, this.cfg, id);
   }
 
   /** «Да, и больше не спрашивай»: the terminal shrinks into the laptop screen, the blueprint appears. */
@@ -1547,13 +1400,10 @@ export class GameScene extends Phaser.Scene {
     else this.hubs.get(this.stage)!.shrinkTo(home.x, home.y, HUB_SHRINK, 900);
     this.stage = next;
     this.owed = { in: 0, me: 0, sub: 0 };
-    this.calls.list = []; // the requests stay on the screen that was left
+    const market = enterMarket(this.state, this.cfg, next, this.calls, this.feed.said);
     this.slogan = null;
-    this.state.strikes = []; // and so do the pickets
-    // a new market: nobody is out of work there yet, an allowance would be paid for nothing
-    if (this.state.allowance > 0) {
-      this.state.allowance = 0;
-      if (next < this.cfg.grid.screen) this.toTell.push(
+    if (market.announceAllowance) {
+      this.toTell.push(
         L(
           'Новый рынок: без работы здесь пока никто не остался. Пособие я выключил — включите, когда появятся.',
           'A new market: nobody here is out of work yet. I switched the allowance off — switch it on when they appear.',
@@ -1572,7 +1422,6 @@ export class GameScene extends Phaser.Scene {
       });
     } else if (next === this.cfg.world.screen) {
       // the camera goes up along the towers and through the steam: the quarter is one red speck on a dark planet
-      this.calls.list = [];
       this.chat = null;
       this.toTell.push(WORLD.quips.entry);
       this.globe.sync(this.globeTopology());
@@ -1585,17 +1434,14 @@ export class GameScene extends Phaser.Scene {
       hub.show(450);
     }
     // a screen where robot dogs work instead of people: Claude says how it goes once he has said his word on the purchase
-    if (this.cfg.sources.some((x) => x.screen === next && x.bribe) && !this.feed.said.squads) {
-      this.feed.said.squads = 1;
-      this.toTell.push(QUIPS.squads[0]);
-    }
+    if (market.introduceSquads) this.toTell.push(QUIPS.squads[0]);
     playSound('scale');
     logEvent(`scale_${next}`);
   }
 
   /** dollars per second of the whole conveyor at full flow; the usage limit is not counted: it is what a bonus is measured by */
   private flowIncome(): number {
-    return flowOf(this.state, this.cfg) * payOf(this.state, this.cfg);
+    return flowIncome(this.state, this.cfg);
   }
 
   /** where a source of work stands on the current screen, for squares and bubbles */
@@ -1620,37 +1466,29 @@ export class GameScene extends Phaser.Scene {
 
   /** A call or an inspection is answered with a «Да»: a bonus flies from that building. */
   private answer(i: number): void {
-    if (this.internClosed) return;
-    const e = takeEvent(this.calls, i);
-    if (!e) return;
-    const count = e.standup ? 2 : 1;
-    const worth = Math.floor(this.flowIncome() * EVENTS.worthSeconds * (1 + bonus(this.state, this.cfg, 'calls')));
-    this.state.money += count * worth;
-    this.state.presses++;
-    this.meta.calls += count;
+    const answer = answerCall(
+      this.calls, i, this.state, this.cfg, this.meta, this.feed.said, this.clock, this.internClosed,
+    );
+    if (!answer) return;
     playSound('yes', 3);
     logEvent('call');
-    if (e.standup) {
-      this.feed.said.standup = 1;
-      this.standupReplyUntil = this.clock + EVENTS.life / 2;
+    if (answer.kind === 'standup') {
+      this.standupReplyUntil = answer.replyUntil;
       logEvent('call');
       logEvent('standup_answered');
       this.saveGame();
       return;
     }
-    const p = this.placeOf(e.at);
+    const p = this.placeOf(answer.at);
     if (p) this.delivered(p.x, p.y - p.h / 2, 8);
-    if (this.calls.taken % 4 === 1) this.say('call');
+    if (answer.remark) this.say('call');
   }
 
   /** Claude hits the usage limit (M22): every session stops until it resets — or until more usage is bought. */
   private hitLimit(): void {
     const s = this.state;
-    const price = Math.floor(this.flowIncome() * limitData.priceSeconds);
-    const wait = limitData.wait * discount(s, this.cfg, 'limit');
-    s.limited = wait;
-    this.limitIn = this.rng.range(limitData.every[0], limitData.every[1]);
-    this.meta.limits++;
+    const { price, wait, nextIn } = startUsageLimit(s, this.cfg, this.meta, this.rng);
+    this.limitIn = nextIn;
     this.limitCard = true;
     playSound('waste');
     logEvent('limit');
@@ -1665,10 +1503,8 @@ export class GameScene extends Phaser.Scene {
     ];
     this.card.show({ head: L('claude — лимит', 'claude — limit'), title: L('Лимит исчерпан', 'Limit reached'), lines, options }, (i) => {
       this.limitCard = false;
-      if (i !== 0 || s.limited <= 0) return; // waiting: the countdown goes on by itself
-      s.money -= price;
+      if (i !== 0 || !buyUsage(s, price)) return; // waiting: the countdown goes on by itself
       this.lastMoney -= price;
-      s.limited = 0;
       playSound('buy');
       this.say('limit:paid', true);
     });
@@ -1676,33 +1512,29 @@ export class GameScene extends Phaser.Scene {
 
   /** the fake five-hour clock of the limit: «4:12:07» */
   private limitClock(): string {
-    const left = Math.ceil((this.state.limited / limitData.wait) * limitData.fakeHours * 3600);
-    const two = (n: number): string => String(n).padStart(2, '0');
-    return `${Math.floor(left / 3600)}:${two(Math.floor((left % 3600) / 60))}:${two(left % 60)}`;
+    return limitClock(this.state.limited);
   }
 
   /** One «Да» for everything that waits: the calls and inspections, and the pile of questions. Returns false when nothing waited. */
   private approveAll(): boolean {
-    const calls = this.calls.list.length;
-    while (this.calls.list.length) this.answer(0);
-    const signed = this.dim && this.signChip();
-    // …and the first volunteers at the gate of the towers
-    const s = this.state;
-    const let_in = this.onGrid && !s.gate && s.queue >= this.cfg.grid.unit;
-    if (let_in) {
-      s.gate = true;
-      s.presses++;
-      playSound('yes', 3);
-    }
-    return this.approvePile() || calls > 0 || signed || let_in;
+    return approvePending(
+      this.calls.list.length,
+      () => this.answer(0),
+      () => this.dim && this.signChip(),
+      () => {
+        const admitted = openVolunteerGate(this.state, this.cfg, this.stage);
+        if (admitted) playSound('yes', 3);
+        return admitted;
+      },
+      () => this.approvePile(),
+    );
   }
 
   /** The «Да» under an invention of the network: from now on it runs on the next generation of hardware. False — nothing waited for a signature. */
   private signChip(): boolean {
     const n = this.state.chips + 1;
-    const chip = takeChip(this.state, this.cfg);
+    const chip = signResearch(this.state, this.cfg, this.internClosed);
     if (!chip) return false;
-    this.state.presses++;
     playSound('all');
     this.paper.toast(`${TOWERS.signed}: № ${n}`, TOWERS.signedSub(chip.name));
     tell(this.feed, feedData, TOWERS.chips[chip.id] ?? TOWERS.signed);
@@ -1717,42 +1549,28 @@ export class GameScene extends Phaser.Scene {
   }
 
   private stepIntern(dt: number): void {
-    const incident = this.meta.intern;
-    if (!incident) return;
-    const credit = stepIncident(incident, dt);
+    const credit = settleIntern(this.state, this.meta, dt);
     if (credit > 0) {
-      this.state.money += credit;
       this.lastMoney += credit;
       logEvent('intern_credit');
       this.saveGame();
     }
-    if (laptopPhase(incident.elapsed) === 'done') delete this.meta.intern;
   }
 
   /** «Да всем»: the whole pile of questions is approved at once. Returns false when there is no pile. */
   private approvePile(): boolean {
-    if (this.internClosed) return false;
-    // a pile is taken whole: a key pressed too early answers the calls and nudges Claude, the pile keeps growing
-    if (this.stack.fill < 1) return false;
     const legend = this.legend;
-    const worth = stackWorth(this.stack, stackData, this.flowIncome()) * (legend ? stackData.legendMult : 1) * (1 + bonus(this.state, this.cfg, 'stack'));
-    takeStack(this.stack, stackData);
+    const hadIntern = !!this.meta.intern;
+    if (!approveStack(this.state, this.cfg, this.meta, this.stack, legend, this.internClosed)) return false;
     this.legend = null;
-    this.state.money += worth;
-    this.state.presses++;
-    this.meta.piles++;
     playSound(legend ? 'finale' : 'all');
     const from = this.stage === 2 ? this.deskSpot() : this.homeSpot();
     this.delivered(from[0], from[1], 14);
     logEvent(legend ? 'yes_legend' : 'yes_all');
     if (legend) {
-      if (!this.meta.legends.includes(legend.id)) {
-        this.meta.legends.push(legend.id);
-        if (legend.id === 'intern') {
-          this.meta.intern = startIncident(this.flowIncome());
-          this.saveGame();
-          logEvent('intern_started');
-        }
+      if (!hadIntern && this.meta.intern) {
+        this.saveGame();
+        logEvent('intern_started');
       }
       this.say('legend', true);
     } else if (this.stack.taken % 3 === 1) this.say('all');
@@ -1761,11 +1579,9 @@ export class GameScene extends Phaser.Scene {
 
   private press(): void {
     this.wake();
-    if (this.onBench) {
-      this.toss(false);
-      return;
-    }
-    if (this.internClosed || (this.stage >= 2 && this.approveAll())) return;
+    const action = routePress(this.onBench, this.internClosed, this.stage, () => this.approveAll());
+    if (action === 'bread') this.toss(false);
+    if (action !== 'task') return;
     const result = pressPipe(this.state, this.cfg);
     this.pressTimes.push(this.clock);
     this.lastPress = this.clock;
@@ -1810,22 +1626,12 @@ export class GameScene extends Phaser.Scene {
 
   /** sessions bought as farms of the given kinds */
   private farmSessions(ids: readonly string[]): number {
-    let n = 0;
-    for (const f of this.cfg.farms) if (ids.includes(f.id)) n += (this.state.farms[f.id] ?? 0) * f.sessions;
-    return n;
+    return farmSessions(this.state, this.cfg, ids);
   }
 
   /** a source picked by its share of the incoming flow */
   private pickSource(sources: readonly Source[]): Source | undefined {
-    const s = this.state;
-    let total = 0;
-    for (const src of sources) total += (s.owned[src.id] ?? 0) * src.inflow;
-    let pick = this.rng.range(0, total);
-    for (const src of sources) {
-      pick -= (s.owned[src.id] ?? 0) * src.inflow;
-      if (pick <= 0 && s.owned[src.id]) return src;
-    }
-    return undefined;
+    return pickIncomingSource(this.state.owned, sources, this.rng);
   }
 
   private step(dt: number): void {
@@ -1904,8 +1710,7 @@ export class GameScene extends Phaser.Scene {
         }
         // the Luddites: once robots work, a crowd marches on the factories now and then and breaks a part of them
         // …until every trade is taken: there is nothing left to defend, and Claude has promised the people something to do
-        const calm = this.won || !!this.feed.said[`done${this.stage}`];
-        const riots = calm ? null : stepRiots(this.riots, RIOTS, dt, unemploymentOf(s, this.cfg) >= RIOTS.from, this.rng);
+        const riots = streetRiot(this.riots, RIOTS, dt, this.won, !!this.feed.said[`done${this.stage}`], s, this.cfg, this.rng);
         if (riots === 'start') {
           hub.mob(8);
           playSound('waste');
@@ -1923,9 +1728,10 @@ export class GameScene extends Phaser.Scene {
       this.lastAutoSound = this.clock;
       playSound('auto');
     }
-    if (!this.won && !this.departing && finished(s, this.cfg)) {
+    const finale = finaleAction(s, this.cfg, this.stage, this.won, this.departing);
+    if (finale) {
       // on the planet the last purchase is a tower that leaves for Mars: the ending waits until it is there
-      if (this.onWorld) this.depart();
+      if (finale === 'depart') this.depart();
       else {
         this.won = true;
         playSound('finale');
@@ -1939,47 +1745,34 @@ export class GameScene extends Phaser.Scene {
     stepStack(this.stack, stackData, dt, s.noAsk);
     if (!hadPile && this.stack.fill > 0) {
       // now and then the pile is a legendary ticket; those not collected yet come first
-      const fresh = LEGENDS.filter((l) => !this.meta.legends.includes(l.id));
-      this.legend = this.rng.next() < stackData.legendChance + bonus(s, this.cfg, 'legend') ? this.rng.pick(fresh.length ? fresh : LEGENDS) : null;
+      this.legend = pickLegend(LEGENDS, this.meta.legends, stackData.legendChance + bonus(s, this.cfg, 'legend'), this.rng);
       this.question = this.legend ? this.legend.ask : this.rng.pick(QUESTIONS);
     }
 
     this.giveAwards(dt);
-    if (this.selfPlay && this.stack.fill >= 1) this.approvePile(); // Claude answers himself
-    if (this.selfPlay && this.dim) this.signChip(); // …and signs his own inventions
+    const auto = automaticWork(this.meta.auto, this.stack.fill, this.dim);
+    if (auto.approve) this.approvePile(); // Claude answers himself
+    if (auto.sign) this.signChip(); // …and signs his own inventions
 
     if (this.stage >= 2) {
       // calls and inspections from the employers of this screen
       // at the towers the requests come from the capsules, where now and then somebody wakes up, and from the gate
-      const owners = this.onGrid
-        ? [...(s.asleep >= this.cfg.grid.unit * 2 ? ['wake:0', 'wake:1'] : []), ...(s.gate ? ['gate'] : [])]
-        : this.onWorld
-          ? ['wake:0', 'wake:1']
-          : this.cfg.sources.filter((x) => this.onSale(x) && (s.owned[x.id] ?? 0) > 0 && this.placeOf(x.id)).map((x) => x.id);
-      if (this.calls.list.some((e) => e.standup && e.left <= dt)) {
-        this.feed.said.standup = 1;
+      const owners = callOwners(this.stage, s, this.cfg, x => this.onSale(x), id => !!this.placeOf(id));
+      const calls = advanceCalls(this.calls, this.feed.said, EVENTS, dt, {
+        stage: this.stage, jobs: s.owned.job ?? 0, owners, intern: !!this.meta.intern,
+        won: this.won, departing: this.departing, cardOpen: this.card.open, selfPlay: this.meta.auto,
+      }, this.rng);
+      if (calls.missed) {
         logEvent('standup_missed');
         this.saveGame();
       }
-      const standupReady = !this.feed.said.standup && !this.meta.intern && !this.won && !this.departing && !this.card.open
-        && (this.stage > 2 || owners.length >= 2 || (s.owned.job ?? 0) >= 2);
-      stepEvents(this.calls, EVENTS, dt, owners, (CALLS[String(this.stage)] ?? []).length, this.rng, standupReady);
-      if (this.selfPlay && this.calls.list.some((e) => e.left < EVENTS.life - 2)) this.answer(0);
+      if (calls.answer) this.answer(0);
 
-      // a placard of the picket is read out now and then — while no allowance is paid
-      if (this.slogan && (this.slogan.left -= dt) <= 0) this.slogan = null;
-      this.sloganIn -= dt;
-      if (this.sloganIn <= 0) {
-        this.sloganIn = this.rng.range(peopleData.sloganEvery[0], peopleData.sloganEvery[1]);
-        // at the towers nobody pickets: the line at the gate has its own talk
-        if (this.stage >= 3 && !this.dim && !s.allowance && owners.length) this.slogan = { at: this.rng.pick(owners), text: this.rng.pick(PICKET), left: peopleData.sloganLife };
-      }
-
-      // a strike: nobody is paid and enough people are out of work — a picket blocks the door of an employer
-      const doors = this.stage >= 3 && !this.dim ? owners.filter((id) => !s.strikes.includes(id)) : [];
-      const hit = stepStrikes(this.strike, STRIKES, dt, unemploymentOf(s, this.cfg), s.allowance > 0, s.strikes.length, doors, this.rng);
-      if (hit) {
-        s.strikes.push(hit);
+      const onStreet = this.stage >= 3 && !this.dim;
+      const picket = advancePlacard(this.slogan, this.sloganIn, dt, onStreet, s.allowance, owners, this.rng);
+      this.slogan = picket.placard;
+      this.sloganIn = picket.countdown;
+      if (streetStrike(this.strike, STRIKES, dt, onStreet, owners, s, this.cfg, this.rng)) {
         playSound('waste');
         this.say('strike', true);
         logEvent('strike');
@@ -1989,7 +1782,7 @@ export class GameScene extends Phaser.Scene {
       // the usage limit: hit now and then, it resets by itself
       this.limitIn -= dt;
       // …unless an employer taken whole has lifted it for good
-      if (this.limitIn <= 0 && !this.meta.intern && s.limited <= 0 && !this.card.open && discount(s, this.cfg, 'limit') > 0.01) this.hitLimit();
+      if (limitDue(this.limitIn, !!this.meta.intern, this.card.open, s, this.cfg)) this.hitLimit();
       if (this.limitCard && s.limited <= 0) {
         this.limitCard = false;
         this.card.hide();
@@ -2000,32 +1793,22 @@ export class GameScene extends Phaser.Scene {
     }
 
     // Claude notices a pause and a bottleneck that does not go away
-    if (!s.noAsk && s.ready >= 2 && this.clock - this.lastPress > IDLE_AFTER) {
+    if (idleAtTerminal(s, this.clock - this.lastPress, IDLE_AFTER)) {
       this.say('idle');
       this.lastPress = this.clock;
     }
     const neck = this.state.limited > 0 ? 'none' : this.neck();
-    if (neck !== this.neckKind) {
-      this.neckKind = neck;
-      this.neckFor = 0;
-    }
-    this.neckFor += dt;
-    if (neck !== 'none' && this.neckFor > NECK_AFTER) {
-      this.say(this.onWorld ? `neck8:${neck}` : `neck:${neck}`);
-      this.neckFor = -45; // and not again for a while
-    }
+    const warning = bottleneckRemark(neck, this.neckKind, this.neckFor, dt, NECK_AFTER, this.onWorld);
+    this.neckKind = neck;
+    this.neckFor = warning.elapsed;
+    if (warning.remark) this.say(warning.remark);
     stepFeed(this.feed, FEED, feedData, dt, this.stage, (id) => this.has(id), this.rng);
-    // every headline the ticker shows goes into its history
-    if (this.feed.news && this.feed.news !== this.meta.news[0]) {
-      this.meta.news.unshift(this.feed.news);
-      if (this.meta.news.length > NEWS_KEPT) this.meta.news.length = NEWS_KEPT;
-    }
+    rememberNews(this.meta.news, this.feed.news);
 
     // smoothed readings: what is slowest, how much comes in per second
-    const k = dt / SMOOTH;
-    this.avgBacklog += (s.backlog - this.avgBacklog) * k;
-    this.avgReady += (s.ready - this.avgReady) * k;
-    this.income = this.internClosed ? 0 : this.income + ((s.money - this.lastMoney) / dt - this.income) * k;
+    this.avgBacklog = smoothReading(this.avgBacklog, s.backlog, dt, SMOOTH);
+    this.avgReady = smoothReading(this.avgReady, s.ready, dt, SMOOTH);
+    this.income = this.internClosed ? 0 : smoothIncome(this.income, s.money - this.lastMoney, dt, SMOOTH);
     this.lastMoney = s.money;
     this.squares.step(dt);
   }
@@ -2054,25 +1837,7 @@ export class GameScene extends Phaser.Scene {
 
   /** The planet for a step: Claude says what he notices for the first time; the picture follows the numbers. */
   private stepWorld(dt: number): void {
-    const s = this.state;
-    const cfg = this.cfg;
-    const q = WORLD.quips;
-    const once = (key: keyof typeof q, when: boolean): void => {
-      if (!when || this.feed.said[`world:${key}`]) return;
-      this.feed.said[`world:${key}`] = 1;
-      this.toTell.push(q[key]);
-    };
-    const nodes = nodesOf(s, cfg);
-    const all = cfg.world.regions.reduce((n, x) => n + x, 0);
-    once('node', nodes >= 1 && s.asleep >= podsOf(s, cfg) * 0.999);
-    once('wire', wireOf(s, cfg) < Math.min(supplyOf(s, cfg), demandOf(s, cfg)) - 0.05);
-    once('sky', nodes >= 4);
-    once('half', nodes * 2 >= all);
-    once('ring', ringed(s, cfg));
-    once('housed', housed(s, cfg));
-    const chip = nextChip(s, cfg);
-    once('neuro', !!chip?.housed && labOf(s, cfg) >= 1);
-    once('ark', housed(s, cfg) && s.chips >= cfg.chips.length);
+    worldStories(this.state, this.cfg, this.feed.said, this.toTell);
     this.globe.sync(this.globeTopology());
     this.globe.step(dt);
   }
@@ -2098,27 +1863,7 @@ export class GameScene extends Phaser.Scene {
 
   /** What the picture of the planet shows now. */
   private globeTopology(): GlobeTopology {
-    const s = this.state;
-    const cfg = this.cfg;
-    const mod = (kind: Module['kind']): Module | undefined => cfg.modules.find((m) => m.kind === kind);
-    const owned = (kind: Module['kind']): number => s.modules[mod(kind)?.id ?? ''] ?? 0;
-    const can = (kind: Module['kind']): boolean => {
-      const m = mod(kind);
-      return !!m && owned(kind) < moduleRoom(s, cfg, m);
-    };
-    const quarter = (cfg.grid.pilot + cfg.grid.blocks.reduce((n, x) => n + x, 0)) * cfg.grid.unit;
-    return {
-      spans: owned('span'),
-      route: s.cableRoute,
-      nodes: nodesOf(s, cfg),
-      asleep: Math.max(0, s.asleep - quarter) / cfg.world.node,
-      threads: owned('thread'),
-      hot: this.neckKind === 'wire',
-      lab: nextChip(s, cfg) ? labOf(s, cfg) : -1,
-      canNode: can('node'),
-      canSpan: can('span'),
-      gone: owned('ark') > 0 && !this.departing,
-    };
+    return globeReadings(this.state, this.cfg, this.neckKind, this.departing);
   }
 
   /**
@@ -2126,18 +1871,7 @@ export class GameScene extends Phaser.Scene {
    * fill and can be turned up), the cable (it carries less than the towers give) or the towers themselves.
    */
   private worldNeck(): Neck {
-    const s = this.state;
-    const cfg = this.cfg;
-    const supply = supplyOf(s, cfg);
-    const wire = wireOf(s, cfg);
-    const asks = demandOf(s, cfg);
-    const dials = cfg.net.some((dial) => (dial.screen ?? cfg.grid.screen) <= this.stage && (s.net[dial.id] ?? 0) < dial.max);
-    if (asks <= Math.min(supply, wire) + 0.05) return dials ? 'net' : 'none';
-    if (wire < supply - 0.05) return 'wire';
-    const all = cfg.world.regions.reduce((n, x) => n + x, 0);
-    // a node that is filling up will give more by itself
-    if (podsOf(s, cfg) - s.asleep > cfg.grid.unit) return this.neckKind === 'pods' ? 'pods' : 'none';
-    return nodesOf(s, cfg) < all ? 'pods' : 'none';
+    return worldBottleneck(this.state, this.cfg, this.neckKind);
   }
 
   /**
@@ -2149,68 +1883,34 @@ export class GameScene extends Phaser.Scene {
     const s = this.state;
     const cfg = this.cfg;
     const unit = cfg.grid.unit;
-    if (!s.gate && s.queue >= unit && (this.gateFor += dt) > QUARTER.gateWait) s.gate = true;
-    const q = TOWERS.quips;
-    const once = (key: keyof typeof q, when: boolean): void => {
-      if (!when || this.feed.said[`towers:${key}`]) return;
-      this.feed.said[`towers:${key}`] = 1;
-      this.toTell.push(q[key]);
-    };
-    const blocks = blocksOf(s, cfg);
-    const free = podsOf(s, cfg) - s.asleep;
-    once('first', s.asleep >= unit);
-    once('queue', s.gate && free < unit * 0.5 && s.queue >= unit * 2.5);
-    once('fed', s.asleep >= unit && s.asleep >= wantedOf(s, cfg) - unit * 0.5);
-    once('empty', blocks >= 1 && free >= unit * 2 && s.queue < unit * 0.5);
-    once('tower', blocks >= 2);
-    once('full', blocks >= QUARTER.firstTower && free < unit * 0.5);
-    once('bolt', blocks > QUARTER.firstTower);
-    once('lab', this.labShown());
-    once('ready', labOf(s, cfg) >= 1);
-    once('housed', housed(s, cfg));
+    this.gateFor = waitAtGate(s, unit, this.gateFor, dt, QUARTER.gateWait);
+    towerStories(s, cfg, QUARTER.firstTower, this.labShown(), this.feed.said, this.toTell);
 
-    this.shiftIn -= dt;
-    if (this.shiftIn <= 0 && s.asleep >= unit * 12) {
-      this.shiftIn = QUARTER.shiftEvery * this.rng.range(0.8, 1.2);
+    const shift = nextShift(this.shiftIn, dt, s.asleep / unit, QUARTER.shiftEvery, this.rng);
+    this.shiftIn = shift.countdown;
+    if (shift.due) {
       this.towers.shift(3);
       this.swaps++;
       // the word is said when the first of them has walked out of the gate
       this.chat = { home: true, lines: this.rng.pick(TOWERS.shifts), t: -1 };
-      once('shift', true);
+      recordStory(this.feed.said, this.toTell, 'towers:shift', TOWERS.quips.shift, true);
       logEvent('shift');
     }
-    if (this.chat) {
-      this.chat.t += dt;
-      if (this.chat.t > QUARTER.talk) this.chat = null;
-    } else if ((this.chatIn -= dt) <= 0) {
-      this.chatIn = this.rng.range(QUARTER.talkEvery[0], QUARTER.talkEvery[1]);
-      if (s.queue >= unit * 3) this.chat = { home: false, lines: this.rng.pick(TOWERS.talk), t: 0 };
-    }
+    const chatter = advanceChat(this.chat, this.chatIn, dt, s.queue / unit, QUARTER.talk, QUARTER.talkEvery, this.rng);
+    this.chat = chatter.chat;
+    this.chatIn = chatter.countdown;
     this.towers.sync(this.towerTopology());
     this.towers.step(dt);
   }
 
   /** the network is seen inventing: it has got far enough with it, or has invented something already */
   private labShown(): boolean {
-    const s = this.state;
-    return !!nextChip(s, this.cfg) && (s.chips > 0 || labOf(s, this.cfg) >= 0.3);
+    return labShown(this.state, this.cfg);
   }
 
   /** What the picture of the towers shows now. */
   private towerTopology(): TowerTopology {
-    const s = this.state;
-    const cfg = this.cfg;
-    const unit = cfg.grid.unit;
-    return {
-      blocks: blocksOf(s, cfg),
-      asleep: s.asleep / unit,
-      queue: s.queue / unit,
-      fed: fedOf(s, cfg) / demandOf(s, cfg),
-      spare: s.asleep > wantedOf(s, cfg) + unit * 0.5,
-      lab: this.labShown() ? labOf(s, cfg) : -1,
-      chips: s.chips,
-      next: s.gate,
-    };
+    return towerReadings(this.state, this.cfg);
   }
 
   /**
@@ -2219,17 +1919,7 @@ export class GameScene extends Phaser.Scene {
    * has opened it is the player: the first volunteers wait for a «Да».
    */
   private gridNeck(): Neck {
-    const s = this.state;
-    const cfg = this.cfg;
-    const unit = cfg.grid.unit;
-    if (!s.gate) return s.queue >= unit ? 'you' : 'none';
-    const free = podsOf(s, cfg) - s.asleep;
-    const full = s.asleep >= wantedOf(s, cfg) - unit * 0.5;
-    if (full && cfg.net.some((dial) => (s.net[dial.id] ?? 0) < dial.max)) return 'net';
-    if (free < unit * 0.5) return blocksOf(s, cfg) < cfg.grid.blocks.length ? 'pods' : 'none';
-    if (s.queue < unit * 0.5) return 'people';
-    // the line is walking in: what was short a moment ago still is
-    return this.neckKind === 'pods' || this.neckKind === 'people' ? this.neckKind : 'none';
+    return towerBottleneck(this.state, this.cfg, this.neckKind);
   }
 
   /** Awards: checked once a second, announced one at a time when Claude is silent. */
@@ -2237,9 +1927,7 @@ export class GameScene extends Phaser.Scene {
     this.sinceAwards += dt;
     if (this.sinceAwards >= 1) {
       this.sinceAwards = 0;
-      for (const a of AWARDS) {
-        if (this.meta.awards.includes(a.id) || this.stat(a.stat) < a.min) continue;
-        this.meta.awards.push(a.id);
+      for (const a of earnAwards(AWARDS, this.meta.awards, (key) => this.stat(key))) {
         this.toTell.push(L(`Грамота «${a.name}». ${a.text}.`, `Award: “${a.name}”. ${a.text}.`));
         logEvent(`award_${a.id}`);
       }
@@ -2258,7 +1946,7 @@ export class GameScene extends Phaser.Scene {
     const s = this.state;
     const b = this.park;
     stepPipe(s, this.cfg, dt, laptopClosed);
-    this.income += ((s.money - this.lastMoney) / dt - this.income) * (dt / SMOOTH);
+    this.income = smoothIncome(this.income, s.money - this.lastMoney, dt, SMOOTH);
     this.lastMoney = s.money;
     const out = stepBench(b, benchData, dt);
     for (let i = 0; i < out.landed; i++) this.benchView.land(this.birdKind());
@@ -2269,42 +1957,23 @@ export class GameScene extends Phaser.Scene {
     }
     for (let i = 0; i < out.auto; i++) this.toss(true);
     this.meta.fed = b.fed;
-    // the headlines of the park go in turn; Claude's word fades as everywhere
-    this.benchNewsIn -= dt;
-    if (this.benchNewsIn <= 0) {
-      this.benchNewsIn = benchData.newsHold;
-      this.feed.news = BENCH.news[this.benchNews++ % BENCH.news.length];
-      if (this.feed.news !== this.meta.news[0]) {
-        this.meta.news.unshift(this.feed.news);
-        if (this.meta.news.length > NEWS_KEPT) this.meta.news.length = NEWS_KEPT;
-      }
-    }
-    this.feed.quiet = Math.max(0, this.feed.quiet - dt);
-    if (this.feed.quip && (this.feed.quipLeft -= dt) <= 0) this.feed.quip = '';
-    // nobody has to throw anything: after a long pause Claude says so, once in a while
-    if (!b.auto && b.waiting > 0 && this.clock - this.lastPress > benchData.idleAfter && !this.feed.quip) {
-      tell(this.feed, feedData, BENCH.quips.idle);
-      this.lastPress = this.clock;
-    }
+    const news = parkNews(this.feed, this.meta.news, this.benchNews, this.benchNewsIn, dt);
+    this.benchNews = news.index;
+    this.benchNewsIn = news.countdown;
+    if (parkIdle(this.feed, b.auto, b.waiting, this.clock - this.lastPress)) this.lastPress = this.clock;
     this.giveAwards(dt);
     this.squares.step(dt);
   }
 
   /** who flies in: pigeons at first, then the word about the bread reaches the others */
   private birdKind(): BirdKind {
-    const n = this.park.thrown;
-    const r = this.rng.next();
-    if (n >= 60 && r < 0.06) return 'seagull';
-    if (n >= 25 && r < 0.16) return 'duck';
-    if (n >= 6 && r < 0.36) return 'sparrow';
-    return 'pigeon';
+    return chooseBird(this.park.thrown, this.rng.next());
   }
 
   /** One whole slice of bread is thrown: by the player's «Да», or by Claude once he was asked to. */
   private toss(byClaude: boolean): void {
     const b = this.park;
-    const onWay = b.courier > 0;
-    const result = throwBread(b, benchData);
+    const { result, courierStarted, message } = tossSlice(b, this.state, this.meta, byClaude);
     if (result === 'empty') {
       if (byClaude) return;
       playSound('waste');
@@ -2313,7 +1982,7 @@ export class GameScene extends Phaser.Scene {
       return;
     }
     // the last slice of the loaf: the courier sets off
-    if (b.courier > 0 && !onWay) this.benchView.courier(benchData.delivery - 0.5);
+    if (courierStarted) this.benchView.courier(benchData.delivery - 0.5);
     if (result === 'fed') this.benchView.feed(byClaude ? 'dog' : 'hand');
     else this.benchView.drop(byClaude ? 'dog' : 'hand');
     if (byClaude) {
@@ -2323,15 +1992,12 @@ export class GameScene extends Phaser.Scene {
       }
       return;
     }
-    this.state.presses++;
-    this.meta.bread++;
     this.benchAsk++;
     this.lastPress = this.clock;
     playSound('yes', this.yesStreak++ % 5);
     this.benchUi.hit('thrown');
-    const line = BENCH.milestones[this.meta.bread] ?? (this.meta.bread === benchData.offerAfter && !b.auto ? BENCH.quips.offer : '');
-    if (line) {
-      tell(this.feed, feedData, line);
+    if (message) {
+      tell(this.feed, feedData, message);
       playSound('quip');
     }
     logEvent('bread');
@@ -2339,9 +2005,7 @@ export class GameScene extends Phaser.Scene {
 
   /** The next line of a kind, in turn: the first one first, and round again after the last. */
   private turn(key: string, lines: readonly string[]): string {
-    const n = this.feed.said[key] ?? 0;
-    this.feed.said[key] = n + 1;
-    return lines[n % lines.length];
+    return cycleLine(this.feed.said, key, lines);
   }
 
   /** The second and the third answer of the prompt on the bench: «Да, и больше не спрашивай» and «Нет». */
@@ -2351,20 +2015,17 @@ export class GameScene extends Phaser.Scene {
     const q = BENCH.quips;
     if (what === 'auto') {
       // Claude throws the bread himself — or gives it back: here it costs nothing either way
-      b.auto = !b.auto;
-      this.meta.benchAuto = b.auto;
-      if (b.auto) this.meta.feeder = true;
+      toggleFeeding(b, this.meta);
       this.benchView.auto(b.auto);
       playSound('buy', b.auto ? 5 : -5);
       tell(this.feed, feedData, b.auto ? this.turn('bench:on', q.autoOn) : this.turn('bench:off', q.autoOff));
       logEvent(b.auto ? 'bench_auto' : 'bench_hand');
     } else if (what === 'no') {
       // «Нет» is available at last: the bird that waited longest leaves without bread
-      const refused = refuseBird(b);
+      const { refused, useReply } = refuseFeeding(b, this.meta);
       if (refused) this.benchView.refuse();
-      this.meta.refused++;
       playSound('ui');
-      tell(this.feed, feedData, refused || this.meta.refused === 1 ? this.turn('bench:no', q.no) : q.noNobody);
+      tell(this.feed, feedData, useReply ? this.turn('bench:no', q.no) : q.noNobody);
       logEvent('bench_no');
     } else return;
     this.benchUi.flash(`bench:${what}`);
@@ -2377,7 +2038,7 @@ export class GameScene extends Phaser.Scene {
     const b = this.park;
     const t = BENCH;
     const ask = b.auto ? t.autoOn : b.loaf <= 0 ? t.noBread : b.waiting > 0 ? t.asks[this.benchAsk % t.asks.length] : t.noBirds;
-    const neck: BenchNeck = b.loaf <= 0 ? 'bread' : b.auto ? 'none' : b.waiting >= benchData.waitMax * 0.7 ? 'you' : b.waiting === 0 && b.thrown > 0 ? 'birds' : 'none';
+    const neck = benchBottleneck(b, benchData.waitMax);
     const fixed = (row: { title: string; sub: string; price: string }): ShopRow => ({ buy: '', title: row.title, sub: row.sub, count: '', price: row.price, state: 'owned' });
     const auto = b.auto ? t.rowAutoOn : t.rowAuto;
     this.benchUi.render({
@@ -2411,15 +2072,7 @@ export class GameScene extends Phaser.Scene {
     // at the towers there are no tasks to wait for and no sessions to buy
     if (this.onGrid) return this.gridNeck();
     if (this.onWorld) return this.worldNeck();
-    const cap = backlogCap(s, this.cfg);
-    const half = Math.ceil(this.cfg.tuning.readyMax / 2);
-    if (!s.noAsk && (this.avgReady >= 3 || (s.ready >= half && this.avgReady >= 1.5))) return 'you';
-    // the tray grows with the flow, so «piling up» and «empty» are shares of it
-    const piling = Math.max(2, cap * 0.1);
-    if (this.avgBacklog >= piling && s.backlog >= piling) return 'claude';
-    const empty = Math.max(0.7, cap * 0.035);
-    if (this.avgBacklog < empty && inflowOf(s, this.cfg) < claudeRate(s, this.cfg) + subagentRate(s, this.cfg)) return 'tasks';
-    return 'none';
+    return workBottleneck(s, this.cfg, this.avgBacklog, this.avgReady);
   }
 
   /**
@@ -2439,12 +2092,7 @@ export class GameScene extends Phaser.Scene {
     const drop = Math.round(slumpOf(s, cfg) * 100);
     const t = cfg.tuning;
     // what every step of the allowance would do to the income right now: the price it keeps and the orders it brings against what it costs
-    const gain = (step: number): number => {
-      const r = step / t.allowanceLevels;
-      return (1 - t.slump * u * (1 - r)) * (1 - t.allowance * step) * (neck === 'tasks' ? 1 + t.orders * r * u : 1);
-    };
-    let best = 0;
-    for (let step = 1; step <= t.allowanceLevels; step++) if (gain(step) > gain(best) + 0.005) best = step;
+    const best = bestAllowance(t, u, neck);
     const pct = (step: number): number => Math.round(t.allowance * step * 100);
     const now = s.allowance ? `${L('пособие', 'allowance')} ${pct(s.allowance)}%` : L('пособия нет', 'no allowance');
     const price = `${L('цена', 'price')} −${drop}%`;
@@ -2504,11 +2152,7 @@ export class GameScene extends Phaser.Scene {
     const s = this.state;
     const cfg = this.cfg;
     const t = TOWERS.rows;
-    const w = cfg.grid.watt;
-    const came = (s.asleep + s.queue) * w;
-    const places = podsOf(s, cfg) * w;
-    const asks = demandOf(s, cfg) - cfg.grid.old;
-    const top = Math.max(withPeople ? came : 0, places, asks, 1e-9);
+    const { came, places, asks, top } = towerPower(s, cfg, withPeople);
     const people: MeterRow = { label: t.people, value: gw(came), fill: came / top, hot: neck === 'people', note: neck === 'people' ? t.peopleShort : t.came(this.people(s.asleep + s.queue), this.people(s.queue)) };
     return [
       ...(withPeople ? [people] : []),
@@ -2525,13 +2169,12 @@ export class GameScene extends Phaser.Scene {
 
   /** people by the million, as the towers count them: «12 млн», «3,46 млрд» */
   private people(n: number): string {
-    const unit = this.cfg.grid.unit;
-    return n < unit / 2 ? '0' : short(Math.round(n / unit) * unit);
+    return short(roundedPopulation(n, this.cfg.grid.unit));
   }
 
   /** dollars a second every gigawatt that goes to work brings */
   private perGw(): number {
-    return this.flowIncome() / Math.max(1e-9, fedOf(this.state, this.cfg));
+    return revenuePerGW(this.state, this.cfg);
   }
 
   /** The robots of the factories (M27): how many work, what the lines make against what breaks. Nothing where there is no factory. */
@@ -2539,17 +2182,7 @@ export class GameScene extends Phaser.Scene {
     const s = this.state;
     const cfg = this.cfg;
     if (!cfg.lines.some((l) => l.screen === this.stage)) return [];
-    let working = 0;
-    let made = 0;
-    let broken = 0;
-    let short_: RobotKind | null = null;
-    for (const kind of ROBOT_KINDS) {
-      working += robotsOf(s, cfg, kind);
-      made += outputOf(s, cfg, kind);
-      broken += wearOf(s, cfg, kind);
-      // a kind that breaks faster than it is made, with jobs still to hold
-      if (wearOf(s, cfg, kind) > outputOf(s, cfg, kind) && robotsOf(s, cfg, kind) > 0) short_ = kind;
-    }
+    const { working, made, broken, shortage: short_ } = fleetReadings(s, cfg);
     return [
       {
         label: L('РОБОТЫ', 'ROBOTS'),
@@ -2597,43 +2230,12 @@ export class GameScene extends Phaser.Scene {
   }
 
   private hubTopology(): HubTopology {
-    const s = this.state;
-    const floors: Record<string, number> = {};
-    const live: Record<string, boolean> = {};
-    const dogs: Record<string, number> = {};
-    let taken = 0;
-    let total = 0;
-    for (const src of this.cfg.sources) {
-      if (src.screen !== this.stage) continue;
-      const owned = s.owned[src.id] ?? 0;
-      // a squad at work colours its unit in as it goes; robots take a `made` employer little by little
-      const job = jobOf(s, src.id);
-      floors[src.id] = (owned + (job ? 1 - job.left / job.total : 0)) / src.max;
-      // the robot dogs that took the jobs stay at the door, and so does the pack that is at work
-      if (src.work) dogs[src.id] = Math.min(3, owned) + (job ? 1 : 0);
-      if (job || (src.made && owned < src.max)) live[src.id] = true;
-      taken += owned;
-      total += src.max;
-    }
-    // the park fills up as the work is taken — while the allowance is paid; without it the people stand with placards
-    const slots = HUBS[this.stage]?.park?.slots.length ?? 0;
-    const rest = s.allowance && total ? Math.ceil((slots * taken) / total) : 0;
-    const struck: Record<string, boolean> = {};
-    for (const id of s.strikes) struck[id] = true;
-    return { floors, farms: s.farms, picket: !s.allowance, rest, live, dogs, struck, guards: this.stage === this.cfg.police.screen ? s.police : 0 };
+    return hubReadings(this.state, this.cfg, this.stage, HUBS[this.stage]?.park?.slots.length ?? 0);
   }
 
   /** the employers of a big screen with something left to take, the cheapest next unit first */
   private offer(): Source[] {
-    const s = this.state;
-    return this.cfg.sources
-      .filter((src) => src.screen === this.stage && !src.made && !jobOf(s, src.id) && (s.owned[src.id] ?? 0) < src.max)
-      .sort((a, b) => this.nextCost(a) - this.nextCost(b));
-  }
-
-  /** what the next step at an employer costs: the bribe that opens it, or its next unit */
-  private nextCost(src: Source): number {
-    return locked(this.state, src) ? bribeCost(this.state, this.cfg, src) : sourceCost(this.state, this.cfg, src);
+    return employersOnOffer(this.state, this.cfg, this.stage);
   }
 
   /** the shop lists the cheapest next units, `limit` of them; the map sells every building */
@@ -2665,7 +2267,7 @@ export class GameScene extends Phaser.Scene {
     const more = 1 + bonus(s, this.cfg, 'lines');
     return this.cfg.lines.filter((l) => l.screen === this.stage).map((l) => {
       const owned = s.lines[l.id] ?? 0;
-      const surge = s.surge[l.id] ?? 1;
+      const surge = surgeMultiplier(s, l.id);
       const note = surge > 1.02 ? `${L('дефицит', 'shortage')} +${Math.round((surge - 1) * 100)}%, ${COOLING}` : l.note;
       return this.row(l.name, `+${short(l.rate * more)} ${ROBOT_WORDS[l.kind].of}${PER_S} · ${note}`, owned ? `×${owned}` : '', `line:${l.id}`, lineCost(s, this.cfg, l));
     });
@@ -2675,7 +2277,7 @@ export class GameScene extends Phaser.Scene {
   private policeRow(): ShopRow {
     const s = this.state;
     const p = this.cfg.police;
-    const off = Math.round((1 - (1 - p.guard) ** s.police) * 100);
+    const off = Math.round((1 - riotShare(s, this.cfg, 1)) * 100);
     if (s.police >= p.max) return { buy: '', title: p.name, sub: L(`восстание ломает на ${off}% меньше`, `a riot breaks ${off}% less`), count: `×${s.police}`, price: '', state: 'owned' };
     return this.row(p.name, s.police ? `${p.note} · ${L('уже', 'already')} −${off}%` : p.note, s.police ? `×${s.police}` : '', 'police', policeCost(s, this.cfg));
   }
@@ -2688,11 +2290,11 @@ export class GameScene extends Phaser.Scene {
       const src = targetOf(s, this.cfg, kind);
       if (!src) continue;
       const owned = s.owned[src.id] ?? 0;
-      const left = (src.max - owned) * (src.staff ?? 0);
+      const { remaining: left, percent } = staffingProgress(owned, src);
       // the count runs every frame: it has a line of its own, so the row never changes its height
       const perk = src.perk ? `\n★ ${src.perk.text}` : '';
       const who = ROBOT_WORDS[kind].many;
-      rows.push({ buy: '', title: `${who[0].toUpperCase()}${who.slice(1)} → ${src.tag} · ${Math.floor((owned / src.max) * 100)}%`, sub: `${L(`ещё ${short(left, 1)} человек`, `${short(left, 1)} more people`)}${perk}`, count: '', price: '', state: 'owned' });
+      rows.push({ buy: '', title: `${who[0].toUpperCase()}${who.slice(1)} → ${src.tag} · ${percent}%`, sub: `${L(`ещё ${short(left, 1)} человек`, `${short(left, 1)} more people`)}${perk}`, count: '', price: '', state: 'owned' });
     }
     const t = HUB_TEXT[this.stage];
     return rows.length ? rows : [{ buy: '', title: t.doneTitle, sub: t.doneSub, count: '', price: '', state: 'owned' }];
@@ -2707,7 +2309,7 @@ export class GameScene extends Phaser.Scene {
       const count = owned && !f.max ? `×${owned}` : '';
       const of = f.max ? `${owned} ${OF} ${f.max} · ` : '';
       if (owned >= (f.max ?? Infinity)) return { buy: '', title: f.name, sub: L('выкуплено всё', 'all bought up'), count: `×${owned}`, price: '', state: 'owned' };
-      const surge = s.surge[f.id] ?? 1;
+      const surge = surgeMultiplier(s, f.id);
       // a shortage is said in the row itself: the price has gone up and will come down
       const note = surge > 1.02 ? `${L('дефицит', 'shortage')}: +${Math.round((surge - 1) * 100)}% ${L('к цене', 'to the price')}, ${COOLING}` : f.note;
       return this.row(f.name, `+${flowText(f.sessions * perSession)}${PER_S} · ${of}${note}`, count, `farm:${f.id}`, farmCost(s, this.cfg, f));
@@ -2732,14 +2334,11 @@ export class GameScene extends Phaser.Scene {
     const t = TOWERS;
     const g = cfg.grid;
     const m = cfg.modules.find((x) => x.kind === 'block')!;
-    const built = blocksOf(s, cfg);
-    if (built >= g.blocks.length) return { buy: '', title: t.blocksDone[0], sub: t.blocksDone[1], count: `${built} ${OF} ${built}`, price: '', state: 'owned' };
-    const add = g.blocks[built];
-    const rings = QUARTER.firstTower - 1;
-    const title = built === 0 ? t.row : t.tower(Math.floor((built - 1) / rings) + 1);
-    const count = built === 0 ? '' : `${((built - 1) % rings) + 1} ${OF} ${rings}`;
-    // a block bought while nobody waits will stand dark: the row says so before it is bought
-    const idle = s.queue < g.unit * 0.5 && podsOf(s, cfg) - s.asleep >= g.unit;
+    const block = nextBlock(s, cfg, QUARTER.firstTower);
+    if (!block) return { buy: '', title: t.blocksDone[0], sub: t.blocksDone[1], count: `${g.blocks.length} ${OF} ${g.blocks.length}`, price: '', state: 'owned' };
+    const { built, add, idle } = block;
+    const title = built === 0 ? t.row : t.tower(block.tower);
+    const count = built === 0 ? '' : `${block.ring} ${OF} ${block.rings}`;
     const places = `+${this.people(add * g.unit)} ${t.places}`;
     return this.row(title, idle ? `${places} · ${t.blockIdle}` : `${places} · +${gw(add * g.unit * g.watt)} · ${t.ofBlocks(built + 1, g.blocks.length)}`, count, `mod:${m.id}`, moduleCost(s, m));
   }
@@ -2749,11 +2348,8 @@ export class GameScene extends Phaser.Scene {
     const s = this.state;
     const cfg = this.cfg;
     const t = TOWERS;
-    const hungry = this.onWorld ? demandOf(s, cfg) > Math.min(supplyOf(s, cfg), wireOf(s, cfg)) + 0.05 : s.asleep < wantedOf(s, cfg) - cfg.grid.unit * 0.5;
-    return cfg.net
-      // a dial is sold from its screen on; on the planet the ones turned all the way at the towers are not shown any more
-      .filter((dial) => (dial.screen ?? cfg.grid.screen) <= this.stage && (!this.onWorld || !!dial.screen || (s.net[dial.id] ?? 0) < dial.max))
-      .filter((dial) => all || dial.yield === 1 || (s.net[dial.id] ?? 0) > 0)
+    const hungry = underpowered(s, cfg, this.onWorld);
+    return networkDials(s, cfg, this.stage, all)
       .map((dial) => {
         const level = s.net[dial.id] ?? 0;
         const count = `${level} ${OF} ${dial.max}`;
@@ -2768,8 +2364,8 @@ export class GameScene extends Phaser.Scene {
   /** `always` — show the row even when there is nothing faster to buy (the terminal does) */
   private planRows(always: boolean): ShopRow[] {
     const s = this.state;
-    const next = this.cfg.plans[s.plan.index + 1];
-    if (next && (next.screen ?? 1) <= this.stage) {
+    const next = planOnSale(s, this.cfg, this.stage);
+    if (next) {
       return [this.row(planTitle(next.name), `${tasksPhrase(next.rate)}${PER_S} · ${next.note}`, '', 'plan', next.price)];
     }
     if (!always) return [];
@@ -2887,55 +2483,7 @@ export class GameScene extends Phaser.Scene {
 
   /** what an award counts: the numbers of the game by name */
   private stat(name: string): number {
-    const s = this.state;
-    if (name.startsWith('own:')) return s.owned[name.slice(4)] ?? 0;
-    if (name.startsWith('farm:')) return s.farms[name.slice(5)] ?? 0;
-    if (name.startsWith('full:')) {
-      const screen = Number(name.slice(5));
-      return this.cfg.sources.filter((x) => x.screen === screen && (s.owned[x.id] ?? 0) >= x.max).length;
-    }
-    if (name.startsWith('hired:')) {
-      const screen = Number(name.slice(6));
-      return this.cfg.sources.filter((x) => x.screen === screen && s.owned[x.id]).length;
-    }
-    const stats: Record<string, number> = {
-      closed: s.closedHere + s.closedBySubagents,
-      presses: s.presses,
-      wasted: s.wasted,
-      money: s.money,
-      plan: s.plan.index,
-      noask: s.noAsk ? 1 : 0,
-      subs: s.subagents,
-      grade: s.grade,
-      scale: s.scale,
-      share: shareOf(s, this.cfg),
-      piles: this.meta.piles,
-      legends: this.meta.legends.length,
-      reports: this.meta.reports,
-      calls: this.meta.calls,
-      limits: this.meta.limits,
-      managers: s.managers.length,
-      riots: this.meta.riots,
-      police: s.police,
-      replaced: replacedOf(s, this.cfg),
-      whole: this.cfg.sources.filter((x) => x.perk && whole(s, x)).length,
-      allowance: s.allowance ? 1 : 0,
-      blocks: blocksOf(s, this.cfg),
-      asleep: s.asleep / this.cfg.grid.unit,
-      housed: this.dim && quartered(s, this.cfg) ? 1 : 0,
-      nodes: nodesOf(s, this.cfg),
-      planet: this.onWorld && housed(s, this.cfg) ? 1 : 0,
-      ring: ringed(s, this.cfg) ? 1 : 0,
-      ark: this.cfg.modules.some((m) => m.kind === 'ark' && (s.modules[m.id] ?? 0) > 0) ? 1 : 0,
-      net: this.cfg.net.reduce((n, dial) => n + (s.net[dial.id] ?? 0), 0),
-      chips: s.chips,
-      swaps: this.swaps,
-      bread: this.meta.bread,
-      fed: this.meta.fed,
-      refused: this.meta.refused,
-      feeder: this.meta.feeder ? 1 : 0,
-    };
-    return stats[name] ?? 0;
+    return statistic(this.state, this.cfg, this.meta, this.stage, this.swaps, name);
   }
 
   /** the pile of questions as Claude's card shows it; nothing when there is no pile */
@@ -2944,7 +2492,7 @@ export class GameScene extends Phaser.Scene {
     const asking = Math.max(1, Math.round(this.stack.fill * (sessionsOf(this.state, this.cfg) + 1)));
     return {
       text: `${this.legend ? L('Легендарный тикет', 'Legendary ticket') : this.count(asking, ASKING_FORMS)}: ${L(`«${this.question}»`, `“${this.question}”`)}`,
-      worth: short(stackWorth(this.stack, stackData, this.flowIncome()) * (this.legend ? stackData.legendMult : 1) * (1 + bonus(this.state, this.cfg, 'stack'))),
+      worth: short(pileWorth(this.state, this.cfg, this.stack, !!this.legend)),
       fill: this.stack.fill,
       legend: this.legend !== null,
     };
@@ -2952,40 +2500,28 @@ export class GameScene extends Phaser.Scene {
 
   /** Ask once per stage. If postponed, the same purchase remains available in the shop. */
   private stepManager(dt: number): boolean {
-    if (!this.state.managers.includes(this.stage) || this.meta.managerOff || this.meta.intern || this.state.limited > 0 || this.onBench) return false;
-    this.sinceManager += dt;
-    if (this.sinceManager < managerTuning.period) return false;
-    this.sinceManager = 0;
+    const timer = managerClock(this.sinceManager, dt, this.state, this.stage, this.meta, this.onBench);
+    this.sinceManager = timer.elapsed;
+    if (!timer.due) return false;
     this.managerDecision = this.inviteTransition() ? null : planManager(this.state, this.cfg);
     return this.managerDecision?.affordable ? this.buy(this.managerDecision.key, true) : false;
   }
 
   private inviteTransition(): boolean {
-    const s = this.state;
-    let action = 'scale';
-    const next = this.cfg.scales[s.scale];
-    let name = next?.name;
-    let price = scaleCost(s, this.cfg);
-    if (this.onWorld) {
-      const ark = this.cfg.modules.find(m => m.kind === 'ark');
-      if (!ark || (s.modules[ark.id] ?? 0) >= moduleRoom(s, this.cfg, ark)) return false;
-      action = 'mod:' + ark.id;
-      name = ark.name;
-      price = moduleCost(s, ark);
-    } else if (!next || !scaleReady(s, this.cfg)) return false;
-    if (!name || s.money < price) return false;
+    const offer = transitionOffer(this.state, this.cfg, this.onWorld);
+    if (!offer) return false;
+    const { name, price, action } = offer;
     const key = 'manager-ready-' + this.stage;
-    if (this.feed.said[key] || this.card.open || this.cine || this.departing || this.won
-      || this.meta.intern || this.calls.list.length || this.standupReplyUntil > this.clock) return true;
+    if (!canInvite({
+      alreadyAsked: !!this.feed.said[key], openCard: this.card.open, cinematic: this.cine,
+      departing: this.departing, won: this.won, incident: !!this.meta.intern,
+      calls: this.calls.list.length, replyUntil: this.standupReplyUntil, clock: this.clock,
+    })) return true;
     this.card.show({
       head: L('Клод — переход', 'Claude — next stage'), title: name,
       lines: [L(`Всё готово. На счёте есть $${short(price)}. Подтверждаете?`, `Everything is ready. We have $${short(price)}. Proceed?`)],
       options: [{ label: YES }, { label: L('Позже', 'Later') }],
-    }, i => {
-      this.feed.said[key] = 1;
-      if (i === 0) this.buy(action);
-      this.saveGame();
-    });
+    }, i => answerTransition(this.feed.said, key, i, () => this.buy(action), () => this.saveGame()));
     return true;
   }
 
@@ -3054,7 +2590,7 @@ export class GameScene extends Phaser.Scene {
 
   /** what it costs to settle one strike: a few seconds of the income */
   private strikePrice(): number {
-    return Math.max(1, Math.floor(this.flowIncome() * STRIKES.priceSeconds));
+    return strikePrice(this.flowIncome());
   }
 
   /** the line under the money: the grade and what one task pays */
@@ -3163,7 +2699,7 @@ export class GameScene extends Phaser.Scene {
           small: true,
           buy: here ? undefined : `aim:${src.id}`,
           can: true,
-          html: `${src.tag} · ${Math.floor((owned / src.max) * 100)}%<br><b>${here ? L(`▶ сюда идут ${robots.many}`, `▶ ${robots.many} incoming`) : L(`ждёт ${robots.of} · клик`, `needs ${robots.many} · click`)}</b>${perk}`,
+          html: `${src.tag} · ${staffingProgress(owned, src).percent}%<br><b>${here ? L(`▶ сюда идут ${robots.many}`, `▶ ${robots.many} incoming`) : L(`ждёт ${robots.of} · клик`, `needs ${robots.many} · click`)}</b>${perk}`,
         });
         continue;
       }
@@ -3230,19 +2766,13 @@ export class GameScene extends Phaser.Scene {
     const g = cfg.grid;
     const t = TOWERS;
     const neck = s.limited > 0 ? 'none' : this.neck();
-    const blocks = blocksOf(s, cfg);
-    const dials = cfg.net.reduce((n, dial) => n + (s.net[dial.id] ?? 0), 0);
-    const hires = cfg.modules.filter((m) => m.kind === 'hire').reduce((n, m) => n + (s.modules[m.id] ?? 0), 0);
-    // what has been met so far: people — once the row stands, the network — once it has eaten its fill, the rest — with the first tower
-    const seenPeople = blocks >= 1 || hires > 0;
-    const seenNet = dials > 0 || s.asleep >= (g.appetite - g.old) / g.watt - g.unit * 0.5;
-    const grown = blocks >= QUARTER.firstTower;
+    const { blocks, seenPeople, seenNet, grown, park } = towerFacilities(s, cfg, QUARTER.firstTower);
 
     const tags: BlueprintTag[] = [];
     const [sx, sy] = this.towers.signSpot();
     tags.push({ x: sx, y: sy, mid: true, small: true, html: t.sign });
     const [px, py] = this.towers.parkSpot();
-    tags.push({ x: px, y: py, small: true, html: t.park(short(Math.max(0, replacedOf(s, cfg) - s.asleep - s.queue))) });
+    tags.push({ x: px, y: py, small: true, html: t.park(short(park)) });
     if (s.queue >= g.unit * 0.5) {
       const [qx, qy] = this.towers.queueSpot();
       tags.push({ x: qx, y: qy, mid: true, small: true, html: t.waiting(this.people(s.queue)) });
@@ -3305,13 +2835,7 @@ export class GameScene extends Phaser.Scene {
     const s = this.state;
     const cfg = this.cfg;
     const t = WORLD.rows;
-    const gives = supplyOf(s, cfg) - cfg.grid.old;
-    const carries = wireOf(s, cfg);
-    const asks = demandOf(s, cfg) - cfg.grid.old;
-    const top = Math.max(gives, carries, asks, 1e-9);
-    const room = cfg.modules.some((m) => m.kind === 'node' && (s.modules[m.id] ?? 0) < moduleRoom(s, cfg, m));
-    const threads = cfg.modules.some((m) => m.kind === 'thread' && (s.modules[m.id] ?? 0) < m.max);
-    const count = cfg.modules.filter((m) => m.kind === 'thread').reduce((n, m) => n + (s.modules[m.id] ?? 0), 1);
+    const { gives, carries, asks, top, room, threads, count } = worldPower(s, cfg);
     return [
       { label: t.towers, value: gw(gives), fill: gives / top, hot: neck === 'pods', note: neck === 'pods' ? (room ? t.towersShort : t.towersReach) : t.slept(this.people(s.asleep), this.people(podsOf(s, cfg))) },
       { label: t.cable, value: gw(carries), fill: carries / top, hot: neck === 'wire', note: neck === 'wire' ? (threads ? t.cableShort : t.cableRing) : t.carries(count, ringed(s, cfg)) },

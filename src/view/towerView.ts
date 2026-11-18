@@ -1,3 +1,4 @@
+import { along, ellipse, length } from './logic/geometry';
 import type Phaser from 'phaser';
 import type { Rng } from '../core/rng';
 import { Walkers } from './walkers';
@@ -629,32 +630,6 @@ function rowCable(x: number): Pt[] {
 /** …and from a tower: down from its foot, under the walkway and into the network */
 function towerCable(t: { x: number }): Pt[] {
   return [[t.x, ROAD], [t.x, ROAD + 38], [NET.x - NET.h * 0.62, ROAD + 38], [NET.x - NET.h * 0.62, ROAD + 4], [NET.x - NET.h * 0.4, ROAD - 14]];
-}
-
-function length(pts: readonly Pt[]): number {
-  let n = 0;
-  for (let i = 1; i < pts.length; i++) n += Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]);
-  return n;
-}
-
-/** the point `d` px along a broken line */
-function along(pts: readonly Pt[], d: number): Pt {
-  for (let i = 1; i < pts.length; i++) {
-    const seg = Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]);
-    if (d <= seg) return [pts[i - 1][0] + ((pts[i][0] - pts[i - 1][0]) * d) / seg, pts[i - 1][1] + ((pts[i][1] - pts[i - 1][1]) * d) / seg];
-    d -= seg;
-  }
-  return pts[pts.length - 1];
-}
-
-/** points of an ellipse arc */
-function ellipse(cx: number, cy: number, rx: number, ry: number, a0: number, a1: number, n: number): Pt[] {
-  const pts: Pt[] = [];
-  for (let i = 0; i <= n; i++) {
-    const a = a0 + ((a1 - a0) * i) / n;
-    pts.push([cx + Math.cos(a) * rx, cy + Math.sin(a) * ry]);
-  }
-  return pts;
 }
 
 function path(g: Phaser.GameObjects.Graphics, pts: readonly Pt[], close: boolean): void {

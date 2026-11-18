@@ -1,7 +1,9 @@
 import './terminal.css';
 import type { Prompt } from '../../content/tickets';
-import { L, LANG } from '../../core/lang';
-import { LOCALE, PER_S } from '../format';
+import { L } from '../../core/lang';
+import { LOCALE, PER_S, tasksPhrase } from '../format';
+export { tasksPhrase } from '../format';
+import { terminalState } from '../logic/terminalState';
 import type { Rect } from '../../view/squares';
 
 /** what runs short: the first three — before the towers, the next three — at them (capsules, people, the appetite of the network), the cable — on the planet */
@@ -84,17 +86,6 @@ const fmt2 = new Intl.NumberFormat(LOCALE, { maximumFractionDigits: 2 });
 const esc = (s: string): string => s.replace(/&/g, '&amp;').replace(/</g, '&lt;');
 /** "+12" in a log line is shown green */
 const logLine = (s: string): string => `⎿ ${esc(s).replace(/(\+\d[\d\s,]*)/g, '<span class="ok">$1</span>')}`;
-
-/** "0,75 задачи", "2 задачи", "15 задач", "21 задача"; English: "0.75 tasks", "1 task", "15 tasks" */
-export function tasksPhrase(count: number): string {
-  const n = Math.abs(count);
-  if (LANG === 'en') return `${fmt2.format(count)} ${n === 1 ? 'task' : 'tasks'}`;
-  let word = 'задач';
-  if (!Number.isInteger(n)) word = 'задачи';
-  else if (n % 10 === 1 && n % 100 !== 11) word = 'задача';
-  else if (n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 12 || n % 100 > 14)) word = 'задачи';
-  return `${fmt2.format(count)} ${word}`;
-}
 
 const NECK_TEXT: Record<Neck, string> = L(
   {
@@ -230,8 +221,7 @@ export function createTerminal(layer: HTMLElement): TerminalUi {
       set('pay', `${L('за задачу', 'per task')} +$${fmt2.format(v.pay)}`);
 
       // the prompt box: asking, working, out of work, or no longer asking at all
-      const working = v.backlog >= 1;
-      const state = v.noAsk ? 'noask' : v.ready > 0 ? 'asking' : working ? 'working' : 'empty';
+      const state = terminalState(v);
       if (last.state !== state) {
         last.state = state;
         ask.className = `tm-ask ${state}`;

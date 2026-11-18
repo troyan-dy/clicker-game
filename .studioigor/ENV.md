@@ -44,7 +44,7 @@ TEST: npm test
 BUILD: npm run build
 CAPTURE: npm run build:gym && node tools/capture.mjs --dir dist-gym --url "/?gym=hello" --out .studioigor/captures/hello --duration 5 --every 1 --inputs tools/inputs/hello.json --wait-for "window.__GAME__?.ready" --seed 7
 EDITOR: none — the code is in the repository
-DEPLOY: python tools/publish.py — собирает релиз и отправляет `dist/` веткой gh-pages в origin (GitHub Pages: https://troyan-dy.github.io/yes-driven-development/); только по слову пользователя
+DEPLOY: GitHub Actions проверяет покрытие и сборку в PR. После слияния в master повторяет проверки и публикует dist/ на https://troyan-dy.github.io/yes-driven-development/. Для повторной публикации текущей версии master вручную — python tools/publish.py.
 
 ## Pitfalls
 - Windows: скрипты студии запускать с `PYTHONIOENCODING=utf-8 PYTHONUTF8=1`; `refs.py` — ещё и с `PYTHONPATH=.studioigor/tools/pyshim` (заглушка fcntl)

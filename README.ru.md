@@ -53,7 +53,10 @@ Yes-Driven Development (YDD) — методология разработки, в
 npm install
 npm run dev      # игра на http://localhost:5173/
 npm run build    # сборка в dist/
+npm run test:coverage  # юнит-тесты и проверка 100% покрытия игровой логики
 ```
+
+Изменения входят в `master` через PR. GitHub проверяет тесты, 100% покрытия игровой логики по каждому файлу и сборку. После слияния те же проверки запускаются на `master`, затем GitHub Pages обновляет игру по прежней ссылке.
 
 Картинки этой страницы сняты с самой игры: `npm run build:gym && node tools/readme.mjs`.
 
