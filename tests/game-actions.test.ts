@@ -5,9 +5,27 @@ import { createBench } from '../src/systems/bench/bench';
 import { createFeed, nextRemark } from '../src/systems/feed/feed';
 import { createPipe } from '../src/systems/pipeline/pipeline';
 import { freshMeta } from '../src/systems/save/save';
-import { openVolunteerGate, settleIntern, signResearch } from '../src/game/logic/approval';
+import { approvePending, openVolunteerGate, routePress, settleIntern, signResearch } from '../src/game/logic/approval';
 import { refuseFeeding, toggleFeeding, tossSlice } from '../src/game/logic/parkActions';
 import { cfg } from './fixtures/pipe';
+
+it('lets one Yes handle all pending work without spending it on a normal task too', () => {
+  const seen: string[] = [];
+  const pending = (calls: number, chip: boolean, gate: boolean, pile: boolean) => () =>
+    approvePending(calls, () => { seen.push('call'); }, () => { seen.push('chip'); return chip; },
+      () => { seen.push('gate'); return gate; }, () => { seen.push('pile'); return pile; });
+  const all = pending(2, true, true, true);
+  expect(routePress(true, true, 8, all)).toBe('bread');
+  expect(routePress(false, true, 8, all)).toBe('blocked');
+  expect(routePress(false, false, 1, all)).toBe('task');
+  expect(seen).toEqual([]);
+  expect(routePress(false, false, 8, all)).toBe('batch');
+  expect(seen).toEqual(['call', 'call', 'chip', 'gate', 'pile']);
+  expect(routePress(false, false, 2, pending(0, false, false, false))).toBe('task');
+  for (const only of ['calls', 'chip', 'gate', 'pile']) {
+    expect(routePress(false, false, 8, pending(only === 'calls' ? 1 : 0, only === 'chip', only === 'gate', only === 'pile'))).toBe('batch');
+  }
+});
 
 it('opens the volunteer gate only once and counts research approval only when signed', () => {
   const state = createPipe(cfg);

@@ -2,6 +2,20 @@ import { laptopPhase, stepIncident } from '../../systems/intern/incident';
 import { takeChip, type PipeConfig, type PipeState } from '../../systems/pipeline/pipeline';
 import type { SavedMeta } from '../../systems/save/save';
 
+/** An accepted batch consumes the press, even if an ordinary task is ready too. */
+export function routePress(onBench: boolean, closed: boolean, stage: number, approvePending: () => boolean) {
+  if (onBench) return 'bread';
+  if (closed) return 'blocked';
+  return stage >= 2 && approvePending() ? 'batch' : 'task';
+}
+
+export function approvePending(calls: number, answerFirst: () => void, sign: () => boolean, admit: () => boolean, takePile: () => boolean): boolean {
+  for (let i = 0; i < calls; i++) answerFirst();
+  const signed = sign();
+  const admitted = admit();
+  return takePile() || calls > 0 || signed || admitted;
+}
+
 export function signResearch(state: PipeState, cfg: PipeConfig) {
   const chip = takeChip(state, cfg);
   if (chip) state.presses++;

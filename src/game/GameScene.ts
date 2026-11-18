@@ -4,7 +4,7 @@ import { towerBottleneck, workBottleneck, worldBottleneck } from './logic/bottle
 import { buyOnStage, employersOnOffer, onSale, planOnSale } from './logic/market';
 import { chooseBird, earnAwards, hasAcquired, pickIncomingSource, statistic } from './logic/progress';
 import Phaser from 'phaser';
-import { openVolunteerGate, settleIntern, signResearch } from './logic/approval';
+import { approvePending, openVolunteerGate, routePress, settleIntern, signResearch } from './logic/approval';
 import { refuseFeeding, toggleFeeding, tossSlice } from './logic/parkActions';
 import { nextRemark } from '../systems/feed/feed';
 import { createGameConfig } from './logic/config';
@@ -1559,13 +1559,17 @@ export class GameScene extends Phaser.Scene {
 
   /** One «Да» for everything that waits: the calls and inspections, and the pile of questions. Returns false when nothing waited. */
   private approveAll(): boolean {
-    const calls = this.calls.list.length;
-    while (this.calls.list.length) this.answer(0);
-    const signed = this.dim && this.signChip();
-    // …and the first volunteers at the gate of the towers
-    const admitted = openVolunteerGate(this.state, this.cfg, this.stage);
-    if (admitted) playSound('yes', 3);
-    return this.approvePile() || calls > 0 || signed || admitted;
+    return approvePending(
+      this.calls.list.length,
+      () => this.answer(0),
+      () => this.dim && this.signChip(),
+      () => {
+        const admitted = openVolunteerGate(this.state, this.cfg, this.stage);
+        if (admitted) playSound('yes', 3);
+        return admitted;
+      },
+      () => this.approvePile(),
+    );
   }
 
   /** The «Да» under an invention of the network: from now on it runs on the next generation of hardware. False — nothing waited for a signature. */
@@ -1617,11 +1621,9 @@ export class GameScene extends Phaser.Scene {
 
   private press(): void {
     this.wake();
-    if (this.onBench) {
-      this.toss(false);
-      return;
-    }
-    if (this.internClosed || (this.stage >= 2 && this.approveAll())) return;
+    const action = routePress(this.onBench, this.internClosed, this.stage, () => this.approveAll());
+    if (action === 'bread') this.toss(false);
+    if (action !== 'task') return;
     const result = pressPipe(this.state, this.cfg);
     this.pressTimes.push(this.clock);
     this.lastPress = this.clock;
