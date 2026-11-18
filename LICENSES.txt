@@ -1,4 +1,4 @@
-Yes-Driven Development 1.3.0 — third-party licences
+Yes-Driven Development 1.4.0 — third-party licences
 
 Music: "In the Lobby" by Umplix — CC0 1.0 (public domain), https://opengameart.org/content/in-the-lobby
 Pictures: generated with an image model from the author's descriptions.
