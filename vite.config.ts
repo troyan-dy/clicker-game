@@ -50,7 +50,7 @@ export default defineConfig(({ mode }) => ({
   test: {
     coverage: {
       provider: 'v8',
-      include: ['src/systems/**/*.ts', 'src/core/{args,lang,metrics,rng,settings}.ts', 'src/content/**/*.ts', 'src/ui/format.ts', 'src/game/logic/**/*.ts'],
+      include: ['src/systems/**/*.ts', 'src/core/**/*.ts', 'src/content/**/*.ts', 'src/ui/format.ts', 'src/ui/logic/**/*.ts', 'src/view/logic/**/*.ts', 'src/data/layout/blueprint.ts', 'src/game/logic/**/*.ts'],
       reporter: ['text', 'json', 'json-summary'],
       thresholds: { perFile: true, lines: 100, functions: 100, statements: 100, branches: 100 },
     },

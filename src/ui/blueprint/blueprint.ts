@@ -1,6 +1,6 @@
 import './blueprint.css';
 import { L } from '../../core/lang';
-import { LOCALE, steady } from '../format';
+import { incomeCounter, moneyCounter } from '../format';
 import { InternLaptop } from '../intern/intern';
 import type { ShopShelf } from '../terminal/terminal';
 
@@ -97,9 +97,7 @@ export interface BlueprintUi {
   extra: HTMLElement;
 }
 
-const fmt = new Intl.NumberFormat(LOCALE, { maximumFractionDigits: 0 });
 // one digit after the comma, always: the income line is centred, a dropped «,0» would move it
-const fmt1 = new Intl.NumberFormat(LOCALE, { minimumFractionDigits: 1, maximumFractionDigits: 1 });
 const esc = (s: string): string => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
 
 /**
@@ -181,14 +179,14 @@ export function createBlueprint(layer: HTMLElement, over: HTMLElement): Blueprin
     render(m) {
       // the counter jumps a few times a second at most: restarting the animation forces a layout
       // the counter keeps every digit while it fits the page
-      const text = m.money < 1e10 ? fmt.format(Math.floor(m.money)) : steady(m.money, 3);
+      const text = moneyCounter(m.money);
       if (set('money', `$${text}`, money) && performance.now() - lastPop > 150) {
         lastPop = performance.now();
         money.classList.remove('pop');
         void money.offsetWidth; // restart the CSS animation
         money.classList.add('pop');
       }
-      const income = m.income >= 1e5 ? steady(Math.round(m.income / 1000) * 1000) : fmt1.format(m.income);
+      const income = incomeCounter(m.income);
       set('summary', `+$${income} ${L('в секунду', 'per second')} · ${esc(m.summary)}`);
       set(
         'meter',

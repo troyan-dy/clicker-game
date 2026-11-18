@@ -1,4 +1,5 @@
 import './card.css';
+import { canChoose, initialChoice, moveChoice } from '../logic/cardChoice';
 import { L } from '../../core/lang';
 
 export interface CardOption {
@@ -72,19 +73,12 @@ export function createCard(layer: HTMLElement, blip: () => void = () => undefine
   };
   const move = (step: number): void => {
     if (!spec) return;
-    const n = spec.options.length;
-    for (let k = 1; k <= n; k++) {
-      const i = (selected + step * k + n * k) % n;
-      if (!spec.options[i].off) {
-        selected = i;
-        break;
-      }
-    }
+    selected = moveChoice(spec.options, selected, step);
     blip();
     paint();
   };
   const choose = (i: number): void => {
-    if (!spec || spec.options[i]?.off) return;
+    if (!spec || !canChoose(spec.options, i)) return;
     const done = pick;
     // the handler may open the next card at once
     spec = null;
@@ -104,7 +98,7 @@ export function createCard(layer: HTMLElement, blip: () => void = () => undefine
     show(next, onPick) {
       spec = next;
       pick = onPick;
-      selected = next.selected ?? Math.max(0, next.options.findIndex((o) => !o.off));
+      selected = initialChoice(next.options, next.selected);
       q('.card-head').textContent = next.head;
       q('h2 span').textContent = next.title;
       q('.card-lines').innerHTML = next.lines.map((l) => `<p>${l}</p>`).join('');

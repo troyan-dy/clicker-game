@@ -41,3 +41,44 @@ export function plural(n: number, forms: readonly [string, string, string]): str
   if (k % 10 >= 2 && k % 10 <= 4 && (k % 100 < 12 || k % 100 > 14)) return forms[1];
   return forms[2];
 }
+
+const fmt2 = new Intl.NumberFormat(LOCALE, { maximumFractionDigits: 2 });
+const fmt1 = new Intl.NumberFormat(LOCALE, { maximumFractionDigits: 1 });
+const fixed1 = new Intl.NumberFormat(LOCALE, { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+
+/** "0,75 задачи", "2 задачи", "15 задач", "21 задача"; English: "0.75 tasks", "1 task", "15 tasks" */
+export function tasksPhrase(count: number): string {
+  const n = Math.abs(count);
+  if (LANG === 'en') return `${fmt2.format(count)} ${n === 1 ? 'task' : 'tasks'}`;
+  const word = Number.isInteger(n) ? plural(n, ['задача', 'задачи', 'задач']) : 'задачи';
+  return `${fmt2.format(count)} ${word}`;
+}
+
+export function moneyCounter(money: number): string {
+  return money < 1e10 ? int.format(Math.floor(money)) : steady(money, 3);
+}
+
+export function incomeCounter(income: number): string {
+  return income >= 1e5 ? steady(Math.round(income / 1000) * 1000) : fixed1.format(income);
+}
+
+/** a grade in the middle of a line: Russian writes it small, English keeps «CTO» and «Team Lead» as they are */
+export const gradeWord = (name: string): string => (LANG === 'en' ? name : name.toLowerCase());
+
+export const planTitle = (name: string): string => L(`Тариф ${name}`, `${name} plan`);
+
+/** the pay for a task: whole dollars from a hundred up — it drifts with unemployment, and «879,9 → 880» would change the width of the line */
+export const payText = (n: number): string => (n >= 100 ? short(Math.round(n)) : fmt1.format(n));
+
+/** gigawatts, after a number: «0,8 ГВт», «240 ГВт» */
+export const gw = (n: number): string => `${n < 100 ? fmt1.format(n) : short(Math.round(n))}${L(' ГВт', ' GW')}`;
+
+/** «3,75 задачи», «26 задач», «34 600 задач», «1,2 млн задач» */
+export function flowText(perSec: number): string {
+  return perSec < 1000 ? tasksPhrase(Math.round(perSec * 100) / 100) : `${short(Math.round(perSec))} ${L('задач', 'tasks')}`;
+}
+
+/** «3,8/с», «3 913/с», «1,2 млн/с» */
+export function perSecond(n: number): string {
+  return `${n < 1000 ? fmt1.format(n) : short(Math.round(n))}${PER_S}`;
+}

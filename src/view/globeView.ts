@@ -1,7 +1,10 @@
 import type Phaser from 'phaser';
 import type { Rng } from '../core/rng';
 import globe from '../data/layout/globe.json';
-import { connectedPilot, routeRegion, SIBERIA, type CableRoute } from '../systems/pipeline/worldRoute';
+import { routeRegion, type CableRoute } from '../systems/pipeline/worldRoute';
+
+import { NODES, orderedNodes, regionProgress } from './logic/globeNodes';
+import { along, curve, length, ellipse } from './logic/geometry';
 
 type Pt = readonly [number, number];
 
@@ -20,12 +23,6 @@ const SPARKS = 16;
 const STARS = 54;
 
 const REGIONS = globe.regions;
-/** every node of towers on the planet, the regions in the order the cable reaches them; the first one is home */
-const NODES = REGIONS.flatMap((r, region) => r.nodes.map((n) => ({ ...n, region }))).map((n, texture) => ({ ...n, texture }));
-// Counting the occupied pilot first lets it light up immediately without displacing a player-built tower.
-const PILOT_FIRST = [NODES[0], ...NODES.filter((n) => n.region === SIBERIA), ...NODES.slice(1).filter((n) => n.region !== SIBERIA)];
-const EAST_FIRST = [...NODES].sort((a, b) => routeRegion('eastasia', a.region) - routeRegion('eastasia', b.region));
-
 /** a point of the picture on the page */
 function at(x: number, y: number): [number, number] {
   return [AT.x + (x - globe.center[0]) * AT.k, AT.y + (y - globe.center[1]) * AT.k];
@@ -229,16 +226,14 @@ export class GlobeView {
 
   sync(t: GlobeTopology): void {
     this.top = t;
-    this.orderedNodes = connectedPilot(t.route, t.spans) ? PILOT_FIRST : t.route === 'eastasia' ? EAST_FIRST : NODES;
+    this.orderedNodes = orderedNodes(t.route, t.spans);
     // the land around a node lights up as people lie down there; home sleeps from the start
     this.orderedNodes.forEach((node, i) => this.lit[node.texture].setAlpha(i === 0 ? 1 : Math.max(0, Math.min(1, t.asleep - (i - 1)))));
   }
 
   /** Use the same positions for clickable labels, lit land, and construction. */
   regionProgress(region: number, built: number): { built: number; next: boolean } {
-    let count = 0;
-    for (let i = 1; i <= built; i++) if (this.orderedNodes[i]?.region === region) count++;
-    return { built: count, next: this.orderedNodes[built + 1]?.region === region };
+    return regionProgress(this.orderedNodes, region, built);
   }
 
   step(dt: number): void {
@@ -420,6 +415,10 @@ export class GlobeView {
 }
 
 /** A node of towers as the planet shows it: three small walls; built ones have a red light each. */
+function circle(cx: number, cy: number, radius: number, n: number): Pt[] {
+  return ellipse(cx, cy, radius, radius, 0, Math.PI * 2, n);
+}
+
 function tower(g: Phaser.GameObjects.Graphics, x: number, y: number, built: boolean): void {
   for (const [dx, h] of [[-7, 12], [0, 17], [7, 12]] as const) {
     if (built) {
@@ -428,42 +427,6 @@ function tower(g: Phaser.GameObjects.Graphics, x: number, y: number, built: bool
       g.fillStyle(POD, 1).fillRect(x + dx - 1.5, y - h + 3, 3, 4);
     } else g.lineStyle(1.5, EDGE, 0.85).strokeRect(x + dx - 3, y - h, 6, h);
   }
-}
-
-function circle(cx: number, cy: number, r: number, n: number): Pt[] {
-  const pts: Pt[] = [];
-  for (let i = 0; i <= n; i++) pts.push([cx + Math.cos((i / n) * Math.PI * 2) * r, cy + Math.sin((i / n) * Math.PI * 2) * r]);
-  return pts;
-}
-
-/** a curve through three points, `n` pieces */
-function curve(a: Pt, b: Pt, c: Pt, n: number): Pt[] {
-  const pts: Pt[] = [];
-  for (let i = 0; i <= n; i++) {
-    const u = i / n;
-    const v = 1 - u;
-    // the middle point is on the curve: the control point is pushed out accordingly
-    const mx = 2 * b[0] - (a[0] + c[0]) / 2;
-    const my = 2 * b[1] - (a[1] + c[1]) / 2;
-    pts.push([v * v * a[0] + 2 * v * u * mx + u * u * c[0], v * v * a[1] + 2 * v * u * my + u * u * c[1]]);
-  }
-  return pts;
-}
-
-function length(pts: readonly Pt[]): number {
-  let n = 0;
-  for (let i = 1; i < pts.length; i++) n += Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]);
-  return n;
-}
-
-/** the point `d` px along a broken line */
-function along(pts: readonly Pt[], d: number): Pt {
-  for (let i = 1; i < pts.length; i++) {
-    const seg = Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]);
-    if (d <= seg && seg > 0) return [pts[i - 1][0] + ((pts[i][0] - pts[i - 1][0]) * d) / seg, pts[i - 1][1] + ((pts[i][1] - pts[i - 1][1]) * d) / seg];
-    d -= seg;
-  }
-  return pts[pts.length - 1];
 }
 
 function path(g: Phaser.GameObjects.Graphics, pts: readonly Pt[], close: boolean): void {

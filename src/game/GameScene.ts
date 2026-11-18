@@ -1,10 +1,13 @@
 import Phaser from 'phaser';
+import { openVolunteerGate, settleIntern, signResearch } from './logic/approval';
+import { refuseFeeding, toggleFeeding, tossSlice } from './logic/parkActions';
+import { nextRemark } from '../systems/feed/feed';
+import { createGameConfig } from './logic/config';
 import { AWARDS } from '../content/awards';
 import { BENCH } from '../content/bench';
 import { CALLS, STANDUP } from '../content/calls';
 import { CREDITS, CREDITS_END, CREDITS_NOTES, MOTTO, TAGLINE, TITLE } from '../content/credits';
 import { LEGENDS, type Legend } from '../content/legends';
-import { words } from '../content/names';
 import { NEWS } from '../content/news';
 import { PICKET } from '../content/picket';
 import { QUIPS } from '../content/quips';
@@ -19,26 +22,12 @@ import { setMusicOn, startMusic } from '../core/music';
 import type { Rng } from '../core/rng';
 import { loadSettings, saveSettings } from '../core/settings';
 import { playSound, setSoundOn, unlockSound } from '../core/sound';
-import autoData from '../data/balance/auto.json';
-import chipData from '../data/balance/chips.json';
-import farmData from '../data/balance/farms.json';
-import gradeData from '../data/balance/grades.json';
-import lineData from '../data/balance/lines.json';
-import managerData from '../data/balance/managers.json';
-import moduleData from '../data/balance/modules.json';
-import netData from '../data/balance/net.json';
-import planData from '../data/balance/plans.json';
-import policeData from '../data/balance/police.json';
-import scaleData from '../data/balance/scales.json';
-import sourceData from '../data/balance/sources.json';
 import { BP, deskScreen } from '../data/layout/blueprint';
 import { HUBS } from '../data/layout/hubs';
 import benchData from '../data/tuning/bench.json';
 import eventsData from '../data/tuning/events.json';
 import feedData from '../data/tuning/feed.json';
-import gridData from '../data/tuning/grid.json';
 import internData from '../data/tuning/intern.json';
-import worldData from '../data/tuning/world.json';
 import limitData from '../data/tuning/limit.json';
 import managerTuning from '../data/tuning/manager.json';
 import peopleData from '../data/tuning/people.json';
@@ -46,18 +35,16 @@ import riotData from '../data/tuning/riots.json';
 import strikeData from '../data/tuning/strikes.json';
 import saveData from '../data/tuning/save.json';
 import stackData from '../data/tuning/stack.json';
-import tuningData from '../data/tuning/pipeline.json';
 import { createOverlay, type Overlay } from '../debug/overlay';
 import { createTuningPanel, type TuningPanel } from '../debug/tuningPanel';
-import { birdRate, createBench, refuseBird, stepBench, throwBread } from '../systems/bench/bench';
+import { birdRate, createBench, stepBench } from '../systems/bench/bench';
 import { createEvents, stepEvents, takeEvent, type EventsTuning } from '../systems/events/events';
 import { createFeed, headline, say, stepFeed, tell, type FeedContent } from '../systems/feed/feed';
-import { laptopPhase, startIncident, stepIncident } from '../systems/intern/incident';
+import { laptopPhase, startIncident } from '../systems/intern/incident';
 import { INTERN_REPORT } from '../ui/intern/intern';
 import { planManager, type ManagerDecision } from '../systems/manager/manager';
 import { createRiots, stepRiots, type RiotTuning } from '../systems/riots/riots';
 import { createStrikes, stepStrikes, type StrikeTuning } from '../systems/strikes/strikes';
-import type { Plan } from '../systems/plan/plan';
 import {
   aimAt,
   backlogCap,
@@ -126,18 +113,13 @@ import {
   subagentPrice,
   subagentRate,
   supplyOf,
-  takeChip,
   targetOf,
   unemploymentOf,
   wantedOf,
   wireOf,
   wearOf,
   whole,
-  type Chip,
-  type Farm,
-  type Line,
   type Module,
-  type PipeConfig,
   type PipeState,
   type RobotKind,
   type Source,
@@ -148,7 +130,7 @@ import type { BenchNeck, BenchUi } from '../ui/bench/bench';
 import type { BlueprintTag, BlueprintUi, ManagerStrip, MeterRow } from '../ui/blueprint/blueprint';
 import type { CardUi } from '../ui/card/card';
 import type { CreditsSpec, CreditsUi } from '../ui/credits/credits';
-import { LOCALE, PER_S, plural, short } from '../ui/format';
+import { LOCALE, PER_S, plural, short, gradeWord, planTitle, payText, gw, flowText, perSecond } from '../ui/format';
 import {
   tasksPhrase,
   TERMINAL_SPOTS,
@@ -224,9 +206,6 @@ const COOLING = L('остывает', 'cooling off');
 const TOP = L('максимум', 'max');
 const REPLACED = L('заменено программистов', 'programmers replaced');
 const UPGRADES_FULL = L('УЛУЧШЕНИЯ · быстрее и дороже', 'UPGRADES · faster and pricier');
-const planTitle = (name: string): string => L(`Тариф ${name}`, `${name} plan`);
-/** a grade in the middle of a line: Russian writes it small, English keeps «CTO» and «Team Lead» as they are */
-const gradeWord = (name: string): string => (LANG === 'en' ? name : name.toLowerCase());
 /** what the sessions ask about when they pile up their questions */
 const QUESTIONS = TICKETS.flatMap((t) => t.asks);
 const SAVE_KEY = 'da-klod-save';
@@ -235,20 +214,8 @@ const MONEY_SPOT: Rect = { x: BP.money.x - 80, y: BP.money.y - 20, w: 160, h: 40
 const HUB_SHRINK = 0.14;
 const fmt1 = new Intl.NumberFormat(LOCALE, { maximumFractionDigits: 1 });
 const fmt2 = new Intl.NumberFormat(LOCALE, { maximumFractionDigits: 2 });
-/** gigawatts, after a number: «0,8 ГВт», «240 ГВт» */
-const gw = (n: number): string => `${n < 100 ? fmt1.format(n) : short(Math.round(n))}${L(' ГВт', ' GW')}`;
-/** the pay for a task: whole dollars from a hundred up — it drifts with unemployment, and «879,9 → 880» would change the width of the line */
-const payText = (n: number): string => (n >= 100 ? short(Math.round(n)) : fmt1.format(n));
 
-/** «3,75 задачи», «26 задач», «34 600 задач», «1,2 млн задач» */
-function flowText(perSec: number): string {
-  return perSec < 1000 ? tasksPhrase(Math.round(perSec * 100) / 100) : `${short(Math.round(perSec))} ${L('задач', 'tasks')}`;
-}
 
-/** «3,8/с», «3 913/с», «1,2 млн/с» */
-function perSecond(n: number): string {
-  return `${n < 1000 ? fmt1.format(n) : short(Math.round(n))}${PER_S}`;
-}
 
 declare global {
   interface Window {
@@ -290,23 +257,7 @@ export class GameScene extends Phaser.Scene {
   private readonly demo: string;
   private readonly settings = loadSettings();
   // own copies of the data: the tuning panel edits them live, the mechanic reads them every step
-  private readonly cfg: PipeConfig = {
-    tuning: { ...tuningData },
-    plans: (planData as Plan[]).map((p) => ({ ...p, ...words('plans', p.id) })),
-    sources: (sourceData as Source[]).map((s) => ({ ...s, ...words('sources', s.id), perk: s.perk && { ...s.perk, ...words('perks', s.id) } })),
-    grades: gradeData.map((g) => ({ ...g, ...words('grades', g.id) })),
-    farms: (farmData as Farm[]).map((f) => ({ ...f, ...words('farms', f.id) })),
-    scales: scaleData.map((x) => ({ ...x, ...words('scales', x.id) })),
-    managers: managerData.map((m) => ({ ...m, ...words('managers', m.screen) })),
-    lines: (lineData as Line[]).map((l) => ({ ...l, ...words('lines', l.id) })),
-    police: { ...policeData, ...words('police', 'police') },
-    modules: (moduleData as Module[]).map((m) => ({ ...m, ...words('modules', m.id) })),
-    net: netData.map((p) => ({ ...p, ...words('net', p.id) })),
-    chips: (chipData as Chip[]).map((c) => ({ ...c, ...words('chips', c.id) })),
-    grid: { ...gridData },
-    world: { ...worldData },
-    auto: { noAsk: { ...autoData.noAsk, ...words('auto', 'noAsk') }, subagent: { ...autoData.subagent, ...words('auto', 'subagent') } },
-  };
+  private readonly cfg = createGameConfig();
   private state!: PipeState;
   private view!: BlueprintView;
   private readonly hubs = new Map<number, HubView>();
@@ -1687,22 +1638,16 @@ export class GameScene extends Phaser.Scene {
     while (this.calls.list.length) this.answer(0);
     const signed = this.dim && this.signChip();
     // …and the first volunteers at the gate of the towers
-    const s = this.state;
-    const let_in = this.onGrid && !s.gate && s.queue >= this.cfg.grid.unit;
-    if (let_in) {
-      s.gate = true;
-      s.presses++;
-      playSound('yes', 3);
-    }
-    return this.approvePile() || calls > 0 || signed || let_in;
+    const admitted = openVolunteerGate(this.state, this.cfg, this.stage);
+    if (admitted) playSound('yes', 3);
+    return this.approvePile() || calls > 0 || signed || admitted;
   }
 
   /** The «Да» under an invention of the network: from now on it runs on the next generation of hardware. False — nothing waited for a signature. */
   private signChip(): boolean {
     const n = this.state.chips + 1;
-    const chip = takeChip(this.state, this.cfg);
+    const chip = signResearch(this.state, this.cfg);
     if (!chip) return false;
-    this.state.presses++;
     playSound('all');
     this.paper.toast(`${TOWERS.signed}: № ${n}`, TOWERS.signedSub(chip.name));
     tell(this.feed, feedData, TOWERS.chips[chip.id] ?? TOWERS.signed);
@@ -1717,16 +1662,12 @@ export class GameScene extends Phaser.Scene {
   }
 
   private stepIntern(dt: number): void {
-    const incident = this.meta.intern;
-    if (!incident) return;
-    const credit = stepIncident(incident, dt);
+    const credit = settleIntern(this.state, this.meta, dt);
     if (credit > 0) {
-      this.state.money += credit;
       this.lastMoney += credit;
       logEvent('intern_credit');
       this.saveGame();
     }
-    if (laptopPhase(incident.elapsed) === 'done') delete this.meta.intern;
   }
 
   /** «Да всем»: the whole pile of questions is approved at once. Returns false when there is no pile. */
@@ -2303,8 +2244,7 @@ export class GameScene extends Phaser.Scene {
   /** One whole slice of bread is thrown: by the player's «Да», or by Claude once he was asked to. */
   private toss(byClaude: boolean): void {
     const b = this.park;
-    const onWay = b.courier > 0;
-    const result = throwBread(b, benchData);
+    const { result, courierStarted, message } = tossSlice(b, this.state, this.meta, byClaude);
     if (result === 'empty') {
       if (byClaude) return;
       playSound('waste');
@@ -2313,7 +2253,7 @@ export class GameScene extends Phaser.Scene {
       return;
     }
     // the last slice of the loaf: the courier sets off
-    if (b.courier > 0 && !onWay) this.benchView.courier(benchData.delivery - 0.5);
+    if (courierStarted) this.benchView.courier(benchData.delivery - 0.5);
     if (result === 'fed') this.benchView.feed(byClaude ? 'dog' : 'hand');
     else this.benchView.drop(byClaude ? 'dog' : 'hand');
     if (byClaude) {
@@ -2323,15 +2263,12 @@ export class GameScene extends Phaser.Scene {
       }
       return;
     }
-    this.state.presses++;
-    this.meta.bread++;
     this.benchAsk++;
     this.lastPress = this.clock;
     playSound('yes', this.yesStreak++ % 5);
     this.benchUi.hit('thrown');
-    const line = BENCH.milestones[this.meta.bread] ?? (this.meta.bread === benchData.offerAfter && !b.auto ? BENCH.quips.offer : '');
-    if (line) {
-      tell(this.feed, feedData, line);
+    if (message) {
+      tell(this.feed, feedData, message);
       playSound('quip');
     }
     logEvent('bread');
@@ -2339,9 +2276,7 @@ export class GameScene extends Phaser.Scene {
 
   /** The next line of a kind, in turn: the first one first, and round again after the last. */
   private turn(key: string, lines: readonly string[]): string {
-    const n = this.feed.said[key] ?? 0;
-    this.feed.said[key] = n + 1;
-    return lines[n % lines.length];
+    return nextRemark(this.feed, key, lines);
   }
 
   /** The second and the third answer of the prompt on the bench: «Да, и больше не спрашивай» and «Нет». */
@@ -2351,20 +2286,17 @@ export class GameScene extends Phaser.Scene {
     const q = BENCH.quips;
     if (what === 'auto') {
       // Claude throws the bread himself — or gives it back: here it costs nothing either way
-      b.auto = !b.auto;
-      this.meta.benchAuto = b.auto;
-      if (b.auto) this.meta.feeder = true;
+      toggleFeeding(b, this.meta);
       this.benchView.auto(b.auto);
       playSound('buy', b.auto ? 5 : -5);
       tell(this.feed, feedData, b.auto ? this.turn('bench:on', q.autoOn) : this.turn('bench:off', q.autoOff));
       logEvent(b.auto ? 'bench_auto' : 'bench_hand');
     } else if (what === 'no') {
       // «Нет» is available at last: the bird that waited longest leaves without bread
-      const refused = refuseBird(b);
+      const { refused, useReply } = refuseFeeding(b, this.meta);
       if (refused) this.benchView.refuse();
-      this.meta.refused++;
       playSound('ui');
-      tell(this.feed, feedData, refused || this.meta.refused === 1 ? this.turn('bench:no', q.no) : q.noNobody);
+      tell(this.feed, feedData, useReply ? this.turn('bench:no', q.no) : q.noNobody);
       logEvent('bench_no');
     } else return;
     this.benchUi.flash(`bench:${what}`);
