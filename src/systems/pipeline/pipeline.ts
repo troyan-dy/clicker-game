@@ -15,6 +15,7 @@
  * Pure logic: no rendering, no clocks of its own; all numbers come from src/data.
  */
 import { buyNextPlan, type Plan, type PlanState } from '../plan/plan';
+import { routeRegion, SIBERIA, type CableRoute } from './worldRoute';
 
 /**
  * What an employer gives once it is taken whole (M23). «Plus» kinds add up: pay, inflow, rate,
@@ -122,6 +123,8 @@ export interface Module {
   tag: string;
   note: string;
   kind: 'block' | 'hire' | 'span' | 'node' | 'thread' | 'ark';
+  /** Local construction price on the eastern branch while its first three sites are being developed. */
+  eastSitePrice?: number;
   amount: number;
   price: number;
   growth: number;
@@ -318,6 +321,8 @@ export interface PipeConfig {
 }
 
 export interface PipeState {
+  /** The first route chosen on the world map. Older connected maps follow their original order. */
+  cableRoute?: CableRoute;
   money: number;
   backlog: number;
   ready: number;
@@ -715,7 +720,7 @@ export function ringed(s: PipeState, cfg: PipeConfig): boolean {
 /** nodes of towers the regions reached so far have room for */
 export function roomOf(s: PipeState, cfg: PipeConfig): number {
   let n = 0;
-  for (let i = reachOf(s, cfg) - 1; i >= 0; i--) n += cfg.world.regions[i];
+  for (let i = reachOf(s, cfg) - 1; i >= 0; i--) n += cfg.world.regions[routeRegion(s.cableRoute, i)];
   return n;
 }
 
@@ -825,7 +830,10 @@ export function flowOf(s: PipeState, cfg: PipeConfig): number {
 }
 
 export function moduleCost(s: PipeState, m: Module): number {
-  return Math.round(m.price * m.growth ** (s.modules[m.id] ?? 0));
+  const owned = s.modules[m.id] ?? 0;
+  const eastSite = s.cableRoute === 'eastasia' && s.modules.span === 1 && owned > 0;
+  const factor = eastSite ? (m.eastSitePrice ?? 1) : 1;
+  return Math.round(m.price * m.growth ** owned * factor);
 }
 
 /** what the next step of a dial of the network costs now */
@@ -844,12 +852,22 @@ export function moduleRoom(s: PipeState, cfg: PipeConfig, m: Module): number {
 }
 
 /** One more block of capsules or reason for people to come; on the planet — a span of the cable, a node of towers, a thread, the tower for Mars. */
-export function buyModule(s: PipeState, cfg: PipeConfig, id: string): boolean {
+export function buyModule(s: PipeState, cfg: PipeConfig, id: string, route?: CableRoute): boolean {
   const m = cfg.modules.find((x) => x.id === id);
   if (!m || !gridOn(s, cfg)) return false;
   const owned = s.modules[id] ?? 0;
+  const firstSpan = m.kind === 'span' && owned === 0;
+  if (firstSpan !== (route !== undefined)) return false;
   if (owned >= moduleRoom(s, cfg, m) || !spend(s, moduleCost(s, m))) return false;
   s.modules[id] = owned + 1;
+  if (m.kind === 'span') {
+    if (route) s.cableRoute = route;
+    if (s.cableRoute && routeRegion(s.cableRoute, owned + 1) === SIBERIA) {
+      const node = cfg.modules.find((part) => part.kind === 'node')!;
+      s.modules[node.id] = (s.modules[node.id] ?? 0) + 1;
+      s.asleep += cfg.world.node;
+    }
+  }
   return true;
 }
 

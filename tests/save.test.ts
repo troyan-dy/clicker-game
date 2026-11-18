@@ -21,6 +21,7 @@ import {
   buyFarm,
   buyGrade,
   buyManager,
+  buyModule,
   buyNoAsk,
   buyPlan,
   buyScale,
@@ -146,6 +147,19 @@ describe('save', () => {
     expect(s.farms.ghost).toBeUndefined();
     expect(s.scale).toBe(0); // no scale without a terminal that agrees by itself
     expect(Object.keys(s).sort()).toEqual(Object.keys(fresh).sort());
+  });
+
+  it('restores an eastern-first route before clamping sleepers and preserves an existing linear route', () => {
+    const raw = { noAsk: true, scale: cfg.scales.length, modules: { span: 1, node: 4 }, asleep: 4 * cfg.world.node };
+    const east = restorePipe(cfg, { ...raw, cableRoute: 'eastasia' });
+    expect(east.asleep).toBe(raw.asleep);
+    expect(east.cableRoute).toBe('eastasia');
+    const old = restorePipe(cfg, { ...raw, modules: { span: 1, node: 1 }, asleep: cfg.world.node, money: 1e18 });
+    expect(old.cableRoute).toBeUndefined();
+    expect(buyModule(old, cfg, 'span')).toBe(true);
+    expect(old.modules.node).toBe(1);
+    expect(old.asleep).toBe(cfg.world.node);
+    expect(restorePipe(cfg, { ...raw, modules: {}, cableRoute: 'eastasia' }).cableRoute).toBeUndefined();
   });
 
   it('test_offline_income_needs_no_ask_and_is_capped', () => {

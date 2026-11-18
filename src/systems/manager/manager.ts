@@ -21,6 +21,7 @@ import {
   outputOf,
   payOf,
   robotsOf,
+  roomOf,
   scaleCost,
   scaleReady,
   screenOf,
@@ -99,8 +100,19 @@ function gridGoal(s: PipeState, cfg: PipeConfig): Goal {
   let cost = world ? 0 : scaleCost(s, cfg);
   for (const m of cfg.modules) {
     const required = limit[m.kind];
-    if (required !== undefined)
-      cost += series(moduleCost(s, m), m.growth, required - (s.modules[m.id] ?? 0));
+    if (required === undefined) continue;
+    const owned = s.modules[m.id] ?? 0;
+    if (m.kind === 'node' && s.cableRoute === 'eastasia' && s.modules.span === 1) {
+      // Only the three eastern sites get the introductory price. Connecting Siberia adds one paid-up node.
+      const sites = roomOf(s, cfg);
+      for (let n = owned; n < required; n++) {
+        if (n === sites) continue;
+        const factor = n > 0 && n < sites ? (m.eastSitePrice ?? 1) : 1;
+        cost += Math.round(m.price * m.growth ** n * factor);
+      }
+    } else {
+      cost += series(moduleCost(s, m), m.growth, required - owned);
+    }
   }
   const quarter = (cfg.grid.pilot + cfg.grid.blocks.reduce((a, b) => a + b, 0)) * cfg.grid.unit;
   const population = quarter + (limit.node ?? 0) * cfg.world.node;

@@ -1,6 +1,7 @@
 import type Phaser from 'phaser';
 import type { Rng } from '../core/rng';
 import globe from '../data/layout/globe.json';
+import { connectedPilot, routeRegion, SIBERIA, type CableRoute } from '../systems/pipeline/worldRoute';
 
 type Pt = readonly [number, number];
 
@@ -20,7 +21,10 @@ const STARS = 54;
 
 const REGIONS = globe.regions;
 /** every node of towers on the planet, the regions in the order the cable reaches them; the first one is home */
-const NODES = REGIONS.flatMap((r, region) => r.nodes.map((n) => ({ ...n, region })));
+const NODES = REGIONS.flatMap((r, region) => r.nodes.map((n) => ({ ...n, region }))).map((n, texture) => ({ ...n, texture }));
+// Counting the occupied pilot first lets it light up immediately without displacing a player-built tower.
+const PILOT_FIRST = [NODES[0], ...NODES.filter((n) => n.region === SIBERIA), ...NODES.slice(1).filter((n) => n.region !== SIBERIA)];
+const EAST_FIRST = [...NODES].sort((a, b) => routeRegion('eastasia', a.region) - routeRegion('eastasia', b.region));
 
 /** a point of the picture on the page */
 function at(x: number, y: number): [number, number] {
@@ -43,10 +47,11 @@ function anchor(region: number): [number, number] {
  * The way of a span of the cable: from a region to the next one along the route; the last span closes
  * the ring. One of them has no land to cross: it goes round the back of the planet, along its rim.
  */
-function spanPath(i: number): Pt[] {
-  const from = anchor(i);
-  const to = anchor(i + 1);
-  const back = REGIONS[i].id === 'australia';
+function spanPath(i: number, route: CableRoute | undefined): Pt[] {
+  const start = routeRegion(route, i);
+  const from = anchor(start);
+  const to = anchor(routeRegion(route, (i + 1) % REGIONS.length));
+  const back = REGIONS[start].id === 'australia';
   if (!back) {
     // a cable hangs a little between its ends
     const mid: Pt = [(from[0] + to[0]) / 2, (from[1] + to[1]) / 2 + 14];
@@ -60,6 +65,7 @@ function spanPath(i: number): Pt[] {
 
 /** What the picture shows: how far the cable has got, what stands and who sleeps, how the network is fed. Draws state, decides nothing. */
 export interface GlobeTopology {
+  route?: CableRoute;
   /** spans of the cable laid: each reaches one more region, the last one closes the ring */
   spans: number;
   /** nodes of towers built, besides the quarter at home */
@@ -109,6 +115,7 @@ export class GlobeView {
   private readonly stars: Pt[] = [];
   private top: GlobeTopology = { spans: 0, nodes: 0, asleep: 0, threads: 0, hot: false, lab: -1, canNode: false, canSpan: false, gone: false };
   private drawn = '';
+  private orderedNodes = NODES;
   private sparkIn = 0;
   private flashIn = 4;
   private flash = 0;
@@ -196,8 +203,8 @@ export class GlobeView {
   spanSpot(): [number, number] | undefined {
     const next = this.top.spans + 1;
     if (next > REGIONS.length) return undefined;
-    if (next < REGIONS.length) return this.regionSpot(next);
-    const pts = spanPath(this.top.spans);
+    if (next < REGIONS.length) return this.regionSpot(routeRegion(this.top.route, next));
+    const pts = spanPath(this.top.spans, this.top.route);
     const [x, y] = pts[Math.floor(pts.length / 2)];
     return [x + 70, y - 20];
   }
@@ -210,7 +217,7 @@ export class GlobeView {
   /** a node somebody sleeps in: a request may come from there */
   wakeSpot(i: number): [number, number] {
     const taken = Math.max(1, Math.floor(this.top.asleep) + 1);
-    const n = NODES[(i * 5 + 1) % Math.min(NODES.length, taken)];
+    const n = this.orderedNodes[(i * 5 + 1) % Math.min(NODES.length, taken)];
     return at(n.x, n.y);
   }
 
@@ -222,13 +229,21 @@ export class GlobeView {
 
   sync(t: GlobeTopology): void {
     this.top = t;
+    this.orderedNodes = connectedPilot(t.route, t.spans) ? PILOT_FIRST : t.route === 'eastasia' ? EAST_FIRST : NODES;
     // the land around a node lights up as people lie down there; home sleeps from the start
-    this.lit.forEach((img, i) => img.setAlpha(i === 0 ? 1 : Math.max(0, Math.min(1, t.asleep - (i - 1)))));
+    this.orderedNodes.forEach((node, i) => this.lit[node.texture].setAlpha(i === 0 ? 1 : Math.max(0, Math.min(1, t.asleep - (i - 1)))));
+  }
+
+  /** Use the same positions for clickable labels, lit land, and construction. */
+  regionProgress(region: number, built: number): { built: number; next: boolean } {
+    let count = 0;
+    for (let i = 1; i <= built; i++) if (this.orderedNodes[i]?.region === region) count++;
+    return { built: count, next: this.orderedNodes[built + 1]?.region === region };
   }
 
   step(dt: number): void {
     this.clock += dt;
-    const key = `${this.top.spans}:${this.top.nodes}:${this.top.threads}:${this.top.hot}:${this.top.canNode}:${this.top.canSpan}:${this.top.gone}`;
+    const key = `${this.top.route}:${this.top.spans}:${this.top.nodes}:${this.top.threads}:${this.top.hot}:${this.top.canNode}:${this.top.canSpan}:${this.top.gone}`;
     if (key !== this.drawn) {
       this.drawn = key;
       this.draw();
@@ -263,13 +278,13 @@ export class GlobeView {
     const width = 2 + t.threads;
     for (let i = 0; i < t.spans; i++) {
       c.lineStyle(width, t.hot ? POD : EDGE, t.hot ? 0.95 : 0.75);
-      path(c, spanPath(i), false);
+      path(c, spanPath(i, t.route), false);
       c.strokePath();
     }
     // where it touches down
     const reach = Math.min(REGIONS.length, 1 + t.spans);
     for (let i = 0; i < reach; i++) {
-      const [x, y] = anchor(i);
+      const [x, y] = anchor(routeRegion(t.route, i));
       c.fillStyle(BODY, 1).fillCircle(x, y, 5);
       c.lineStyle(1.5, EDGE, 0.8).strokeCircle(x, y, 5);
     }
@@ -279,19 +294,20 @@ export class GlobeView {
     const n = this.next;
     m.clear();
     n.clear();
-    NODES.forEach((node, i) => {
+    this.orderedNodes.forEach((node, i) => {
       if (i === 0) return;
       const [x, y] = at(node.x, node.y);
       if (i <= t.nodes) tower(m, x, y, true);
       else if (i === t.nodes + 1 && t.canNode) tower(n, x, y, false);
-      else if (node.region < reach) {
+      else if (routeRegion(t.route, node.region) < reach) {
         m.lineStyle(1, EDGE, 0.3).strokeCircle(x, y, 4);
       }
     });
     // the span that is laid next is marked out
     if (t.canSpan && t.spans < REGIONS.length) {
       n.lineStyle(2, EDGE, 0.8);
-      dashed(n, spanPath(t.spans), 8);
+      dashed(n, spanPath(t.spans, t.route), 8);
+      if (t.spans === 0) dashed(n, spanPath(0, 'eastasia'), 8);
     }
   }
 
@@ -362,16 +378,17 @@ export class GlobeView {
 
   /** the way of the power from a node to the network at home: to the cable, and along it — the shorter way round once the ring is closed */
   private wayHome(i: number): Pt[] {
-    const node = NODES[Math.min(i, NODES.length - 1)];
+    const node = this.orderedNodes[Math.min(i, NODES.length - 1)];
     const from = at(node.x, node.y);
     const home = this.homeSpot();
     if (node.region === 0) return [from, home];
     const back: Pt[] = [from, anchor(node.region)];
     const ringed = this.top.spans >= REGIONS.length;
-    if (ringed && node.region > REGIONS.length / 2) {
-      for (let r = node.region; r < REGIONS.length; r++) back.push(...spanPath(r).slice(1));
+    const step = routeRegion(this.top.route, node.region);
+    if (ringed && step > REGIONS.length / 2) {
+      for (let r = step; r < REGIONS.length; r++) back.push(...spanPath(r, this.top.route).slice(1));
     } else {
-      for (let r = node.region - 1; r >= 0; r--) back.push(...spanPath(r).slice(0, -1).reverse());
+      for (let r = step - 1; r >= 0; r--) back.push(...spanPath(r, this.top.route).slice(0, -1).reverse());
     }
     back.push(home);
     return back;
@@ -393,7 +410,7 @@ export class GlobeView {
     g.clear();
     g.lineStyle(3, BOLT, 1);
     for (let i = 0; i < REGIONS.length; i++) {
-      const pts = spanPath(i).map(([x, y]) => [x + this.rng.range(-3, 3), y + this.rng.range(-3, 3)] as const);
+      const pts = spanPath(i, this.top.route).map(([x, y]) => [x + this.rng.range(-3, 3), y + this.rng.range(-3, 3)] as const);
       path(g, pts, false);
       g.strokePath();
     }

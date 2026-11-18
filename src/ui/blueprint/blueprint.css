@@ -453,6 +453,11 @@
 .bl-tag.act b {
   color: var(--dim);
 }
+/* A pin on the globe is much smaller than a building on the city map. */
+.bl-tag:is([data-row^='route:'], [data-row='mod:span'], [data-row='mod:node'])::before {
+  width: 40px;
+  height: 22px;
+}
 .bl-tag.act.can b {
   color: var(--money);
 }

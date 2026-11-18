@@ -162,6 +162,7 @@ export function restorePipe(cfg: PipeConfig, raw: unknown): PipeState {
     const n = Math.floor(num(modules[m.id], 0, 0, m.max));
     if (n > 0) s.modules[m.id] = n;
   }
+  if (s.modules.span > 0 && (r.cableRoute === 'siberia' || r.cableRoute === 'eastasia')) s.cableRoute = r.cableRoute;
   const net = counts(r.net);
   for (const p of cfg.net) {
     const n = Math.floor(num(net[p.id], 0, 0, p.max));

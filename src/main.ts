@@ -62,11 +62,11 @@ function pickScene(): Phaser.Scene {
     const save = !args.capture && (gym ? args.save : true);
     const menu = args.menu || (!gym && !args.capture);
     // a tuning session may open on a later screen: ?gym=agree&state=city|gov|planet|street|zig|world|finale|bench
-    const start = gym ? ({ city: 3, intern: 3, gov: 4, planet: 5, street: 6, zig: 7, world: 8, finale: 9, bench: 10 }[args.state] ?? 0) : 0;
+    const start = gym ? ({ city: 3, intern: 3, standup: 3, manager: 3, gov: 4, planet: 5, street: 6, zig: 7, world: 8, finale: 9, bench: 10 }[args.state] ?? 0) : 0;
     // the terminal lies on top of the paper, the bench after the credits — on top of both
     const term = createTerminal(layer);
     const bench = createBench(layer);
-    return new GameScene(rng, term, paper, card, credits, bench, { overlay: args.debug, save, gym, menu, start, demoIntern: gym && args.state === 'intern' });
+    return new GameScene(rng, term, paper, card, credits, bench, { overlay: args.debug, save, gym, menu, start, demo: gym ? args.state : '' });
   }
 }
 const hello = __TOOLS__ && args.gym === 'hello';

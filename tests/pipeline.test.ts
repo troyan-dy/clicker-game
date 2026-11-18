@@ -49,6 +49,8 @@ import {
   keysNeeded,
   keysOf,
   labOf,
+  moduleCost,
+  moduleRoom,
   netCost,
   nodesOf,
   payOf,
@@ -716,7 +718,7 @@ describe('pipeline', () => {
     // home has room for one node; the next one needs a region the cable has reached
     expect(buyModule(s, cfg, 'node')).toBe(true);
     expect(buyModule(s, cfg, 'node')).toBe(false);
-    expect(buyModule(s, cfg, 'span')).toBe(true);
+    expect(buyModule(s, cfg, 'span', 'eastasia')).toBe(true);
     expect(buyModule(s, cfg, 'node')).toBe(true);
     expect(nodesOf(s, cfg)).toBe(2);
     expect(podsOf(s, cfg)).toBe(quarter + 2 * w.node);
@@ -749,6 +751,37 @@ describe('pipeline', () => {
     // …and there is a place for every one of them: nobody is left idle at the end
     expect(places).toBeGreaterThanOrEqual(idle);
     expect(places).toBeLessThan(idle + 100);
+  });
+
+  it('the first cable must be chosen, trades immediate power for sites, and rejoins after the second span', () => {
+    const base = atTowers();
+    base.scale++;
+    base.modules.block = cfg.grid.blocks.length;
+    base.asleep = podsOf(base, cfg);
+    base.money = 1e19;
+    expect(buyModule(base, cfg, 'node')).toBe(true);
+    const short = structuredClone(base);
+    const long = structuredClone(base);
+    expect(buyModule(short, cfg, 'span')).toBe(false);
+    const poor = { ...structuredClone(base), money: 0 };
+    expect(buyModule(poor, cfg, 'span', 'siberia')).toBe(false);
+    expect(poor.cableRoute).toBeUndefined();
+    expect(buyModule(short, cfg, 'span', 'siberia')).toBe(true);
+    expect(buyModule(long, cfg, 'span', 'eastasia')).toBe(true);
+    expect(short.money).toBe(long.money);
+    const node = cfg.modules.find((m) => m.kind === 'node')!;
+    expect(moduleRoom(short, cfg, node) - nodesOf(short, cfg)).toBe(0);
+    expect(moduleRoom(long, cfg, node) - nodesOf(long, cfg)).toBe(3);
+    expect(moduleCost(long, node)).toBeCloseTo(Math.round(moduleCost(base, node) * node.eastSitePrice!));
+    expect(supplyOf(short, cfg) - supplyOf(long, cfg)).toBeCloseTo(cfg.world.node * cfg.grid.watt);
+    expect(buyModule(short, cfg, 'span', 'eastasia')).toBe(false);
+    expect(buyModule(short, cfg, 'span')).toBe(true);
+    expect(buyModule(long, cfg, 'span')).toBe(true);
+    expect(long.modules).toEqual(short.modules);
+    expect(long.money).toBe(short.money);
+    expect(long.asleep).toBe(short.asleep);
+    expect(moduleCost(long, node)).toBe(moduleCost(short, node));
+    expect(moduleRoom(long, cfg, node)).toBe(moduleRoom(short, cfg, node));
   });
 
   it('test_pipe_prices_grow_and_money_is_required', () => {
