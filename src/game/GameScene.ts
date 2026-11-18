@@ -35,6 +35,7 @@ import eventsData from '../data/tuning/events.json';
 import feedData from '../data/tuning/feed.json';
 import { activeBackgroundSeconds, advanceBackground, backgroundWork, collectMorning, elapsedMs, frameRemainder, missedBackgroundFrames, morningDuration, restoredWin, resumeOffline } from './logic/background';
 import limitData from '../data/tuning/limit.json';
+import { SAVE_KEY, SaveOwnership } from './logic/saveOwnership';
 import { canInvite, managerClock, managerOnDuty, transitionOffer } from './logic/transitions';
 import riotData from '../data/tuning/riots.json';
 import strikeData from '../data/tuning/strikes.json';
@@ -203,7 +204,6 @@ const REPLACED = L('заменено программистов', 'programmers r
 const UPGRADES_FULL = L('УЛУЧШЕНИЯ · быстрее и дороже', 'UPGRADES · faster and pricier');
 /** what the sessions ask about when they pile up their questions */
 const QUESTIONS = TICKETS.flatMap((t) => t.asks);
-const SAVE_KEY = 'da-klod-save';
 const MONEY_SPOT: Rect = { x: BP.money.x - 80, y: BP.money.y - 20, w: 160, h: 40 };
 /** a big screen shrinks to this share of its size when it becomes a node of the next one */
 const HUB_SHRINK = 0.14;
@@ -287,8 +287,7 @@ export class GameScene extends Phaser.Scene {
   private paused = false;
   private backgroundAt: number | null = null;
   private backgroundTimer?: number;
-  private supersededSave = false;
-  private lastSavedJson: string | null = null;
+  private readonly saveOwnership = new SaveOwnership(() => localStorage);
   /** a saved game was opened */
   private resumed = false;
   /** what the sessions did while the game was closed; shown after the title card */
@@ -467,7 +466,7 @@ export class GameScene extends Phaser.Scene {
     });
     window.addEventListener('storage', event => {
       // A second game tab has taken over. Never overwrite its newer progress.
-      if (this.saving && this.backgroundAt !== null && (event.key === SAVE_KEY || event.key === null)) this.supersededSave = true;
+      this.saveOwnership.storageChanged(event.key, this.saving, this.backgroundAt !== null);
     });
     syncVisibility();
     if (__TOOLS__) window.__gym = {
@@ -502,7 +501,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   update(_time: number, deltaMs: number): void {
-    if (this.supersededSave || document.hidden) return;
+    if (this.saveOwnership.superseded || document.hidden) return;
     if (this.backgroundAt !== null) {
       // A visible second window still renders normally. Only missed frames need a catch-up.
       const now = Date.now();
@@ -564,18 +563,19 @@ export class GameScene extends Phaser.Scene {
     window.clearInterval(this.backgroundTimer);
     this.settleBackground();
     this.backgroundAt = null;
-    if (this.supersededSave) window.location.reload();
-    else if (!this.paused) this.saveGame();
+    const action = this.saveOwnership.onFocus(this.paused);
+    if (action === 'reload') window.location.reload();
+    else if (action === 'save') this.saveGame();
   }
 
   private settleBackground(): void {
     if (this.backgroundAt === null) return;
-    if (this.saving && this.backgroundSaveChanged()) return;
+    if (this.saving && this.saveOwnership.checkForTakeover()) return;
     const now = Date.now();
     const elapsed = elapsedMs(this.backgroundAt, now) / 1000;
     this.backgroundAt = Math.max(now, this.backgroundAt);
     const active = activeBackgroundSeconds(elapsed, {
-      paused: this.paused, frozen: this.frozen, superseded: this.supersededSave,
+      paused: this.paused, frozen: this.frozen, superseded: this.saveOwnership.superseded,
       cinematic: this.cine, creditsRolling: this.credits.rolling,
     }, this.slow);
     if (!active) return;
@@ -598,38 +598,15 @@ export class GameScene extends Phaser.Scene {
 
   private saveGame(): void {
     this.sinceSave = 0;
-    if (!this.saving || this.frozen || this.supersededSave) return;
-    try {
-      if (this.backgroundAt !== null && this.backgroundSaveChanged()) return;
+    this.saveOwnership.write(this.saving, this.frozen, this.backgroundAt !== null, () => {
       const feed = { shown: this.feed.shown, said: this.feed.said };
-      const json = packSave({ at: Date.now(), state: this.state, feed, meta: this.meta, won: this.won, seconds: this.seconds });
-      localStorage.setItem(SAVE_KEY, json);
-      this.lastSavedJson = json;
-    } catch {
-      // private mode or a full disk: the game goes on without saving
-    }
-  }
-
-  /** Storage events can be delayed while this page is frozen. Check the last write before catching up. */
-  private backgroundSaveChanged(): boolean {
-    try {
-      if (localStorage.getItem(SAVE_KEY) !== this.lastSavedJson) this.supersededSave = true;
-    } catch {
-      // Storage can be disabled; the open tab can still earn in memory.
-    }
-    return this.supersededSave;
+      return packSave({ at: Date.now(), state: this.state, feed, meta: this.meta, won: this.won, seconds: this.seconds });
+    });
   }
 
   /** Opens a saved game on the screen it was left at. Returns false when there is nothing to open. */
   private loadGame(): boolean {
-    if (!this.saving) return false;
-    let json: string | null;
-    try {
-      json = localStorage.getItem(SAVE_KEY);
-      this.lastSavedJson = json;
-    } catch {
-      return false;
-    }
+    const json = this.saveOwnership.read(this.saving);
     const file = unpackSave(json, this.cfg);
     if (!file) return false;
     this.state = file.state;
