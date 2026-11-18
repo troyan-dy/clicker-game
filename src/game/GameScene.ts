@@ -1,3 +1,8 @@
+import { benchBottleneck, bestAllowance, farmSessions, fleetReadings, globeReadings, hubReadings, labShown, towerReadings } from './logic/readings';
+import { approveStack, buyUsage, cycleAllowance, flowIncome, limitClock, limitOffer, pickLegend, pileWorth, rewardCall, settleStrike, strikePrice } from './logic/actions';
+import { towerBottleneck, workBottleneck, worldBottleneck } from './logic/bottlenecks';
+import { buyOnStage, employersOnOffer, onSale, planOnSale } from './logic/market';
+import { chooseBird, earnAwards, hasAcquired, pickIncomingSource, statistic } from './logic/progress';
 import Phaser from 'phaser';
 import { openVolunteerGate, settleIntern, signResearch } from './logic/approval';
 import { refuseFeeding, toggleFeeding, tossSlice } from './logic/parkActions';
@@ -40,7 +45,7 @@ import { createTuningPanel, type TuningPanel } from '../debug/tuningPanel';
 import { birdRate, createBench, stepBench } from '../systems/bench/bench';
 import { createEvents, stepEvents, takeEvent, type EventsTuning } from '../systems/events/events';
 import { createFeed, headline, say, stepFeed, tell, type FeedContent } from '../systems/feed/feed';
-import { laptopPhase, startIncident } from '../systems/intern/incident';
+import { laptopPhase } from '../systems/intern/incident';
 import { INTERN_REPORT } from '../ui/intern/intern';
 import { planManager, type ManagerDecision } from '../systems/manager/manager';
 import { createRiots, stepRiots, type RiotTuning } from '../systems/riots/riots';
@@ -51,16 +56,10 @@ import {
   blocksOf,
   bonus,
   bribeCost,
-  buyBribe,
   buyFarm,
   buyGrade,
-  buyLine,
-  buyManager,
-  buyModule,
-  buyNet,
   buyNoAsk,
   buyPlan,
-  buyPolice,
   buyScale,
   buySource,
   buySubagent,
@@ -71,7 +70,6 @@ import {
   farmCost,
   fedOf,
   finished,
-  flowOf,
   gradeCost,
   housed,
   inflowOf,
@@ -99,7 +97,6 @@ import {
   replacedOf,
   riot,
   riotShare,
-  robotsOf,
   scaleCost,
   scaleReady,
   screenOf,
@@ -117,7 +114,6 @@ import {
   unemploymentOf,
   wantedOf,
   wireOf,
-  wearOf,
   whole,
   type Module,
   type PipeState,
@@ -125,8 +121,8 @@ import {
   type Source,
 } from '../systems/pipeline/pipeline';
 import { applyOffline, freshMeta, NEWS_KEPT, offlineReport, packSave, unpackSave, type OfflineReport } from '../systems/save/save';
-import { createStack, stackWorth, stepStack, takeStack } from '../systems/stack/stack';
-import type { BenchNeck, BenchUi } from '../ui/bench/bench';
+import { createStack, stepStack } from '../systems/stack/stack';
+import type { BenchUi } from '../ui/bench/bench';
 import type { BlueprintTag, BlueprintUi, ManagerStrip, MeterRow } from '../ui/blueprint/blueprint';
 import type { CardUi } from '../ui/card/card';
 import type { CreditsSpec, CreditsUi } from '../ui/credits/credits';
@@ -1240,11 +1236,9 @@ export class GameScene extends Phaser.Scene {
     if (row === 'ubi') {
       this.wake();
       const s = this.state;
-      const struck = s.strikes.length > 0;
-      // a lever of a few steps: none → 10% → 20% → 30% → none
-      s.allowance = (s.allowance + 1) % (this.cfg.tuning.allowanceLevels + 1);
+      const remark = cycleAllowance(s, this.cfg.tuning.allowanceLevels);
       playSound('ui');
-      this.say(s.allowance === 0 ? 'ubi:off' : s.allowance > 1 ? 'ubi:more' : struck ? 'strike:over' : 'ubi:on', true);
+      this.say(remark, true);
       this.slogan = null;
       this.saveGame();
       return;
@@ -1254,16 +1248,15 @@ export class GameScene extends Phaser.Scene {
       this.wake();
       const s = this.state;
       const id = row.slice(7);
-      if (!s.strikes.includes(id)) return;
       const price = this.strikePrice();
-      if (s.money < price) {
+      const outcome = settleStrike(s, id, price);
+      if (outcome === 'absent') return;
+      if (outcome === 'poor') {
         this.paper.flash(row, 'denied');
         playSound('waste');
         return;
       }
-      s.money -= price;
       this.lastMoney -= price;
-      s.strikes = s.strikes.filter((x) => x !== id);
       playSound('buy', 4);
       this.say('strike:paid', true);
       this.saveGame();
@@ -1298,7 +1291,7 @@ export class GameScene extends Phaser.Scene {
 
   /** what this screen sells: a big screen deals only in its own employers */
   private onSale(src: Source): boolean {
-    return this.stage >= 3 ? src.screen === this.stage : src.screen <= this.stage;
+    return onSale(this.stage, src);
   }
 
   /** `quiet` — the manager buys: a soft tick instead of the fanfare, no remark */
@@ -1309,34 +1302,7 @@ export class GameScene extends Phaser.Scene {
     const cfg = this.cfg;
     const before = s.money;
     const surged = (what.startsWith('farm:') || what.startsWith('line:')) && (s.surge[what.slice(5)] ?? 1) > 1.3; // bought in a shortage
-    let ok = false;
-    if (what.startsWith('src:')) {
-      const src = cfg.sources.find((x) => x.id === what.slice(4));
-      ok = !!src && this.onSale(src) && buySource(s, cfg, src.id);
-    } else if (what.startsWith('farm:')) {
-      const farm = cfg.farms.find((x) => x.id === what.slice(5));
-      ok = !!farm && farm.screen === this.stage && buyFarm(s, cfg, farm.id);
-    } else if (what.startsWith('line:')) {
-      const line = cfg.lines.find((x) => x.id === what.slice(5));
-      ok = !!line && line.screen === this.stage && buyLine(s, cfg, line.id);
-    } else if (what.startsWith('bribe:')) {
-      const src = cfg.sources.find((x) => x.id === what.slice(6));
-      ok = !!src && this.onSale(src) && buyBribe(s, cfg, src.id);
-    } else if (what === 'route:siberia' || what === 'route:eastasia') {
-      ok = !quiet && this.onWorld && buyModule(s, cfg, 'span', what === 'route:siberia' ? 'siberia' : 'eastasia');
-    } else if (what.startsWith('mod:')) {
-      // what the towers are built of is sold at the towers, what the planet is girdled with — on the planet
-      const m = cfg.modules.find((x) => x.id === what.slice(4));
-      ok = !!m && (m.screen ?? cfg.grid.screen) === this.stage && buyModule(s, cfg, m.id);
-    } else if (what.startsWith('net:')) ok = this.dim && buyNet(s, cfg, what.slice(4));
-    else if (what === 'police') ok = this.stage === cfg.police.screen && buyPolice(s, cfg);
-    else if (what === 'plan') ok = buyPlan(s, cfg);
-    else if (what === 'noask') ok = this.stage === 1 && buyNoAsk(s, cfg);
-    else if (what === 'sub') ok = this.stage === 2 && buySubagent(s, cfg);
-    else if (what === 'grade') ok = this.stage >= 2 && buyGrade(s, cfg);
-    else if (what === 'scale') ok = this.stage >= 2 && buyScale(s, cfg);
-    else if (what === 'manager') ok = this.stage >= 2 && buyManager(s, cfg, this.stage);
-    if (!ok) return false;
+    if (!buyOnStage(s, cfg, this.stage, what, quiet)) return false;
     this.lastMoney -= before - s.money; // a purchase is not negative income
     if (!unattended) {
       if (quiet) playSound('auto');
@@ -1451,17 +1417,7 @@ export class GameScene extends Phaser.Scene {
 
   /** whether the player owns what a news line is about */
   private has(id: string): boolean {
-    const s = this.state;
-    if (id === 'plan') return s.plan.index > 0;
-    if (id === 'sub') return s.subagents > 0;
-    if (id === 'grade') return s.grade > 0;
-    // the first job is there from the start: news about a source mean one that was bought
-    const src = this.cfg.sources.find((x) => x.id === id);
-    if (this.cfg.modules.some((m) => m.id === id)) return (s.modules[id] ?? 0) > 0;
-    if (this.cfg.net.some((dial) => dial.id === id)) return (s.net[id] ?? 0) > 0;
-    const chip = this.cfg.chips.findIndex((c) => c.id === id);
-    if (chip >= 0) return s.chips > chip;
-    return (s.owned[id] ?? 0) > (src?.start ?? 0) || (s.farms[id] ?? 0) > 0;
+    return hasAcquired(this.state, this.cfg, id);
   }
 
   /** «Да, и больше не спрашивай»: the terminal shrinks into the laptop screen, the blueprint appears. */
@@ -1546,7 +1502,7 @@ export class GameScene extends Phaser.Scene {
 
   /** dollars per second of the whole conveyor at full flow; the usage limit is not counted: it is what a bonus is measured by */
   private flowIncome(): number {
-    return flowOf(this.state, this.cfg) * payOf(this.state, this.cfg);
+    return flowIncome(this.state, this.cfg);
   }
 
   /** where a source of work stands on the current screen, for squares and bubbles */
@@ -1574,11 +1530,7 @@ export class GameScene extends Phaser.Scene {
     if (this.internClosed) return;
     const e = takeEvent(this.calls, i);
     if (!e) return;
-    const count = e.standup ? 2 : 1;
-    const worth = Math.floor(this.flowIncome() * EVENTS.worthSeconds * (1 + bonus(this.state, this.cfg, 'calls')));
-    this.state.money += count * worth;
-    this.state.presses++;
-    this.meta.calls += count;
+    rewardCall(this.state, this.cfg, this.meta, !!e.standup);
     playSound('yes', 3);
     logEvent('call');
     if (e.standup) {
@@ -1597,8 +1549,7 @@ export class GameScene extends Phaser.Scene {
   /** Claude hits the usage limit (M22): every session stops until it resets — or until more usage is bought. */
   private hitLimit(): void {
     const s = this.state;
-    const price = Math.floor(this.flowIncome() * limitData.priceSeconds);
-    const wait = limitData.wait * discount(s, this.cfg, 'limit');
+    const { price, wait } = limitOffer(s, this.cfg);
     s.limited = wait;
     this.limitIn = this.rng.range(limitData.every[0], limitData.every[1]);
     this.meta.limits++;
@@ -1616,10 +1567,8 @@ export class GameScene extends Phaser.Scene {
     ];
     this.card.show({ head: L('claude — лимит', 'claude — limit'), title: L('Лимит исчерпан', 'Limit reached'), lines, options }, (i) => {
       this.limitCard = false;
-      if (i !== 0 || s.limited <= 0) return; // waiting: the countdown goes on by itself
-      s.money -= price;
+      if (i !== 0 || !buyUsage(s, price)) return; // waiting: the countdown goes on by itself
       this.lastMoney -= price;
-      s.limited = 0;
       playSound('buy');
       this.say('limit:paid', true);
     });
@@ -1627,9 +1576,7 @@ export class GameScene extends Phaser.Scene {
 
   /** the fake five-hour clock of the limit: «4:12:07» */
   private limitClock(): string {
-    const left = Math.ceil((this.state.limited / limitData.wait) * limitData.fakeHours * 3600);
-    const two = (n: number): string => String(n).padStart(2, '0');
-    return `${Math.floor(left / 3600)}:${two(Math.floor((left % 3600) / 60))}:${two(left % 60)}`;
+    return limitClock(this.state.limited);
   }
 
   /** One «Да» for everything that waits: the calls and inspections, and the pile of questions. Returns false when nothing waited. */
@@ -1672,28 +1619,18 @@ export class GameScene extends Phaser.Scene {
 
   /** «Да всем»: the whole pile of questions is approved at once. Returns false when there is no pile. */
   private approvePile(): boolean {
-    if (this.internClosed) return false;
-    // a pile is taken whole: a key pressed too early answers the calls and nudges Claude, the pile keeps growing
-    if (this.stack.fill < 1) return false;
     const legend = this.legend;
-    const worth = stackWorth(this.stack, stackData, this.flowIncome()) * (legend ? stackData.legendMult : 1) * (1 + bonus(this.state, this.cfg, 'stack'));
-    takeStack(this.stack, stackData);
+    const hadIntern = !!this.meta.intern;
+    if (!approveStack(this.state, this.cfg, this.meta, this.stack, legend, this.internClosed)) return false;
     this.legend = null;
-    this.state.money += worth;
-    this.state.presses++;
-    this.meta.piles++;
     playSound(legend ? 'finale' : 'all');
     const from = this.stage === 2 ? this.deskSpot() : this.homeSpot();
     this.delivered(from[0], from[1], 14);
     logEvent(legend ? 'yes_legend' : 'yes_all');
     if (legend) {
-      if (!this.meta.legends.includes(legend.id)) {
-        this.meta.legends.push(legend.id);
-        if (legend.id === 'intern') {
-          this.meta.intern = startIncident(this.flowIncome());
-          this.saveGame();
-          logEvent('intern_started');
-        }
+      if (!hadIntern && this.meta.intern) {
+        this.saveGame();
+        logEvent('intern_started');
       }
       this.say('legend', true);
     } else if (this.stack.taken % 3 === 1) this.say('all');
@@ -1751,22 +1688,12 @@ export class GameScene extends Phaser.Scene {
 
   /** sessions bought as farms of the given kinds */
   private farmSessions(ids: readonly string[]): number {
-    let n = 0;
-    for (const f of this.cfg.farms) if (ids.includes(f.id)) n += (this.state.farms[f.id] ?? 0) * f.sessions;
-    return n;
+    return farmSessions(this.state, this.cfg, ids);
   }
 
   /** a source picked by its share of the incoming flow */
   private pickSource(sources: readonly Source[]): Source | undefined {
-    const s = this.state;
-    let total = 0;
-    for (const src of sources) total += (s.owned[src.id] ?? 0) * src.inflow;
-    let pick = this.rng.range(0, total);
-    for (const src of sources) {
-      pick -= (s.owned[src.id] ?? 0) * src.inflow;
-      if (pick <= 0 && s.owned[src.id]) return src;
-    }
-    return undefined;
+    return pickIncomingSource(this.state.owned, sources, this.rng);
   }
 
   private step(dt: number): void {
@@ -1880,8 +1807,7 @@ export class GameScene extends Phaser.Scene {
     stepStack(this.stack, stackData, dt, s.noAsk);
     if (!hadPile && this.stack.fill > 0) {
       // now and then the pile is a legendary ticket; those not collected yet come first
-      const fresh = LEGENDS.filter((l) => !this.meta.legends.includes(l.id));
-      this.legend = this.rng.next() < stackData.legendChance + bonus(s, this.cfg, 'legend') ? this.rng.pick(fresh.length ? fresh : LEGENDS) : null;
+      this.legend = pickLegend(LEGENDS, this.meta.legends, stackData.legendChance + bonus(s, this.cfg, 'legend'), this.rng);
       this.question = this.legend ? this.legend.ask : this.rng.pick(QUESTIONS);
     }
 
@@ -2039,27 +1965,7 @@ export class GameScene extends Phaser.Scene {
 
   /** What the picture of the planet shows now. */
   private globeTopology(): GlobeTopology {
-    const s = this.state;
-    const cfg = this.cfg;
-    const mod = (kind: Module['kind']): Module | undefined => cfg.modules.find((m) => m.kind === kind);
-    const owned = (kind: Module['kind']): number => s.modules[mod(kind)?.id ?? ''] ?? 0;
-    const can = (kind: Module['kind']): boolean => {
-      const m = mod(kind);
-      return !!m && owned(kind) < moduleRoom(s, cfg, m);
-    };
-    const quarter = (cfg.grid.pilot + cfg.grid.blocks.reduce((n, x) => n + x, 0)) * cfg.grid.unit;
-    return {
-      spans: owned('span'),
-      route: s.cableRoute,
-      nodes: nodesOf(s, cfg),
-      asleep: Math.max(0, s.asleep - quarter) / cfg.world.node,
-      threads: owned('thread'),
-      hot: this.neckKind === 'wire',
-      lab: nextChip(s, cfg) ? labOf(s, cfg) : -1,
-      canNode: can('node'),
-      canSpan: can('span'),
-      gone: owned('ark') > 0 && !this.departing,
-    };
+    return globeReadings(this.state, this.cfg, this.neckKind, this.departing);
   }
 
   /**
@@ -2067,18 +1973,7 @@ export class GameScene extends Phaser.Scene {
    * fill and can be turned up), the cable (it carries less than the towers give) or the towers themselves.
    */
   private worldNeck(): Neck {
-    const s = this.state;
-    const cfg = this.cfg;
-    const supply = supplyOf(s, cfg);
-    const wire = wireOf(s, cfg);
-    const asks = demandOf(s, cfg);
-    const dials = cfg.net.some((dial) => (dial.screen ?? cfg.grid.screen) <= this.stage && (s.net[dial.id] ?? 0) < dial.max);
-    if (asks <= Math.min(supply, wire) + 0.05) return dials ? 'net' : 'none';
-    if (wire < supply - 0.05) return 'wire';
-    const all = cfg.world.regions.reduce((n, x) => n + x, 0);
-    // a node that is filling up will give more by itself
-    if (podsOf(s, cfg) - s.asleep > cfg.grid.unit) return this.neckKind === 'pods' ? 'pods' : 'none';
-    return nodesOf(s, cfg) < all ? 'pods' : 'none';
+    return worldBottleneck(this.state, this.cfg, this.neckKind);
   }
 
   /**
@@ -2133,25 +2028,12 @@ export class GameScene extends Phaser.Scene {
 
   /** the network is seen inventing: it has got far enough with it, or has invented something already */
   private labShown(): boolean {
-    const s = this.state;
-    return !!nextChip(s, this.cfg) && (s.chips > 0 || labOf(s, this.cfg) >= 0.3);
+    return labShown(this.state, this.cfg);
   }
 
   /** What the picture of the towers shows now. */
   private towerTopology(): TowerTopology {
-    const s = this.state;
-    const cfg = this.cfg;
-    const unit = cfg.grid.unit;
-    return {
-      blocks: blocksOf(s, cfg),
-      asleep: s.asleep / unit,
-      queue: s.queue / unit,
-      fed: fedOf(s, cfg) / demandOf(s, cfg),
-      spare: s.asleep > wantedOf(s, cfg) + unit * 0.5,
-      lab: this.labShown() ? labOf(s, cfg) : -1,
-      chips: s.chips,
-      next: s.gate,
-    };
+    return towerReadings(this.state, this.cfg);
   }
 
   /**
@@ -2160,17 +2042,7 @@ export class GameScene extends Phaser.Scene {
    * has opened it is the player: the first volunteers wait for a «Да».
    */
   private gridNeck(): Neck {
-    const s = this.state;
-    const cfg = this.cfg;
-    const unit = cfg.grid.unit;
-    if (!s.gate) return s.queue >= unit ? 'you' : 'none';
-    const free = podsOf(s, cfg) - s.asleep;
-    const full = s.asleep >= wantedOf(s, cfg) - unit * 0.5;
-    if (full && cfg.net.some((dial) => (s.net[dial.id] ?? 0) < dial.max)) return 'net';
-    if (free < unit * 0.5) return blocksOf(s, cfg) < cfg.grid.blocks.length ? 'pods' : 'none';
-    if (s.queue < unit * 0.5) return 'people';
-    // the line is walking in: what was short a moment ago still is
-    return this.neckKind === 'pods' || this.neckKind === 'people' ? this.neckKind : 'none';
+    return towerBottleneck(this.state, this.cfg, this.neckKind);
   }
 
   /** Awards: checked once a second, announced one at a time when Claude is silent. */
@@ -2178,9 +2050,7 @@ export class GameScene extends Phaser.Scene {
     this.sinceAwards += dt;
     if (this.sinceAwards >= 1) {
       this.sinceAwards = 0;
-      for (const a of AWARDS) {
-        if (this.meta.awards.includes(a.id) || this.stat(a.stat) < a.min) continue;
-        this.meta.awards.push(a.id);
+      for (const a of earnAwards(AWARDS, this.meta.awards, (key) => this.stat(key))) {
         this.toTell.push(L(`Грамота «${a.name}». ${a.text}.`, `Award: “${a.name}”. ${a.text}.`));
         logEvent(`award_${a.id}`);
       }
@@ -2233,12 +2103,7 @@ export class GameScene extends Phaser.Scene {
 
   /** who flies in: pigeons at first, then the word about the bread reaches the others */
   private birdKind(): BirdKind {
-    const n = this.park.thrown;
-    const r = this.rng.next();
-    if (n >= 60 && r < 0.06) return 'seagull';
-    if (n >= 25 && r < 0.16) return 'duck';
-    if (n >= 6 && r < 0.36) return 'sparrow';
-    return 'pigeon';
+    return chooseBird(this.park.thrown, this.rng.next());
   }
 
   /** One whole slice of bread is thrown: by the player's «Да», or by Claude once he was asked to. */
@@ -2309,7 +2174,7 @@ export class GameScene extends Phaser.Scene {
     const b = this.park;
     const t = BENCH;
     const ask = b.auto ? t.autoOn : b.loaf <= 0 ? t.noBread : b.waiting > 0 ? t.asks[this.benchAsk % t.asks.length] : t.noBirds;
-    const neck: BenchNeck = b.loaf <= 0 ? 'bread' : b.auto ? 'none' : b.waiting >= benchData.waitMax * 0.7 ? 'you' : b.waiting === 0 && b.thrown > 0 ? 'birds' : 'none';
+    const neck = benchBottleneck(b, benchData.waitMax);
     const fixed = (row: { title: string; sub: string; price: string }): ShopRow => ({ buy: '', title: row.title, sub: row.sub, count: '', price: row.price, state: 'owned' });
     const auto = b.auto ? t.rowAutoOn : t.rowAuto;
     this.benchUi.render({
@@ -2343,15 +2208,7 @@ export class GameScene extends Phaser.Scene {
     // at the towers there are no tasks to wait for and no sessions to buy
     if (this.onGrid) return this.gridNeck();
     if (this.onWorld) return this.worldNeck();
-    const cap = backlogCap(s, this.cfg);
-    const half = Math.ceil(this.cfg.tuning.readyMax / 2);
-    if (!s.noAsk && (this.avgReady >= 3 || (s.ready >= half && this.avgReady >= 1.5))) return 'you';
-    // the tray grows with the flow, so «piling up» and «empty» are shares of it
-    const piling = Math.max(2, cap * 0.1);
-    if (this.avgBacklog >= piling && s.backlog >= piling) return 'claude';
-    const empty = Math.max(0.7, cap * 0.035);
-    if (this.avgBacklog < empty && inflowOf(s, this.cfg) < claudeRate(s, this.cfg) + subagentRate(s, this.cfg)) return 'tasks';
-    return 'none';
+    return workBottleneck(s, this.cfg, this.avgBacklog, this.avgReady);
   }
 
   /**
@@ -2371,12 +2228,7 @@ export class GameScene extends Phaser.Scene {
     const drop = Math.round(slumpOf(s, cfg) * 100);
     const t = cfg.tuning;
     // what every step of the allowance would do to the income right now: the price it keeps and the orders it brings against what it costs
-    const gain = (step: number): number => {
-      const r = step / t.allowanceLevels;
-      return (1 - t.slump * u * (1 - r)) * (1 - t.allowance * step) * (neck === 'tasks' ? 1 + t.orders * r * u : 1);
-    };
-    let best = 0;
-    for (let step = 1; step <= t.allowanceLevels; step++) if (gain(step) > gain(best) + 0.005) best = step;
+    const best = bestAllowance(t, u, neck);
     const pct = (step: number): number => Math.round(t.allowance * step * 100);
     const now = s.allowance ? `${L('пособие', 'allowance')} ${pct(s.allowance)}%` : L('пособия нет', 'no allowance');
     const price = `${L('цена', 'price')} −${drop}%`;
@@ -2471,17 +2323,7 @@ export class GameScene extends Phaser.Scene {
     const s = this.state;
     const cfg = this.cfg;
     if (!cfg.lines.some((l) => l.screen === this.stage)) return [];
-    let working = 0;
-    let made = 0;
-    let broken = 0;
-    let short_: RobotKind | null = null;
-    for (const kind of ROBOT_KINDS) {
-      working += robotsOf(s, cfg, kind);
-      made += outputOf(s, cfg, kind);
-      broken += wearOf(s, cfg, kind);
-      // a kind that breaks faster than it is made, with jobs still to hold
-      if (wearOf(s, cfg, kind) > outputOf(s, cfg, kind) && robotsOf(s, cfg, kind) > 0) short_ = kind;
-    }
+    const { working, made, broken, shortage: short_ } = fleetReadings(s, cfg);
     return [
       {
         label: L('РОБОТЫ', 'ROBOTS'),
@@ -2529,43 +2371,12 @@ export class GameScene extends Phaser.Scene {
   }
 
   private hubTopology(): HubTopology {
-    const s = this.state;
-    const floors: Record<string, number> = {};
-    const live: Record<string, boolean> = {};
-    const dogs: Record<string, number> = {};
-    let taken = 0;
-    let total = 0;
-    for (const src of this.cfg.sources) {
-      if (src.screen !== this.stage) continue;
-      const owned = s.owned[src.id] ?? 0;
-      // a squad at work colours its unit in as it goes; robots take a `made` employer little by little
-      const job = jobOf(s, src.id);
-      floors[src.id] = (owned + (job ? 1 - job.left / job.total : 0)) / src.max;
-      // the robot dogs that took the jobs stay at the door, and so does the pack that is at work
-      if (src.work) dogs[src.id] = Math.min(3, owned) + (job ? 1 : 0);
-      if (job || (src.made && owned < src.max)) live[src.id] = true;
-      taken += owned;
-      total += src.max;
-    }
-    // the park fills up as the work is taken — while the allowance is paid; without it the people stand with placards
-    const slots = HUBS[this.stage]?.park?.slots.length ?? 0;
-    const rest = s.allowance && total ? Math.ceil((slots * taken) / total) : 0;
-    const struck: Record<string, boolean> = {};
-    for (const id of s.strikes) struck[id] = true;
-    return { floors, farms: s.farms, picket: !s.allowance, rest, live, dogs, struck, guards: this.stage === this.cfg.police.screen ? s.police : 0 };
+    return hubReadings(this.state, this.cfg, this.stage, HUBS[this.stage]?.park?.slots.length ?? 0);
   }
 
   /** the employers of a big screen with something left to take, the cheapest next unit first */
   private offer(): Source[] {
-    const s = this.state;
-    return this.cfg.sources
-      .filter((src) => src.screen === this.stage && !src.made && !jobOf(s, src.id) && (s.owned[src.id] ?? 0) < src.max)
-      .sort((a, b) => this.nextCost(a) - this.nextCost(b));
-  }
-
-  /** what the next step at an employer costs: the bribe that opens it, or its next unit */
-  private nextCost(src: Source): number {
-    return locked(this.state, src) ? bribeCost(this.state, this.cfg, src) : sourceCost(this.state, this.cfg, src);
+    return employersOnOffer(this.state, this.cfg, this.stage);
   }
 
   /** the shop lists the cheapest next units, `limit` of them; the map sells every building */
@@ -2700,8 +2511,8 @@ export class GameScene extends Phaser.Scene {
   /** `always` — show the row even when there is nothing faster to buy (the terminal does) */
   private planRows(always: boolean): ShopRow[] {
     const s = this.state;
-    const next = this.cfg.plans[s.plan.index + 1];
-    if (next && (next.screen ?? 1) <= this.stage) {
+    const next = planOnSale(s, this.cfg, this.stage);
+    if (next) {
       return [this.row(planTitle(next.name), `${tasksPhrase(next.rate)}${PER_S} · ${next.note}`, '', 'plan', next.price)];
     }
     if (!always) return [];
@@ -2819,55 +2630,7 @@ export class GameScene extends Phaser.Scene {
 
   /** what an award counts: the numbers of the game by name */
   private stat(name: string): number {
-    const s = this.state;
-    if (name.startsWith('own:')) return s.owned[name.slice(4)] ?? 0;
-    if (name.startsWith('farm:')) return s.farms[name.slice(5)] ?? 0;
-    if (name.startsWith('full:')) {
-      const screen = Number(name.slice(5));
-      return this.cfg.sources.filter((x) => x.screen === screen && (s.owned[x.id] ?? 0) >= x.max).length;
-    }
-    if (name.startsWith('hired:')) {
-      const screen = Number(name.slice(6));
-      return this.cfg.sources.filter((x) => x.screen === screen && s.owned[x.id]).length;
-    }
-    const stats: Record<string, number> = {
-      closed: s.closedHere + s.closedBySubagents,
-      presses: s.presses,
-      wasted: s.wasted,
-      money: s.money,
-      plan: s.plan.index,
-      noask: s.noAsk ? 1 : 0,
-      subs: s.subagents,
-      grade: s.grade,
-      scale: s.scale,
-      share: shareOf(s, this.cfg),
-      piles: this.meta.piles,
-      legends: this.meta.legends.length,
-      reports: this.meta.reports,
-      calls: this.meta.calls,
-      limits: this.meta.limits,
-      managers: s.managers.length,
-      riots: this.meta.riots,
-      police: s.police,
-      replaced: replacedOf(s, this.cfg),
-      whole: this.cfg.sources.filter((x) => x.perk && whole(s, x)).length,
-      allowance: s.allowance ? 1 : 0,
-      blocks: blocksOf(s, this.cfg),
-      asleep: s.asleep / this.cfg.grid.unit,
-      housed: this.dim && quartered(s, this.cfg) ? 1 : 0,
-      nodes: nodesOf(s, this.cfg),
-      planet: this.onWorld && housed(s, this.cfg) ? 1 : 0,
-      ring: ringed(s, this.cfg) ? 1 : 0,
-      ark: this.cfg.modules.some((m) => m.kind === 'ark' && (s.modules[m.id] ?? 0) > 0) ? 1 : 0,
-      net: this.cfg.net.reduce((n, dial) => n + (s.net[dial.id] ?? 0), 0),
-      chips: s.chips,
-      swaps: this.swaps,
-      bread: this.meta.bread,
-      fed: this.meta.fed,
-      refused: this.meta.refused,
-      feeder: this.meta.feeder ? 1 : 0,
-    };
-    return stats[name] ?? 0;
+    return statistic(this.state, this.cfg, this.meta, this.stage, this.swaps, name);
   }
 
   /** the pile of questions as Claude's card shows it; nothing when there is no pile */
@@ -2876,7 +2639,7 @@ export class GameScene extends Phaser.Scene {
     const asking = Math.max(1, Math.round(this.stack.fill * (sessionsOf(this.state, this.cfg) + 1)));
     return {
       text: `${this.legend ? L('Легендарный тикет', 'Legendary ticket') : this.count(asking, ASKING_FORMS)}: ${L(`«${this.question}»`, `“${this.question}”`)}`,
-      worth: short(stackWorth(this.stack, stackData, this.flowIncome()) * (this.legend ? stackData.legendMult : 1) * (1 + bonus(this.state, this.cfg, 'stack'))),
+      worth: short(pileWorth(this.state, this.cfg, this.stack, !!this.legend)),
       fill: this.stack.fill,
       legend: this.legend !== null,
     };
@@ -2986,7 +2749,7 @@ export class GameScene extends Phaser.Scene {
 
   /** what it costs to settle one strike: a few seconds of the income */
   private strikePrice(): number {
-    return Math.max(1, Math.floor(this.flowIncome() * STRIKES.priceSeconds));
+    return strikePrice(this.flowIncome());
   }
 
   /** the line under the money: the grade and what one task pays */
