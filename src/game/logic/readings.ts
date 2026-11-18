@@ -20,6 +20,7 @@ import {
   type Module,
   type PipeConfig,
   type PipeState,
+  type Source,
   type RobotKind,
 } from '../../systems/pipeline/pipeline';
 
@@ -56,7 +57,7 @@ export function hubReadings(
     taken += owned;
     total += src.max;
   }
-  // the park fills up as the work is taken вЂ” while the allowance is paid; without it the people stand with placards
+  // With an allowance the park fills as jobs disappear. Otherwise workers picket.
   const rest = s.allowance && total ? Math.ceil((slots * taken) / total) : 0;
   const struck: Record<string, boolean> = {};
   for (const id of s.strikes) struck[id] = true;
@@ -155,4 +156,15 @@ export function benchBottleneck(b: BenchState, max: number): BenchNeck {
         : b.waiting === 0 && b.thrown > 0
           ? 'birds'
           : 'none';
+}
+
+export function roundedPopulation(people: number, unit: number): number {
+  return Math.max(0, Math.round(people / unit)) * unit;
+}
+
+export function staffingProgress(owned: number, employer: Source) {
+  return {
+    remaining: (employer.max - owned) * (employer.staff ?? 0),
+    percent: Math.floor((owned / employer.max) * 100),
+  };
 }

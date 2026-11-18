@@ -91,3 +91,15 @@ export function buyOnStage(
   if (what === 'manager') return stage >= 2 && buyManager(s, cfg, stage);
   return false;
 }
+
+export function surgeMultiplier(s: PipeState, id: string): number {
+  return s.surge[id] ?? 1;
+}
+
+/** The price is shown to the nearest percent. Claude comments only on a larger shortage. */
+export function boughtInShortage(s: PipeState, what: string): boolean {
+  return (
+    (what.startsWith('farm:') || what.startsWith('line:')) &&
+    surgeMultiplier(s, what.slice(5)) > 1.3
+  );
+}

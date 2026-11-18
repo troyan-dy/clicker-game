@@ -1,3 +1,4 @@
+import { automaticCall } from './stages';
 import type { Rng } from '../../core/rng';
 import { CALLS } from '../../content/calls';
 import { PICKET } from '../../content/picket';
@@ -5,7 +6,6 @@ import people from '../../data/tuning/people.json';
 import { stepEvents, type EventsState, type EventsTuning } from '../../systems/events/events';
 import {
   discount,
-  finished,
   unemploymentOf,
   type PipeConfig,
   type PipeState,
@@ -13,17 +13,6 @@ import {
 } from '../../systems/pipeline/pipeline';
 import { stepRiots, type RiotState, type RiotTuning } from '../../systems/riots/riots';
 import { stepStrikes, type StrikeState, type StrikeTuning } from '../../systems/strikes/strikes';
-
-export function endingAction(
-  s: PipeState,
-  cfg: PipeConfig,
-  won: boolean,
-  departing: boolean,
-  onWorld: boolean,
-) {
-  if (won || departing || !finished(s, cfg)) return null;
-  return onWorld ? 'depart' : 'ending';
-}
 
 export function streetRiot(
   riots: RiotState,
@@ -94,7 +83,7 @@ export function advanceCalls(
     rng,
     ready,
   );
-  const answer = options.selfPlay && calls.list.some((e) => e.left < tuning.life - 2);
+  const answer = automaticCall(options.selfPlay, calls.list, tuning.life);
   return { missed, answer };
 }
 

@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
   chooseBird,
+  completeEmployers,
+  cycleLine,
   earnAwards,
   hasAcquired,
   pickIncomingSource,
@@ -110,4 +112,21 @@ describe('world progress', () => {
   ] as const)('after %i throws and a roll of %f the park gets a %s', (n, r, bird) =>
     expect(chooseBird(n, r)).toBe(bird),
   );
+});
+
+it('announces a completed market only once and rotates each series of lines independently', () => {
+  const s = createPipe(cfg),
+    said = {};
+  const market = cfg.sources.filter((x) => x.screen === 5);
+  expect(completeEmployers(s, cfg, 5, said)).toBe(false);
+  for (const src of market) s.owned[src.id] = src.max;
+  expect(completeEmployers(s, cfg, 5, said)).toBe(true);
+  expect(completeEmployers(s, cfg, 5, said)).toBe(false);
+  const lines = ['one', 'two'];
+  expect(['a', 'a', 'b', 'a'].map((key) => cycleLine(said, key, lines))).toEqual([
+    'one',
+    'two',
+    'one',
+    'one',
+  ]);
 });

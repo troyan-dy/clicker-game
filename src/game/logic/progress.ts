@@ -124,3 +124,26 @@ export function pickIncomingSource(
   }
   return undefined;
 }
+
+/** Mark completion once. Only screens with a completion headline use this milestone. */
+export function completeEmployers(
+  s: PipeState,
+  cfg: PipeConfig,
+  screen: number,
+  said: Record<string, number>,
+): boolean {
+  const key = 'done' + screen;
+  if (said[key] || !cfg.sources.every((x) => x.screen !== screen || whole(s, x))) return false;
+  said[key] = 1;
+  return true;
+}
+
+export function cycleLine(
+  said: Record<string, number>,
+  key: string,
+  lines: readonly string[],
+): string {
+  const n = said[key] ?? 0;
+  said[key] = n + 1;
+  return lines[n % lines.length];
+}

@@ -5,7 +5,6 @@ import {
   advanceCalls,
   advancePlacard,
   callOwners,
-  endingAction,
   limitDue,
   streetRiot,
   streetStrike,
@@ -157,18 +156,6 @@ describe('street incidents', () => {
 });
 
 describe('run progression', () => {
-  it('starts the appropriate ending only once and only after the last purchase', () => {
-    const s = createPipe(cfg);
-    s.scale = cfg.scales.length;
-    expect(endingAction(s, cfg, false, false, true)).toBeNull();
-    s.modules.ark = 1;
-    expect(endingAction(s, cfg, false, false, true)).toBe('depart');
-    expect(endingAction(s, cfg, false, true, true)).toBeNull();
-    expect(endingAction(s, cfg, true, false, true)).toBeNull();
-    const old = { ...cfg, scales: [], sources: [] };
-    expect(endingAction(createPipe(old), old, false, false, false)).toBe('ending');
-  });
-
   it('raises new usage limits only outside an incident or modal and before permanent immunity', () => {
     const s = createPipe(cfg);
     expect(limitDue(1, false, false, s, cfg)).toBe(false);

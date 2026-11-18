@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { cfg } from './fixtures/pipe';
-import { buyOnStage, employersOnOffer } from '../src/game/logic/market';
+import { boughtInShortage, buyOnStage, employersOnOffer } from '../src/game/logic/market';
 import { bribeCost, createPipe, sourceCost } from '../src/systems/pipeline/pipeline';
 
 function funded(stage: number) {
@@ -114,4 +114,14 @@ describe('the shop on the current screen', () => {
       open.map((x) => sourceCost(s, cfg, x)).sort((a, b) => a - b),
     );
   });
+});
+
+it('recognizes shortages only for farms and production lines above the commentary threshold', () => {
+  const s = createPipe(cfg);
+  expect(boughtInShortage(s, 'farm:rack')).toBe(false);
+  s.surge.rack = 1.3;
+  expect(boughtInShortage(s, 'farm:rack')).toBe(false);
+  s.surge.rack = 1.31;
+  expect(boughtInShortage(s, 'line:rack')).toBe(true);
+  expect(boughtInShortage(s, 'src:rack')).toBe(false);
 });

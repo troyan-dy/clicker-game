@@ -115,10 +115,3 @@ export function say(f: FeedState, content: FeedContent, tuning: FeedTuning, on: 
   f.quiet = f.quipLeft + tuning.quipGap;
   return true;
 }
-
-/** Rotate a category's remarks without changing any other category's position. */
-export function nextRemark(feed: FeedState, key: string, lines: readonly string[]): string {
-  const index = feed.said[key] ?? 0;
-  feed.said[key] = index + 1;
-  return lines[index % lines.length];
-}

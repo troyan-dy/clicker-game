@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
   benchBottleneck,
+  roundedPopulation,
+  staffingProgress,
   bestAllowance,
   farmSessions,
   fleetReadings,
@@ -130,5 +132,15 @@ describe('values computed for the game screens', () => {
     expect(read()).toBe('none');
     b.loaf = 0;
     expect(read()).toBe('bread');
+  });
+});
+
+it('rounds sleepers to the closest unit and counts unfilled positions at a partial takeover', () => {
+  expect([0, 4, 5, 14, 15].map((n) => roundedPopulation(n, 10))).toEqual([0, 0, 10, 10, 20]);
+  const employer = { ...cfg.sources[0], max: 4, staff: 24 };
+  expect(staffingProgress(1.5, employer)).toEqual({ remaining: 60, percent: 37 });
+  expect(staffingProgress(0, { ...employer, staff: undefined })).toEqual({
+    remaining: 0,
+    percent: 0,
   });
 });

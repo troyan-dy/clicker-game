@@ -2,7 +2,6 @@ import { expect, it } from 'vitest';
 import { BENCH } from '../src/content/bench';
 import tuning from '../src/data/tuning/bench.json';
 import { createBench } from '../src/systems/bench/bench';
-import { createFeed, nextRemark } from '../src/systems/feed/feed';
 import { createPipe } from '../src/systems/pipeline/pipeline';
 import { freshMeta } from '../src/systems/save/save';
 import { approvePending, openVolunteerGate, routePress, settleIntern, signResearch } from '../src/game/logic/approval';
@@ -88,9 +87,4 @@ it('distinguishes refusing a waiting bird from pressing No with an empty queue',
   park.waiting = 1;
   expect(refuseFeeding(park, meta)).toEqual({ refused: true, useReply: true });
   expect([meta.refused, park.refused, park.waiting]).toEqual([3, 1, 0]);
-  const feed = createFeed();
-  expect(nextRemark(feed, 'no', ['A', 'B'])).toBe('A');
-  expect(nextRemark(feed, 'auto', ['C'])).toBe('C');
-  expect(nextRemark(feed, 'no', ['A', 'B'])).toBe('B');
-  expect(nextRemark(feed, 'no', ['A', 'B'])).toBe('A');
 });
