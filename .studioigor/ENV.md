@@ -40,7 +40,7 @@ VERIFIED: yes
 
 ## Commands
 RUN: npm run dev -- --open
-TEST: npx tsc --noEmit && npx vitest run
+TEST: npm test
 BUILD: npm run build
 CAPTURE: npm run build:gym && node tools/capture.mjs --dir dist-gym --url "/?gym=hello" --out .studioigor/captures/hello --duration 5 --every 1 --inputs tools/inputs/hello.json --wait-for "window.__GAME__?.ready" --seed 7
 EDITOR: none — the code is in the repository
