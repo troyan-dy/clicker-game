@@ -51,7 +51,7 @@ import { createTuningPanel, type TuningPanel } from '../debug/tuningPanel';
 import { birdRate, createBench, refuseBird, stepBench, throwBread } from '../systems/bench/bench';
 import { createEvents, stepEvents, takeEvent, type EventsTuning } from '../systems/events/events';
 import { createFeed, headline, say, stepFeed, tell, type FeedContent } from '../systems/feed/feed';
-import { managerPick, type ManagerNeed } from '../systems/manager/manager';
+import { managerPick } from '../systems/manager/manager';
 import { createRiots, stepRiots, type RiotTuning } from '../systems/riots/riots';
 import { createStrikes, stepStrikes, type StrikeTuning } from '../systems/strikes/strikes';
 import type { Plan } from '../systems/plan/plan';
@@ -1786,10 +1786,7 @@ export class GameScene extends Phaser.Scene {
       if (this.sinceManager >= managerTuning.period) {
         this.sinceManager = 0;
         if (s.managers.includes(this.stage) && !this.meta.managerOff && s.limited <= 0) {
-          // at the towers he builds the next block, betters the terms or starts a copy of the network — whatever runs short
-          const k = this.neckKind;
-          const need: ManagerNeed = k === 'tasks' || k === 'pods' || k === 'people' || k === 'net' || k === 'wire' ? k : k === 'claude' ? 'sessions' : null;
-          const pick = managerPick(s, this.cfg, this.stage, need, managerTuning.share);
+          const pick = managerPick(s, this.cfg);
           if (pick) this.buy(pick, true);
         }
       }
@@ -2749,10 +2746,10 @@ export class GameScene extends Phaser.Scene {
   private managerStrip(): ManagerStrip | undefined {
     const m = this.cfg.managers.find((x) => x.screen === this.stage);
     if (!m) return undefined;
-    if (!this.state.managers.includes(this.stage)) return { title: m.name, note: m.note, right: `$${short(m.price)}`, state: this.state.money >= m.price ? 'can' : 'poor' };
+    if (!this.state.managers.includes(this.stage)) return { title: m.name, note: L('покупает улучшения для перехода', 'buys upgrades for the next stage'), right: `$${short(m.price)}`, state: this.state.money >= m.price ? 'can' : 'poor' };
     return this.meta.managerOff
       ? { title: m.name, note: L('клик — пусть работает', 'click — back to work'), right: L('пауза', 'paused'), state: 'off' }
-      : { title: m.name, note: L('клик — пауза', 'click — pause'), right: L('покупает сам', 'buys by itself'), state: 'on' };
+      : { title: m.name, note: L('готовит переход · клик — пауза', 'preparing next stage · click to pause'), right: L('работает', 'working'), state: 'on' };
   }
 
   /** the requests of the employers as bubbles over their buildings */

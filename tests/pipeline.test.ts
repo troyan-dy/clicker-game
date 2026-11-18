@@ -49,7 +49,6 @@ import {
   keysNeeded,
   keysOf,
   labOf,
-  moduleRoom,
   netCost,
   nodesOf,
   payOf,
@@ -270,19 +269,32 @@ describe('pipeline', () => {
     expect(s.money).toBeGreaterThan(start); // …and work goes on after the reset
   });
 
-  it('test_manager_buys_only_what_is_needed_and_within_his_share', () => {
+  it('manager buys immediately when profitable and preserves an affordable transition', () => {
     const s = rich();
     buyNoAsk(s, cfg);
     expect(buyManager(s, cfg, 2)).toBe(true);
-    expect(buyManager(s, cfg, 2)).toBe(false); // one manager per screen
-    expect(managerPick(s, cfg, 2, null, 0.3)).toBeNull(); // nothing is short: he keeps the money
-    expect(managerPick(s, cfg, 2, 'sessions', 0.3)).toBe('sub');
-    expect(managerPick(s, cfg, 2, 'tasks', 0.3)).toBe('src:freelance'); // the cheapest work on sale
-    s.money = 20;
-    expect(managerPick(s, cfg, 2, 'tasks', 0.3)).toBeNull(); // dearer than his share of the money
+    expect(buyManager(s, cfg, 2)).toBe(false);
+    expect(managerPick(s, cfg)).toBeNull(); // the money for the transition stays on the account
+    s.money = cfg.plans[1].price;
+    const before = structuredClone(s);
+    expect(managerPick(s, cfg)).toBe('plan'); // spends 100% when it accelerates the transition
+    expect(s).toEqual(before);
+    s.money = cfg.scales[0].price - 1;
+    expect(managerPick(s, cfg)).toBeNull(); // waiting one dollar beats another upgrade
+  });
+
+  it('manager can finish mandatory employers even when income is already sufficient', () => {
+    const s = rich();
+    s.noAsk = true;
+    s.scale = 1;
     s.money = 1e12;
-    expect(managerPick(s, cfg, 3, 'tasks', 0.3)).toMatch(/^src:/);
-    expect(managerPick(s, cfg, 3, 'sessions', 0.3)).toBe('farm:rack');
+    const employers = cfg.sources.filter(x => x.screen === 3);
+    for (const x of employers.slice(0, 5)) s.owned[x.id] = x.max;
+    const last = employers[5];
+    s.owned[last.id] = last.max - 1;
+    expect(managerPick(s, cfg)).toBe('src:' + last.id);
+    buySource(s, cfg, last.id);
+    expect(managerPick(s, cfg)).toBeNull();
   });
 
   it('test_events_ask_only_employers_the_player_works_for', () => {
@@ -634,16 +646,17 @@ describe('pipeline', () => {
     expect(labOf(s, cfg)).toBeLessThan(0.5);
   });
 
-  it('test_manager_at_the_towers_buys_what_runs_short_and_leaves_the_price_of_a_gigawatt_to_the_player', () => {
+  it('manager helps fill the quarter and stops when it is ready', () => {
     const s = atTowers();
+    s.gate = true;
     s.money = 1e30;
-    const screen = cfg.grid.screen;
-    expect(managerPick(s, cfg, screen, 'pods', 1)).toBe('mod:block');
-    expect(managerPick(s, cfg, screen, 'people', 1)).toBe('mod:hire');
-    expect(managerPick(s, cfg, screen, 'net', 1)).toBe(`net:${cfg.net.find((p) => p.yield === 1)!.id}`);
-    // nothing is left to build: he does not buy a block that is not there
-    s.modules.block = cfg.grid.blocks.length;
-    expect(managerPick(s, cfg, screen, 'pods', 1)).toBeNull();
+    s.modules.block = cfg.grid.blocks.length - 1;
+    s.modules.hire = cfg.modules.find(m => m.kind === 'hire')!.max;
+    s.asleep = podsOf(s, cfg);
+    expect(managerPick(s, cfg)).toBe('mod:block');
+    buyModule(s, cfg, 'block');
+    s.asleep = podsOf(s, cfg);
+    expect(managerPick(s, cfg)).toBeNull();
   });
 
   it('test_planet_nodes_stand_where_the_cable_has_reached_and_the_cable_carries_only_so_much', () => {
@@ -682,14 +695,6 @@ describe('pipeline', () => {
     expect(buyModule(s, cfg, 'span')).toBe(true);
     expect(wireOf(s, cfg)).toBe(w.wire * 4);
     expect(buyModule(s, cfg, 'span')).toBe(false);
-    // the manager lays the cable when there is nowhere to put a node, and thickens it when it runs hot
-    const fresh = atTowers();
-    fresh.money = 1e40;
-    fresh.scale++;
-    fresh.modules.node = moduleRoom(fresh, cfg, cfg.modules.find((m) => m.kind === 'node')!);
-    expect(managerPick(fresh, cfg, w.screen, 'pods', 1)).toBe('mod:span');
-    expect(managerPick(fresh, cfg, w.screen, 'wire', 1)).toBe('mod:thread');
-    expect(managerPick(fresh, cfg, w.screen, 'net', 1)).toBe('net:halls');
   });
 
   it('test_planet_the_picture_has_a_place_for_every_node_the_data_sells', () => {
