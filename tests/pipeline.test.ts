@@ -313,6 +313,23 @@ describe('pipeline', () => {
     expect(st.taken).toBe(1);
   });
 
+  it('the paired standup uses two ordinary call slots and one answer', () => {
+    const tuning = { every: [20, 20] as const, life: 14, worthSeconds: 2, max: 2 };
+    const calls = createEvents(tuning);
+    const rng = createRng(7);
+    stepEvents(calls, tuning, 20, ['job'], 3, rng, true);
+    expect(calls.list).toHaveLength(1);
+    expect(calls.wait).toBe(40);
+    expect(takeEvent(calls, 0)?.standup).toBe(true);
+    expect(takeEvent(calls, 0)).toBeUndefined();
+    expect(calls.taken).toBe(2);
+    stepEvents(calls, tuning, 39, ['job'], 3, rng);
+    expect(calls.list).toHaveLength(0);
+    stepEvents(calls, tuning, 1, ['job'], 3, rng);
+    expect(calls.list[0]?.standup).toBeUndefined();
+    expect(calls.list).toHaveLength(1);
+  });
+
   it('test_perk_of_a_whole_employer_changes_pay_and_prices', () => {
     const s = createPipe(cfg);
     s.noAsk = true;
