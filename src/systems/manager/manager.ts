@@ -168,7 +168,7 @@ function shop(s: PipeState, cfg: PipeConfig, screen: number): Offer[] {
   }
   if (screen === 2) add('sub', cfg.auto.subagent.name, 'capacity', d => subagentPrice(cfg, d.subagents), d => buySubagent(d, cfg));
   const plan = cfg.plans[s.plan.index + 1];
-  if (plan && (plan.screen ?? 1) <= screen) add('plan', plan.name, 'capacity', d => cfg.plans[d.plan.index + 1]?.price ?? Infinity, d => buyPlan(d, cfg));
+  if (plan && (plan.screen ?? 1) <= screen) add('plan', plan.name, 'capacity', () => plan.price, d => buyPlan(d, cfg));
   const grade = cfg.grades[s.grade + 1];
   if (grade) add('grade', grade.name, 'pay', d => gradeCost(d, cfg), d => buyGrade(d, cfg));
   return offers;
