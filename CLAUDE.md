@@ -66,3 +66,17 @@ changes files. Work on the task and return the contract from your role.
   Found a better way — `learn.py propose`; `status` will show what was accepted.
 - Change the `.studioigor/` state through `studio.py` (decide, tick, note, commit) when
   there is a command for it.
+
+## Agent skills
+
+### Issue tracker
+
+Задачи и спецификации ведём в GitHub Issues. См. `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Для разбора задач используем пять стандартных меток. См. `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+У игры общий словарь и одна папка архитектурных решений. См. `docs/agents/domain.md`.
