@@ -37,6 +37,7 @@ import benchData from '../data/tuning/bench.json';
 import eventsData from '../data/tuning/events.json';
 import feedData from '../data/tuning/feed.json';
 import gridData from '../data/tuning/grid.json';
+import internData from '../data/tuning/intern.json';
 import worldData from '../data/tuning/world.json';
 import limitData from '../data/tuning/limit.json';
 import managerTuning from '../data/tuning/manager.json';
@@ -53,7 +54,7 @@ import { createEvents, stepEvents, takeEvent, type EventsTuning } from '../syste
 import { createFeed, headline, say, stepFeed, tell, type FeedContent } from '../systems/feed/feed';
 import { laptopPhase, startIncident, stepIncident } from '../systems/intern/incident';
 import { INTERN_REPORT } from '../ui/intern/intern';
-import { managerPick } from '../systems/manager/manager';
+import { planManager, type ManagerDecision } from '../systems/manager/manager';
 import { createRiots, stepRiots, type RiotTuning } from '../systems/riots/riots';
 import { createStrikes, stepStrikes, type StrikeTuning } from '../systems/strikes/strikes';
 import type { Plan } from '../systems/plan/plan';
@@ -121,6 +122,7 @@ import {
   slumpOf,
   sourceInflow,
   stepPipe,
+  stepBackgroundWork,
   subagentPrice,
   subagentRate,
   supplyOf,
@@ -337,6 +339,10 @@ export class GameScene extends Phaser.Scene {
   private frozen = false;
   /** a menu or the ending is open: the world stands still */
   private paused = false;
+  private backgroundAt: number | null = null;
+  private backgroundTimer?: number;
+  private supersededSave = false;
+  private lastSavedJson: string | null = null;
   /** a saved game was opened */
   private resumed = false;
   /** what the sessions did while the game was closed; shown after the title card */
@@ -347,6 +353,7 @@ export class GameScene extends Phaser.Scene {
   private readonly calls = createEvents(EVENTS);
   private standupReplyUntil = 0;
   private sinceManager = 0;
+  private managerDecision: ManagerDecision | null = null;
   private managerBought = 0;
 
   /** seconds until Claude hits the usage limit again */
@@ -464,6 +471,18 @@ export class GameScene extends Phaser.Scene {
       this.enterBench(true);
     }
     if (__TOOLS__ && !this.resumed) {
+      if (this.demo === 'buyer') {
+        const s = this.state;
+        s.noAsk = true;
+        s.plan.index = 2;
+        s.grade = 2;
+        s.subagents = 3;
+        s.owned.job = 4;
+        s.owned.freelance = 7;
+        s.money = 150;
+        s.managers.push(2);
+        this.openStage();
+      }
       if (this.demo === 'intern') this.forcePile('intern');
       if (this.demo === 'standup') this.calls.wait = 2;
       if (this.demo === 'manager') {
@@ -491,7 +510,20 @@ export class GameScene extends Phaser.Scene {
       if (row) this.click(row);
       else if (!el.closest('.tm-side') && !el.closest('.bl-shop')) this.press();
     });
-    window.addEventListener('pagehide', () => this.saveGame());
+    const syncVisibility = () => this.setBackground(document.hidden);
+    window.addEventListener('blur', () => this.setBackground(true));
+    window.addEventListener('focus', syncVisibility);
+    document.addEventListener('visibilitychange', syncVisibility);
+    window.addEventListener('pageshow', syncVisibility);
+    window.addEventListener('pagehide', () => {
+      this.settleBackground();
+      this.saveGame();
+    });
+    window.addEventListener('storage', event => {
+      // A second game tab has taken over. Never overwrite its newer progress.
+      if (this.saving && this.backgroundAt !== null && (event.key === SAVE_KEY || event.key === null)) this.supersededSave = true;
+    });
+    syncVisibility();
     if (__TOOLS__) window.__gym = {
       buy: (what) => this.buy(what),
       press: () => this.press(),
@@ -524,6 +556,18 @@ export class GameScene extends Phaser.Scene {
   }
 
   update(_time: number, deltaMs: number): void {
+    if (this.supersededSave || document.hidden) return;
+    if (this.backgroundAt !== null) {
+      // A visible second window still renders normally. Only missed frames need a catch-up.
+      const elapsedMs = Math.max(0, Date.now() - this.backgroundAt);
+      if (elapsedMs > 250) {
+        this.settleBackground();
+        deltaMs = 0;
+      } else {
+        this.backgroundAt += elapsedMs;
+        deltaMs = elapsedMs;
+      }
+    }
     if (this.internReplay) {
       this.internReplay.elapsed += Math.min(deltaMs / 1000, 0.25);
       const elapsed = this.internReplay.elapsed;
@@ -564,15 +608,83 @@ export class GameScene extends Phaser.Scene {
     if (this.sinceSave >= saveData.autosaveSeconds) this.saveGame();
   }
 
+  private setBackground(background: boolean): void {
+    if (background === (this.backgroundAt !== null)) return;
+    if (background) {
+      this.backgroundAt = Date.now();
+      if (!this.paused) this.saveGame();
+      this.backgroundTimer = window.setInterval(() => {
+        if (this.backgroundAt !== null && (document.hidden || Date.now() - this.backgroundAt > 250)) this.settleBackground();
+        if (this.sinceSave >= saveData.autosaveSeconds) this.saveGame();
+      }, 1000);
+      return;
+    }
+    window.clearInterval(this.backgroundTimer);
+    this.settleBackground();
+    this.backgroundAt = null;
+    if (this.supersededSave) window.location.reload();
+    else if (!this.paused) this.saveGame();
+  }
+
+  private settleBackground(): void {
+    if (this.backgroundAt === null) return;
+    if (this.saving && this.backgroundSaveChanged()) return;
+    const now = Date.now();
+    const elapsed = Math.max(0, (now - this.backgroundAt) / 1000);
+    this.backgroundAt = Math.max(now, this.backgroundAt);
+    if (!elapsed || this.paused || this.frozen || this.supersededSave || this.cine || this.credits.rolling) return;
+    let remaining = elapsed * (this.slow ? 0.25 : 1);
+    const managed = this.state.managers.includes(this.stage) && !this.meta.managerOff && !this.onBench;
+    // Sleeping browsers may return hours in one tick. Replan after a purchase and skip ahead while saving.
+    let interval = managed ? managerTuning.period : remaining;
+    while (remaining > 0) {
+      const dt = Math.min(remaining, interval);
+      this.backgroundProduction(dt);
+      this.seconds += dt;
+      interval = this.stepManager(dt) ? managerTuning.period : interval * 2;
+      remaining -= dt;
+    }
+    this.sinceSave += elapsed;
+    this.lastMoney = this.state.money;
+  }
+
+  private backgroundProduction(dt: number): void {
+    const incident = this.meta.intern;
+    const work = (seconds: number, down = false) => {
+      for (const id of stepBackgroundWork(this.state, this.cfg, seconds, down)) this.unitDone(id);
+    };
+    if (incident) {
+      const before = Math.min(dt, Math.max(0, internData.routeSeconds - incident.elapsed));
+      const throughOutage = Math.min(dt, Math.max(0, internData.routeSeconds + internData.closedSeconds - incident.elapsed));
+      work(before);
+      work(throughOutage - before, true);
+      work(dt - throughOutage);
+      this.stepIntern(dt);
+    } else work(dt);
+  }
+
   private saveGame(): void {
     this.sinceSave = 0;
-    if (!this.saving || this.frozen) return;
+    if (!this.saving || this.frozen || this.supersededSave) return;
     try {
+      if (this.backgroundAt !== null && this.backgroundSaveChanged()) return;
       const feed = { shown: this.feed.shown, said: this.feed.said };
-      localStorage.setItem(SAVE_KEY, packSave({ at: Date.now(), state: this.state, feed, meta: this.meta, won: this.won, seconds: this.seconds }));
+      const json = packSave({ at: Date.now(), state: this.state, feed, meta: this.meta, won: this.won, seconds: this.seconds });
+      localStorage.setItem(SAVE_KEY, json);
+      this.lastSavedJson = json;
     } catch {
       // private mode or a full disk: the game goes on without saving
     }
+  }
+
+  /** Storage events can be delayed while this page is frozen. Check the last write before catching up. */
+  private backgroundSaveChanged(): boolean {
+    try {
+      if (localStorage.getItem(SAVE_KEY) !== this.lastSavedJson) this.supersededSave = true;
+    } catch {
+      // Storage can be disabled; the open tab can still earn in memory.
+    }
+    return this.supersededSave;
   }
 
   /** Opens a saved game on the screen it was left at. Returns false when there is nothing to open. */
@@ -581,6 +693,7 @@ export class GameScene extends Phaser.Scene {
     let json: string | null;
     try {
       json = localStorage.getItem(SAVE_KEY);
+      this.lastSavedJson = json;
     } catch {
       return false;
     }
@@ -600,13 +713,16 @@ export class GameScene extends Phaser.Scene {
     this.park.auto = file.meta.benchAuto;
     this.openStage();
     if (this.won && this.meta.atBench) this.enterBench(true);
-    this.pendingReport = offlineReport(this.state, this.cfg, saveData, (Date.now() - file.at) / 1000);
+    const awaySeconds = Math.max(0, (Date.now() - file.at) / 1000);
+    this.pendingReport = offlineReport(this.state, this.cfg, saveData, awaySeconds);
+    this.state.limited = Math.max(0, this.state.limited - awaySeconds);
     return true;
   }
 
   /** Shows the screen the game is on at once, without the camera move. */
   private openStage(): void {
     this.stage = screenOf(this.state);
+    this.managerDecision = null;
     if (this.stage >= 2) {
       this.term.root.classList.add('gone');
       this.paper.show(true);
@@ -1236,7 +1352,8 @@ export class GameScene extends Phaser.Scene {
 
   /** `quiet` — the manager buys: a soft tick instead of the fanfare, no remark */
   private buy(what: string, quiet = false): boolean {
-    this.wake();
+    const unattended = quiet && this.backgroundAt !== null;
+    if (!unattended) this.wake();
     const s = this.state;
     const cfg = this.cfg;
     const before = s.money;
@@ -1270,8 +1387,10 @@ export class GameScene extends Phaser.Scene {
     else if (what === 'manager') ok = this.stage >= 2 && buyManager(s, cfg, this.stage);
     if (!ok) return false;
     this.lastMoney -= before - s.money; // a purchase is not negative income
-    if (quiet) playSound('auto');
-    else playSound('buy', BUY_PITCH[what.split(':')[0]] ?? 0);
+    if (!unattended) {
+      if (quiet) playSound('auto');
+      else playSound('buy', BUY_PITCH[what.split(':')[0]] ?? 0);
+    }
     if (what.startsWith('src:')) {
       const src = cfg.sources.find((x) => x.id === what.slice(4))!;
       if (src.work) {
@@ -1284,7 +1403,7 @@ export class GameScene extends Phaser.Scene {
     else if (what === 'scale') this.scaleUp();
     if (quiet) {
       this.paper.flash(what, 'bought');
-      if (++this.managerBought % 15 === 1) this.say('manager');
+      if (!unattended && ++this.managerBought % 15 === 1) this.say('manager');
     } else this.remark(what, surged);
     this.saveGame();
     return true;
@@ -1335,7 +1454,7 @@ export class GameScene extends Phaser.Scene {
   private unitDone(id: string): void {
     const src = this.cfg.sources.find((x) => x.id === id);
     if (!src) return;
-    if (src.work) playSound('buy', 7);
+    if (src.work && this.backgroundAt === null) playSound('buy', 7);
     this.taken(src);
     this.saveGame();
   }
@@ -1359,7 +1478,7 @@ export class GameScene extends Phaser.Scene {
 
   /** An employer is taken whole (M23): its perk works from now on; a banner, the news and Claude say so. */
   private takeover(src: Source): void {
-    playSound('all');
+    if (this.backgroundAt === null) playSound('all');
     const perk = src.perk!.text;
     this.paper.toast(`${src.tag} — ${L('целиком', 'taken whole')}`, L(`теперь ${perk}`, `now: ${perk}`));
     tell(this.feed, feedData, L(`${src.tag} — целиком. Теперь ${perk}.`, `${src.tag} — taken whole. Now: ${perk}.`));
@@ -1877,15 +1996,7 @@ export class GameScene extends Phaser.Scene {
         this.say('limit:over', true);
       }
 
-      // the manager buys the small things; while the limit is hit, sessions only look short
-      this.sinceManager += dt;
-      if (this.sinceManager >= managerTuning.period) {
-        this.sinceManager = 0;
-        if (s.managers.includes(this.stage) && !this.meta.managerOff && !this.meta.intern && s.limited <= 0) {
-          const pick = this.inviteTransition() ? null : managerPick(s, this.cfg);
-          if (pick) this.buy(pick, true);
-        }
-      }
+      this.stepManager(dt);
     }
 
     // Claude notices a pause and a bottleneck that does not go away
@@ -2840,6 +2951,15 @@ export class GameScene extends Phaser.Scene {
   }
 
   /** Ask once per stage. If postponed, the same purchase remains available in the shop. */
+  private stepManager(dt: number): boolean {
+    if (!this.state.managers.includes(this.stage) || this.meta.managerOff || this.meta.intern || this.state.limited > 0 || this.onBench) return false;
+    this.sinceManager += dt;
+    if (this.sinceManager < managerTuning.period) return false;
+    this.sinceManager = 0;
+    this.managerDecision = this.inviteTransition() ? null : planManager(this.state, this.cfg);
+    return this.managerDecision?.affordable ? this.buy(this.managerDecision.key, true) : false;
+  }
+
   private inviteTransition(): boolean {
     const s = this.state;
     let action = 'scale';
@@ -2874,9 +2994,16 @@ export class GameScene extends Phaser.Scene {
     const m = this.cfg.managers.find((x) => x.screen === this.stage);
     if (!m) return undefined;
     if (!this.state.managers.includes(this.stage)) return { title: m.name, note: L('покупает улучшения для перехода', 'buys upgrades for the next stage'), right: `$${short(m.price)}`, state: this.state.money >= m.price ? 'can' : 'poor' };
-    return this.meta.managerOff
-      ? { title: m.name, note: L('клик — пусть работает', 'click — back to work'), right: L('пауза', 'paused'), state: 'off' }
-      : { title: m.name, note: L('готовит переход · клик — пауза', 'preparing next stage · click to pause'), right: L('работает', 'working'), state: 'on' };
+    if (this.meta.managerOff) return { title: m.name, note: L('клик — пусть работает', 'click — back to work'), right: L('пауза', 'paused'), state: 'off' };
+    const plan = this.managerDecision;
+    const purpose = {
+      work: L('Работа', 'Work'), capacity: L('Сессии', 'Sessions'), pay: L('Доход', 'Income'), build: L('Стройка', 'Construction'),
+    };
+    return {
+      title: m.name, state: 'on',
+      note: plan ? `${purpose[plan.purpose]} · ${plan.name}` : L('Готовит переход', 'Preparing next stage'),
+      right: plan && !plan.affordable ? L('копит', 'saving') : L('работает', 'working'),
+    };
   }
 
   /** the requests of the employers as bubbles over their buildings */

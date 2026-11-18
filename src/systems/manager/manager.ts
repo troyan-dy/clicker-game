@@ -1,3 +1,4 @@
+import tuning from '../../data/tuning/manager.json';
 import {
   bribeCost,
   buyBribe,
@@ -10,7 +11,9 @@ import {
   buySource,
   buySubagent,
   discount,
+  farmCost,
   flowOf,
+  gradeCost,
   gridOn,
   hireOf,
   jobOf,
@@ -18,6 +21,7 @@ import {
   lineCost,
   locked,
   moduleCost,
+  netCost,
   outputOf,
   payOf,
   robotsOf,
@@ -25,8 +29,10 @@ import {
   scaleCost,
   scaleReady,
   screenOf,
+  sourceCost,
   sourcePrice,
   stepPipe,
+  subagentPrice,
   whole,
   worldOn,
   type Module,
@@ -127,83 +133,117 @@ function estimate(s: PipeState, cfg: PipeConfig, screen: number) {
   return { seconds: Math.max(seconds, goal.workSeconds), cost: goal.cost, income };
 }
 
-/** Compare buying now with waiting. Short projections let squads, factories and new capacity start producing. */
-export function managerPick(s: PipeState, cfg: PipeConfig): string | null {
-  const screen = screenOf(s);
-  if (!s.noAsk || s.limited > 0 || (scaleReady(s, cfg) && s.money >= scaleCost(s, cfg)))
-    return null;
-  const forecast = (next: PipeState) => {
-    stepPipe(next, cfg, 4);
-    stepPipe(next, cfg, 4);
-    return estimate(next, cfg, screen);
-  };
-  const wait = forecast(structuredClone(s));
-  const options: { key: string; buy: (draft: PipeState) => boolean }[] = [];
-  function offer(key: string, buy: (draft: PipeState) => boolean): void {
-    options.push({ key, buy });
+type Purpose = 'work' | 'capacity' | 'pay' | 'build';
+interface Offer {
+  key: string;
+  name: string;
+  purpose: Purpose;
+  price: (s: PipeState) => number;
+  buy: (s: PipeState) => boolean;
+}
+
+function shop(s: PipeState, cfg: PipeConfig, screen: number): Offer[] {
+  const offers: Offer[] = [];
+  function add(key: string, name: string, purpose: Purpose, price: Offer['price'], buy: Offer['buy']): void {
+    offers.push({ key, name, purpose, price, buy });
   }
   if (gridOn(s, cfg)) {
     for (const m of cfg.modules) {
-      if ((m.screen ?? cfg.grid.screen) !== screen || m.kind === 'ark') continue;
-      if (m.kind === 'span' && !s.modules[m.id]) continue; // the player chooses the first route
-      offer('mod:' + m.id, (d) => buyModule(d, cfg, m.id));
+      if ((m.screen ?? cfg.grid.screen) !== screen || m.kind === 'ark' || (m.kind === 'span' && !s.modules.span)) continue;
+      add('mod:' + m.id, m.name, 'build', d => moduleCost(d, m), d => buyModule(d, cfg, m.id));
     }
-    for (const n of cfg.net) offer('net:' + n.id, (d) => buyNet(d, cfg, n.id));
-  } else {
-    for (const x of cfg.sources) {
-      if ((screen <= 2 ? x.screen > screen : x.screen !== screen) || x.made || whole(s, x))
-        continue;
-      if (locked(s, x)) offer('bribe:' + x.id, (d) => buyBribe(d, cfg, x.id));
-      else offer('src:' + x.id, (d) => buySource(d, cfg, x.id));
-    }
-    for (const f of cfg.farms)
-      if (f.screen === screen) offer('farm:' + f.id, (d) => buyFarm(d, cfg, f.id));
-    for (const l of cfg.lines)
-      if (l.screen === screen) offer('line:' + l.id, (d) => buyLine(d, cfg, l.id));
-    if (screen === 2) offer('sub', (d) => buySubagent(d, cfg));
-    if ((cfg.plans[s.plan.index + 1]?.screen ?? 1) <= screen) offer('plan', (d) => buyPlan(d, cfg));
-    offer('grade', (d) => buyGrade(d, cfg));
+    for (const n of cfg.net) add('net:' + n.id, n.name, 'pay', d => netCost(d, n), d => buyNet(d, cfg, n.id));
+    return offers;
+  }
+  for (const x of cfg.sources) {
+    if ((screen === 2 ? x.screen > screen : x.screen !== screen) || x.made || whole(s, x)) continue;
+    if (locked(s, x)) add('bribe:' + x.id, x.name, 'work', d => bribeCost(d, cfg, x), d => buyBribe(d, cfg, x.id));
+    add('src:' + x.id, x.name, 'work', d => sourceCost(d, cfg, x), d => buySource(d, cfg, x.id));
+  }
+  for (const f of cfg.farms) {
+    if (f.screen === screen) add('farm:' + f.id, f.name, 'capacity', d => farmCost(d, cfg, f), d => buyFarm(d, cfg, f.id));
+  }
+  for (const l of cfg.lines) {
+    if (l.screen === screen) add('line:' + l.id, l.name, 'build', d => lineCost(d, cfg, l), d => buyLine(d, cfg, l.id));
+  }
+  if (screen === 2) add('sub', cfg.auto.subagent.name, 'capacity', d => subagentPrice(cfg, d.subagents), d => buySubagent(d, cfg));
+  const plan = cfg.plans[s.plan.index + 1];
+  if (plan && (plan.screen ?? 1) <= screen) add('plan', plan.name, 'capacity', d => cfg.plans[d.plan.index + 1]?.price ?? Infinity, d => buyPlan(d, cfg));
+  const grade = cfg.grades[s.grade + 1];
+  if (grade) add('grade', grade.name, 'pay', d => gradeCost(d, cfg), d => buyGrade(d, cfg));
+  return offers;
+}
+
+export interface ManagerDecision {
+  key: string;
+  name: string;
+  purpose: Purpose;
+  affordable: boolean;
+}
+
+/** Compare waiting, one purchase and complementary purchases at the same elapsed time. */
+export function planManager(s: PipeState, cfg: PipeConfig): ManagerDecision | null {
+  const screen = screenOf(s);
+  if (!s.noAsk || s.limited > 0 || (scaleReady(s, cfg) && s.money >= scaleCost(s, cfg))) return null;
+  const offers = shop(s, cfg, screen);
+  function projectedEstimate(next: PipeState) {
+    if (screen < 5) return estimate(next, cfg, screen);
+    // Value a running squad or a new tower over the same interval for every option, including waiting.
+    const projected = structuredClone(next);
+    for (let second = 0; second < tuning.previewSeconds; second++) stepPipe(projected, cfg, 1);
+    projected.money = next.money;
+    return estimate(projected, cfg, screen);
+  }
+  const base = projectedEstimate(s);
+  const horizon = Math.min(base.seconds, tuning.reinvestSeconds);
+  let bestGain = -Infinity;
+  let bestFinish = base.seconds;
+  let choice: ManagerDecision | null = null;
+
+  function project(from: PipeState, income: number, offer: Offer) {
+    const price = offer.price(from);
+    const wait = Math.max(0, price - from.money) / income;
+    if (!Number.isFinite(wait) || wait > horizon) return null;
+    const next = structuredClone(from);
+    next.money = Math.max(next.money, price);
+    if (!offer.buy(next)) return null;
+    return { next, wait };
   }
 
-  let choice: string | null = null;
-  let best = 0;
-  const singles: { key: string; draft: PipeState }[] = [];
-  function rank(key: string, draft: PipeState, price: number, delay = 0): void {
-    const after = forecast(structuredClone(draft));
-    const progress = Math.max(0, wait.cost - after.cost) / wait.income;
-    const saving = wait.seconds - after.seconds - delay;
-    if (saving < -0.01 || (saving <= 0.01 && !progress)) return;
-    const score = (Math.max(0, saving) + Math.min(progress, 1)) / Math.max(1, price / wait.income);
-    if (score > best) {
-      best = score;
-      choice = key;
+  function rank(next: PipeState, elapsed: number, first: ManagerDecision) {
+    const after = projectedEstimate(next);
+    const finish = elapsed + after.seconds;
+    const progress = base.cost - after.cost;
+    if (finish > base.seconds + 0.001 || (finish >= base.seconds - 0.001 && progress <= 0)) return;
+    // Money earned by the next reinvestment, plus costs already paid toward mandatory contracts.
+    // Near the transition the actual time to completion takes precedence.
+    const gain = base.seconds <= horizon ? base.seconds - finish :
+      (next.money - s.money + progress + (horizon - elapsed) * after.income) / base.income - horizon;
+    if (gain > bestGain + 0.001 || (Math.abs(gain - bestGain) <= 0.001 && finish < bestFinish)) {
+      bestGain = gain;
+      bestFinish = finish;
+      choice = first;
     }
   }
-  for (const option of options) {
-    const draft = structuredClone(s);
-    if (!option.buy(draft)) continue;
-    rank(option.key, draft, s.money - draft.money);
-    singles.push({ key: option.key, draft });
-  }
-  // A contract and extra processing capacity can be valuable together even when neither alone pays off.
-  if (!choice && !gridOn(s, cfg)) {
-    const capacity = (key: string) => key === 'sub' || key === 'plan' || key.startsWith('farm:');
-    for (const first of singles) {
-      for (const second of options) {
-        if (capacity(first.key) === capacity(second.key)) continue;
-        const draft = structuredClone(first.draft);
-        // Price the second purchase with the same rules, including discounts unlocked by the first.
-        const credit = wait.cost;
-        draft.money += credit;
-        if (!second.buy(draft)) continue;
-        draft.money -= credit;
-        const shortfall = Math.max(0, -draft.money);
-        const rate = Math.max(0.01, flowOf(first.draft, cfg) * payOf(first.draft, cfg));
-        const price = s.money - draft.money;
-        draft.money += shortfall;
-        rank(first.key, draft, price, shortfall / rate);
-      }
+
+  for (const a of offers) {
+    const one = project(s, base.income, a);
+    if (!one) continue;
+    const first = { key: a.key, name: a.name, purpose: a.purpose, affordable: one.wait === 0 };
+    rank(one.next, one.wait, first);
+    if (screen >= 6) continue;
+    const rate = Math.max(0.01, flowOf(one.next, cfg) * payOf(one.next, cfg));
+    for (const b of offers) {
+      // Cross the bottleneck in either order, or finish/unlock a single contract.
+      if (a.purpose === b.purpose && !(a.purpose === 'work' && a.key.split(':')[1] === b.key.split(':')[1])) continue;
+      const two = project(one.next, rate, b);
+      if (two && one.wait + two.wait <= horizon) rank(two.next, one.wait + two.wait, first);
     }
   }
   return choice;
+}
+
+export function managerPick(s: PipeState, cfg: PipeConfig): string | null {
+  const plan = planManager(s, cfg);
+  return plan?.affordable ? plan.key : null;
 }

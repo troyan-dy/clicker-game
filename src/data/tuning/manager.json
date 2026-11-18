@@ -1,1 +1,1 @@
-{ "period": 1.2 }
+{ "period": 1.2, "reinvestSeconds": 90, "previewSeconds": 8 }

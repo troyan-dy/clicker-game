@@ -920,6 +920,7 @@ export function stepPipe(
   cfg: PipeConfig,
   dt: number,
   processingDown = false,
+  background = false,
 ): { arrived: number; here: number; subagents: number; done: string[]; came: number; lay: number } {
   const t = cfg.tuning;
   /** `done` — employers where a unit was just taken by a squad, or that the robots have just taken whole */
@@ -955,13 +956,16 @@ export function stepPipe(
   // were whole (to keep them so), then to the one the robots are aimed at, then to the others in order.
   // When the lines make less than breaks, the robots at work dwindle — the whole employers last of all.
   for (const kind of ROBOTS) {
-    let robots = outputOf(s, cfg, kind) * dt;
+    // A batch may cover hours. Account for the wear of both existing and newly built robots.
+    const retention = background && dt > 1 ? (1 - t.wear) ** dt : 1 - t.wear * dt;
+    const workingTime = background && dt > 1 && t.wear > 0 ? (1 - retention) / t.wear : dt;
+    let robots = outputOf(s, cfg, kind) * workingTime;
     const wasWhole: Record<string, boolean> = {};
     for (const src of cfg.sources) {
       if (src.made !== kind) continue;
       const owned = s.owned[src.id] ?? 0;
       wasWhole[src.id] = owned >= src.max;
-      if (owned > 0) s.owned[src.id] = owned * (1 - t.wear * dt);
+      if (owned > 0) s.owned[src.id] = owned * retention;
     }
     for (let pass = 0; pass < 3 && robots > 0; pass++) {
       for (const src of cfg.sources) {
@@ -985,31 +989,58 @@ export function stepPipe(
     const moved = stepGrid(s, cfg, dt);
     out.came = moved.came;
     out.lay = moved.into;
+  } else {
+    // the people left without work order tasks while the allowance is paid
+    if (s.allowance > 0) s.orders = Math.min(1, s.orders + dt / t.ordersRise);
+    else s.orders = Math.max(0, s.orders - dt / t.ordersFade);
+    if (s.allowance > 0 && s.strikes.length) s.strikes = [];
+  }
+  processTasks(s, cfg, dt, processingDown, out, background);
+  return out;
+}
+
+/** An open background tab earns from its existing production. Player decisions and events wait. */
+export function stepBackgroundWork(s: PipeState, cfg: PipeConfig, dt: number, processingDown = false): string[] {
+  const done: string[] = [];
+  let remaining = dt;
+  for (let batch = 1; remaining > 0; batch *= 2) {
+    const limited = s.limited > 0;
+    const seconds = Math.min(remaining, batch, limited ? s.limited : Infinity);
+    done.push(...stepPipe(s, cfg, seconds, processingDown || limited, true).done);
+    remaining -= seconds;
+  }
+  return done;
+}
+
+function processTasks(
+  s: PipeState, cfg: PipeConfig, dt: number, processingDown: boolean,
+  out: { arrived: number; here: number; subagents: number }, background: boolean,
+): void {
+  if (gridOn(s, cfg)) {
     const tasks = s.limited > 0 || processingDown ? 0 : inflowOf(s, cfg) * dt;
     pay(s, cfg, true, tasks);
     s.backlog = 0;
     s.subAcc += tasks;
     out.subagents = Math.floor(s.subAcc);
     s.subAcc -= out.subagents;
-    return out;
+    return;
   }
 
-  // the people left without work order tasks while the allowance is paid; without it the orders dry up
-  if (s.allowance > 0) s.orders = Math.min(1, s.orders + dt / t.ordersRise);
-  else s.orders = Math.max(0, s.orders - dt / t.ordersFade);
-  // …and nobody who is paid stands in a doorway
-  if (s.allowance > 0 && s.strikes.length) s.strikes = [];
-
-  // tasks arrive
+  const t = cfg.tuning;
   const cap = backlogCap(s, cfg);
   s.inflowAcc += inflowOf(s, cfg) * dt;
-  out.arrived = Math.max(0, Math.min(Math.floor(s.inflowAcc), cap - s.backlog));
+  // In a batch, work arrives and is paid throughout the interval. Only the remainder must fit the queue.
+  const arrivals = Math.floor(s.inflowAcc);
+  out.arrived = background ? arrivals : Math.max(0, Math.min(arrivals, cap - s.backlog));
   s.inflowAcc -= out.arrived;
   s.backlog += out.arrived;
   if (s.backlog >= cap) s.inflowAcc = Math.min(s.inflowAcc, 1); // the boss waits
 
   // The intern shut the lid: incoming work still queues while processing waits.
-  if (processingDown) return out;
+  if (processingDown) {
+    s.backlog = Math.min(cap, s.backlog);
+    return;
+  }
 
   // Claude in the player's terminal
   const rate = claudeRate(s, cfg);
@@ -1049,7 +1080,7 @@ export function stepPipe(
   pay(s, cfg, true, out.subagents);
   if (s.backlog < 1) s.subAcc = Math.min(s.subAcc, 1);
 
-  return out;
+  if (background) s.backlog = Math.min(cap, s.backlog);
 }
 
 /** One «Да». Once the terminal stops asking, a press nudges Claude: it closes a waiting task at once. */

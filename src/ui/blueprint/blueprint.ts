@@ -100,7 +100,7 @@ export interface BlueprintUi {
 const fmt = new Intl.NumberFormat(LOCALE, { maximumFractionDigits: 0 });
 // one digit after the comma, always: the income line is centred, a dropped «,0» would move it
 const fmt1 = new Intl.NumberFormat(LOCALE, { minimumFractionDigits: 1, maximumFractionDigits: 1 });
-const esc = (s: string): string => s.replace(/&/g, '&amp;').replace(/</g, '&lt;');
+const esc = (s: string): string => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
 
 /**
  * Adds the paper blueprint as a layer of a 1920×1080 `.ui1080` container (below the terminal).
@@ -245,7 +245,7 @@ export function createBlueprint(layer: HTMLElement, over: HTMLElement): Blueprin
           else delete el.dataset.buy;
         });
       const mg = m.manager;
-      set('manager', mg ? `<div class="bl-mgr ${mg.state}" data-row="manager"><i></i><b>${esc(mg.title)}</b><small>${esc(mg.note)}</small><span>${esc(mg.right)}</span></div>` : '');
+      set('manager', mg ? `<div class="bl-mgr ${mg.state}" data-row="manager" title="${esc(mg.note)}"><i></i><b>${esc(mg.title)}</b><small>${esc(mg.note)}</small><span>${esc(mg.right)}</span></div>` : '');
       showMark();
     },
     flash(row, kind) {

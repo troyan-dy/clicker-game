@@ -17,7 +17,7 @@ import gridData from '../src/data/tuning/grid.json';
 import worldData from '../src/data/tuning/world.json';
 import tuningData from '../src/data/tuning/pipeline.json';
 import { createEvents, stepEvents, takeEvent } from '../src/systems/events/events';
-import { managerPick } from '../src/systems/manager/manager';
+import { managerPick, planManager } from '../src/systems/manager/manager';
 import { createRiots, stepRiots } from '../src/systems/riots/riots';
 import { createStrikes, stepStrikes } from '../src/systems/strikes/strikes';
 import type { Plan } from '../src/systems/plan/plan';
@@ -64,6 +64,7 @@ import {
   sessionsOf,
   sourceInflow,
   sourcePrice,
+  stepBackgroundWork,
   stepPipe,
   supplyOf,
   takeChip,
@@ -118,6 +119,50 @@ function rich(): PipeState {
 }
 
 describe('pipeline', () => {
+  it('pays a hidden tab for the whole interval even when its work exceeds one backlog', () => {
+    const s = createPipe(cfg);
+    s.noAsk = true;
+    s.plan.index = 1;
+    s.backlog = 0;
+    s.think = 0;
+    const regular = structuredClone(s);
+    for (let i = 0; i < 90; i++) stepBackgroundWork(regular, cfg, 1);
+    const start = s.money;
+    stepBackgroundWork(s, cfg, 90);
+    expect(s.money - start).toBe(180 * payOf(s, cfg));
+    expect(s.money).toBe(regular.money);
+    expect(s.closedHere).toBe(regular.closedHere);
+    expect(s.backlog).toBeLessThanOrEqual(backlogCap(s, cfg));
+  });
+
+  it('only pays for approved work and independent sessions before automatic approval', () => {
+    const s = createPipe(cfg);
+    const start = s.money;
+    stepBackgroundWork(s, cfg, 60);
+    expect(s.money).toBe(start);
+    expect(s.ready).toBe(cfg.tuning.readyMax);
+    s.buffered = 1;
+    s.subagents = 1;
+    stepBackgroundWork(s, cfg, 16);
+    expect(s.closedHere).toBe(1);
+    expect(s.closedBySubagents).toBe(3);
+    expect(s.money - start).toBe(4 * payOf(s, cfg));
+  });
+
+  it('respects an outage and resumes paying after the remaining usage limit', () => {
+    const s = createPipe(cfg);
+    s.noAsk = true;
+    s.limited = 5;
+    const start = s.money;
+    stepBackgroundWork(s, cfg, 3, true);
+    expect(s.limited).toBe(2);
+    stepBackgroundWork(s, cfg, 2, true);
+    expect(s.money).toBe(start);
+    s.limited = 4;
+    stepBackgroundWork(s, cfg, 8);
+    expect(s.money - start).toBe(3 * payOf(s, cfg));
+  });
+
   it('test_pipe_every_yes_pays_one_task', () => {
     const s = createPipe(cfg);
     s.ready = 3;
@@ -283,6 +328,25 @@ describe('pipeline', () => {
     expect(s).toEqual(before);
     s.money = cfg.scales[0].price - 1;
     expect(managerPick(s, cfg)).toBeNull(); // waiting one dollar beats another upgrade
+  });
+
+  it('picks a larger contract when sessions are idle despite affordable freelance work', () => {
+    const s = createPipe(cfg);
+    Object.assign(s, { noAsk: true, money: 1000, subagents: 4, grade: 4 });
+    s.plan.index = 2; // 30 tasks/s of capacity, only 2/s coming in
+    expect(managerPick(s, cfg)).toBe('src:referral');
+    const before = flowOf(s, cfg);
+    buySource(s, cfg, 'referral');
+    expect(flowOf(s, cfg) - before).toBe(8);
+  });
+
+  it('saves for processing when work is waiting, and buys the moment funds are available', () => {
+    const s = createPipe(cfg);
+    Object.assign(s, { noAsk: true, money: 95 });
+    expect(planManager(s, cfg)).toMatchObject({ key: 'plan', purpose: 'capacity', affordable: false });
+    expect(managerPick(s, cfg)).toBeNull(); // freelance is affordable but would delay processing
+    s.money = 100;
+    expect(managerPick(s, cfg)).toBe('plan');
   });
 
   it('manager can finish mandatory employers even when income is already sufficient', () => {

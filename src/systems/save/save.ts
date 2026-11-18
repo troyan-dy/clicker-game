@@ -5,13 +5,10 @@
  */
 import { laptopPhase, type InternIncident } from '../intern/incident';
 import {
-  claudeRate,
   createPipe,
-  gridOn,
-  inflowOf,
+  flowOf,
   payOf,
   podsOf,
-  subagentRate,
   type PipeConfig,
   type PipeState,
 } from '../pipeline/pipeline';
@@ -115,6 +112,9 @@ export function restorePipe(cfg: PipeConfig, raw: unknown): PipeState {
   s.ready = Math.floor(num(r.ready, 0, 0, cfg.tuning.readyMax));
   s.buffered = Math.floor(num(r.buffered, 0, 0, cfg.tuning.buffer));
   s.think = num(r.think, 0, 0, 1);
+  s.inflowAcc = num(r.inflowAcc, 0, 0, 1);
+  s.subAcc = num(r.subAcc, 0, 0, 1);
+  s.limited = num(r.limited, 0);
   s.plan.index = Math.floor(num(counts(r.plan).index, 0, 0, cfg.plans.length - 1));
   s.noAsk = r.noAsk === true;
   s.subagents = Math.floor(num(r.subagents, 0));
@@ -226,8 +226,8 @@ export function offlineReport(s: PipeState, cfg: PipeConfig, tuning: SaveTuning,
   const counted = Math.min(seconds, tuning.offlineCapHours * 3600);
   if (!s.noAsk) return { seconds: counted, tasks: 0, dollars: 0, waited: true };
   // at the towers the network closes whatever comes in; before them — what the sessions manage
-  const flow = gridOn(s, cfg) ? inflowOf(s, cfg) : Math.min(inflowOf(s, cfg), claudeRate(s, cfg) + subagentRate(s, cfg));
-  const tasks = Math.floor(flow * counted * tuning.offlineRate);
+  const productive = Math.max(0, counted - s.limited);
+  const tasks = Math.floor(flowOf(s, cfg) * productive * tuning.offlineRate);
   return { seconds: counted, tasks, dollars: tasks * payOf(s, cfg), waited: false };
 }
 

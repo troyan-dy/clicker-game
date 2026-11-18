@@ -98,6 +98,9 @@ describe('save', () => {
 
   it('test_save_round_trip_keeps_the_whole_game', () => {
     const s = grown();
+    s.inflowAcc = 0.75;
+    s.subAcc = 0.25;
+    s.limited = 2;
     s.allowance = 2;
     s.orders = 0.5;
     s.bribed.exchange = true;
