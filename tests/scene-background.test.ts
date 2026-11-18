@@ -11,9 +11,14 @@ import {
   restoredWin,
   resumeOffline,
 } from '../src/game/logic/background';
-import { canInvite, managerClock, transitionOffer } from '../src/game/logic/transitions';
-import { createPipe, podsOf, type PipeConfig } from '../src/systems/pipeline/pipeline';
-import { freshMeta, type SaveFile } from '../src/systems/save/save';
+import {
+  answerTransition,
+  canInvite,
+  managerClock,
+  transitionOffer,
+} from '../src/game/logic/transitions';
+import { buyScale, createPipe, podsOf, type PipeConfig } from '../src/systems/pipeline/pipeline';
+import { freshMeta, packSave, unpackSave, type SaveFile } from '../src/systems/save/save';
 import manager from '../src/data/tuning/manager.json';
 import save from '../src/data/tuning/save.json';
 import { cfg } from './fixtures/pipe';
@@ -235,4 +240,55 @@ describe('manager timing and transitions', () => {
     expect(canInvite({ ...ready, calls: 2 })).toBe(false);
     expect(canInvite({ ...ready, replyUntil: 12.1 })).toBe(false);
   });
+});
+
+describe('answering a manager invitation', () => {
+  it.each([
+    { scenario: 'accepted', choice: 0, cash: cfg.scales[0].price, bought: true, attempts: 1 },
+    { scenario: 'postponed', choice: 1, cash: cfg.scales[0].price, bought: false, attempts: 0 },
+    { scenario: 'no longer affordable', choice: 0, cash: 0, bought: false, attempts: 1 },
+  ])(
+    'persists a $scenario invitation without asking again on this stage',
+    ({ choice, cash, bought, attempts }) => {
+      const state = createPipe(cfg);
+      state.noAsk = true;
+      state.money = cash;
+      const feed = { shown: [], said: {} as Record<string, number> };
+      const meta = freshMeta();
+      const key = 'manager-ready-2';
+      const saves: string[] = [];
+      const save = () => {
+        saves.push(packSave({ at: 12, state, feed, meta, won: false, seconds: 1 }));
+      };
+      const buy = vi.fn(() => {
+        expect(feed.said[key]).toBe(1);
+        if (!buyScale(state, cfg)) return false;
+        save(); // a successful shop purchase saves immediately
+        return true;
+      });
+
+      answerTransition(feed.said, key, choice, buy, save);
+      expect(buy).toHaveBeenCalledTimes(attempts);
+      expect(saves).toHaveLength(bought ? 2 : 1);
+      for (const serialized of saves) {
+        const file = unpackSave(serialized, cfg)!;
+        expect(file.state.scale).toBe(bought ? 1 : 0);
+        expect(file.state.money).toBe(bought ? cash - cfg.scales[0].price : cash);
+        const ready = {
+          openCard: false,
+          cinematic: false,
+          departing: false,
+          won: false,
+          incident: false,
+          calls: 0,
+          replyUntil: 0,
+          clock: 10,
+        };
+        expect(canInvite({ ...ready, alreadyAsked: !!file.feed.said[key] })).toBe(false);
+        expect(canInvite({ ...ready, alreadyAsked: !!file.feed.said['manager-ready-3'] })).toBe(
+          true,
+        );
+      }
+    },
+  );
 });

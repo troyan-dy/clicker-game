@@ -71,3 +71,16 @@ export function canInvite(t: TransitionInterruptions): boolean {
     t.replyUntil > t.clock
   );
 }
+
+/** Mark the current stage before buying: a successful purchase can already save the new stage. */
+export function answerTransition(
+  said: Record<string, number>,
+  key: string,
+  choice: number,
+  buy: () => boolean,
+  save: () => void,
+): void {
+  said[key] = 1;
+  if (choice === 0) buy();
+  save();
+}

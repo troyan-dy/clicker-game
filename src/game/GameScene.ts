@@ -37,7 +37,7 @@ import feedData from '../data/tuning/feed.json';
 import { activeBackgroundSeconds, advanceBackground, backgroundWork, collectMorning, elapsedMs, frameRemainder, missedBackgroundFrames, morningDuration, restoredWin, resumeOffline } from './logic/background';
 import limitData from '../data/tuning/limit.json';
 import { SAVE_KEY, SaveOwnership } from './logic/saveOwnership';
-import { canInvite, managerClock, managerOnDuty, transitionOffer } from './logic/transitions';
+import { answerTransition, canInvite, managerClock, managerOnDuty, transitionOffer } from './logic/transitions';
 import riotData from '../data/tuning/riots.json';
 import strikeData from '../data/tuning/strikes.json';
 import saveData from '../data/tuning/save.json';
@@ -2526,11 +2526,7 @@ export class GameScene extends Phaser.Scene {
       head: L('Клод — переход', 'Claude — next stage'), title: name,
       lines: [L(`Всё готово. На счёте есть $${short(price)}. Подтверждаете?`, `Everything is ready. We have $${short(price)}. Proceed?`)],
       options: [{ label: YES }, { label: L('Позже', 'Later') }],
-    }, i => {
-      this.feed.said[key] = 1;
-      if (i === 0) this.buy(action);
-      this.saveGame();
-    });
+    }, i => answerTransition(this.feed.said, key, i, () => this.buy(action), () => this.saveGame()));
     return true;
   }
 
