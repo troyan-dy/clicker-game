@@ -58,7 +58,9 @@ export function stepEvents(st: EventsState, t: EventsTuning, dt: number, owners:
 
 /** The request number `i` is answered. Returns it, or nothing when there is no such request any more. */
 export function takeEvent(st: EventsState, i: number): MapEvent | undefined {
-  const [e] = st.list.splice(i, 1);
-  if (e) st.taken += e.standup ? 2 : 1;
+  const e = st.list[i];
+  if (!e) return undefined;
+  st.list.splice(i, 1);
+  st.taken += e.standup ? 2 : 1;
   return e;
 }
