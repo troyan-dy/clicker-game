@@ -236,6 +236,12 @@
   background: var(--coral);
 }
 
+.bl-tag:has(.standup-employer) {
+  padding: 9px 14px 12px;
+  font-size: 20px;
+  animation: none;
+}
+
 /* the ending: the interface gives way to the picture */
 .bl.cut .bl-hud,
 .bl-over.cut .bl-tags,

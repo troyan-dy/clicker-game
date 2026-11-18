@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import { AWARDS } from '../content/awards';
 import { BENCH } from '../content/bench';
-import { CALLS } from '../content/calls';
+import { CALLS, STANDUP } from '../content/calls';
 import { CREDITS, CREDITS_END, CREDITS_NOTES, MOTTO, TAGLINE, TITLE } from '../content/credits';
 import { LEGENDS, type Legend } from '../content/legends';
 import { words } from '../content/names';
@@ -341,6 +341,7 @@ export class GameScene extends Phaser.Scene {
   private question = QUESTIONS[0];
   /** calls and inspections waiting for a «Да» on the current screen */
   private readonly calls = createEvents(EVENTS);
+  private standupReplyUntil = 0;
   private sinceManager = 0;
   private managerBought = 0;
   /** seconds until Claude hits the usage limit again */
@@ -1455,13 +1456,23 @@ export class GameScene extends Phaser.Scene {
   private answer(i: number): void {
     const e = takeEvent(this.calls, i);
     if (!e) return;
-    this.state.money += Math.floor(this.flowIncome() * EVENTS.worthSeconds * (1 + bonus(this.state, this.cfg, 'calls')));
+    const count = e.standup ? 2 : 1;
+    const worth = Math.floor(this.flowIncome() * EVENTS.worthSeconds * (1 + bonus(this.state, this.cfg, 'calls')));
+    this.state.money += count * worth;
     this.state.presses++;
-    this.meta.calls++;
+    this.meta.calls += count;
     playSound('yes', 3);
+    logEvent('call');
+    if (e.standup) {
+      this.feed.said.standup = 1;
+      this.standupReplyUntil = this.clock + EVENTS.life / 2;
+      logEvent('call');
+      logEvent('standup_answered');
+      this.saveGame();
+      return;
+    }
     const p = this.placeOf(e.at);
     if (p) this.delivered(p.x, p.y - p.h / 2, 8);
-    logEvent('call');
     if (this.calls.taken % 4 === 1) this.say('call');
   }
 
@@ -1748,7 +1759,14 @@ export class GameScene extends Phaser.Scene {
         : this.onWorld
           ? ['wake:0', 'wake:1']
           : this.cfg.sources.filter((x) => this.onSale(x) && (s.owned[x.id] ?? 0) > 0 && this.placeOf(x.id)).map((x) => x.id);
-      stepEvents(this.calls, EVENTS, dt, owners, (CALLS[String(this.stage)] ?? []).length, this.rng);
+      if (this.calls.list.some((e) => e.standup && e.left <= dt)) {
+        this.feed.said.standup = 1;
+        logEvent('standup_missed');
+        this.saveGame();
+      }
+      const standupReady = !this.feed.said.standup && !this.won && !this.departing && !this.card.open
+        && (this.stage > 2 || owners.length >= 2 || (s.owned.job ?? 0) >= 2);
+      stepEvents(this.calls, EVENTS, dt, owners, (CALLS[String(this.stage)] ?? []).length, this.rng, standupReady);
       if (this.selfPlay && this.calls.list.some((e) => e.left < EVENTS.life - 2)) this.answer(0);
 
       // a placard of the picket is read out now and then — while no allowance is paid
@@ -2763,7 +2781,21 @@ export class GameScene extends Phaser.Scene {
     const gate = lines.slice(QUARTER.wakes);
     const text = (e: { at: string; kind: number }): string => (!this.onGrid ? lines[e.kind % Math.max(1, lines.length)] : e.at === 'gate' ? gate[e.kind % gate.length] : wakes[e.kind % wakes.length]) ?? '';
     const tags: BlueprintTag[] = [];
+    const standup = this.calls.list.findIndex((event) => event.standup);
+    if (standup >= 0 || this.standupReplyUntil > this.clock) {
+      const event = this.calls.list[standup];
+      const meter = event ? `<u style="width:${Math.ceil(event.left / EVENTS.life * 12) / 12 * 100}%"></u>` : '';
+      STANDUP.forEach((caller, side) => {
+        const words = event ? caller.question : caller.reply;
+        const action = event ? `<br>${L('↵ Да обоим', '↵ Yes to both')}` : '';
+        tags.push({
+          x: 360 + side * 600, y: 372, mid: true, ev: event ? standup : undefined, say: !event,
+          html: `<b class="standup-employer">${caller.employer}</b><br>${words}${action}${meter}`,
+        });
+      });
+    }
     this.calls.list.forEach((e, i) => {
+      if (e.standup) return;
       const p = this.placeOf(e.at);
       if (!p) return;
       // the bar of the time left moves in a dozen steps: the captions are rebuilt only then

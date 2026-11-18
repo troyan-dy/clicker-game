@@ -17,6 +17,8 @@ export interface EventsTuning {
 }
 
 export interface MapEvent {
+  /** Two employers sharing the same slot in the calendar and the same answer. */
+  standup?: true;
   /** id of the employer that asks */
   at: string;
   /** which of the screen's requests it is */
@@ -37,12 +39,18 @@ export function createEvents(t: EventsTuning): EventsState {
 }
 
 /** `owners` — employers the player works for on this screen; `kinds` — how many requests the screen knows. */
-export function stepEvents(st: EventsState, t: EventsTuning, dt: number, owners: readonly string[], kinds: number, rng: Rng): void {
+export function stepEvents(st: EventsState, t: EventsTuning, dt: number, owners: readonly string[], kinds: number, rng: Rng, standupReady = false): void {
   for (const e of st.list) e.left -= dt;
   st.list = st.list.filter((e) => e.left > 0);
   st.wait -= dt;
   if (st.wait > 0) return;
   st.wait = rng.range(t.every[0], t.every[1]);
+  if (standupReady && !st.list.length) {
+    st.list.push({ at: 'job', kind: 0, left: t.life, standup: true });
+    // This meeting pays for two calls and uses two slots in the ordinary schedule.
+    st.wait += rng.range(t.every[0], t.every[1]);
+    return;
+  }
   const free = owners.filter((id) => !st.list.some((e) => e.at === id));
   if (!free.length || kinds <= 0 || st.list.length >= t.max) return;
   st.list.push({ at: rng.pick(free), kind: rng.int(0, kinds - 1), left: t.life });
@@ -51,6 +59,6 @@ export function stepEvents(st: EventsState, t: EventsTuning, dt: number, owners:
 /** The request number `i` is answered. Returns it, or nothing when there is no such request any more. */
 export function takeEvent(st: EventsState, i: number): MapEvent | undefined {
   const [e] = st.list.splice(i, 1);
-  if (e) st.taken++;
+  if (e) st.taken += e.standup ? 2 : 1;
   return e;
 }
