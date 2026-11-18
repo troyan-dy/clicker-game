@@ -344,6 +344,7 @@ export class GameScene extends Phaser.Scene {
   private standupReplyUntil = 0;
   private sinceManager = 0;
   private managerBought = 0;
+
   /** seconds until Claude hits the usage limit again */
   private limitIn = limitData.first;
   /** the card about the limit is open */
@@ -1804,7 +1805,7 @@ export class GameScene extends Phaser.Scene {
       if (this.sinceManager >= managerTuning.period) {
         this.sinceManager = 0;
         if (s.managers.includes(this.stage) && !this.meta.managerOff && s.limited <= 0) {
-          const pick = managerPick(s, this.cfg);
+          const pick = this.inviteTransition() ? null : managerPick(s, this.cfg);
           if (pick) this.buy(pick, true);
         }
       }
@@ -2758,6 +2759,35 @@ export class GameScene extends Phaser.Scene {
       fill: this.stack.fill,
       legend: this.legend !== null,
     };
+  }
+
+  /** Ask once per stage. If postponed, the same purchase remains available in the shop. */
+  private inviteTransition(): boolean {
+    const s = this.state;
+    let action = 'scale';
+    const next = this.cfg.scales[s.scale];
+    let name = next?.name;
+    let price = scaleCost(s, this.cfg);
+    if (this.onWorld) {
+      const ark = this.cfg.modules.find(m => m.kind === 'ark');
+      if (!ark || (s.modules[ark.id] ?? 0) >= moduleRoom(s, this.cfg, ark)) return false;
+      action = 'mod:' + ark.id;
+      name = ark.name;
+      price = moduleCost(s, ark);
+    } else if (!next || !scaleReady(s, this.cfg)) return false;
+    if (!name || s.money < price) return false;
+    const key = 'manager-ready-' + this.stage;
+    if (this.feed.said[key] || this.card.open || this.cine || this.departing || this.won || this.calls.list.length) return true;
+    this.card.show({
+      head: L('Клод — переход', 'Claude — next stage'), title: name,
+      lines: [L(`Всё готово. На счёте есть $${short(price)}. Подтверждаете?`, `Everything is ready. We have $${short(price)}. Proceed?`)],
+      options: [{ label: YES }, { label: L('Позже', 'Later') }],
+    }, i => {
+      this.feed.said[key] = 1;
+      if (i === 0) this.buy(action);
+      this.saveGame();
+    });
+    return true;
   }
 
   /** Claude the manager of the current screen as the shop shows him; nothing when the screen has none */

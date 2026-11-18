@@ -297,6 +297,29 @@ describe('pipeline', () => {
     expect(managerPick(s, cfg)).toBeNull();
   });
 
+  it('manager gets past a balanced city where a contract and server are needed together', () => {
+    const s = rich();
+    s.noAsk = true;
+    s.scale = 1;
+    s.plan.index = 3;
+    s.owned.job = 30; // 60 incoming tasks and 60 per second of processing capacity
+    s.grade = 6;
+    s.money = 600_000;
+    const before = flowOf(s, cfg);
+    const spare = structuredClone(s);
+    expect(buyFarm(spare, cfg, 'rack')).toBe(true);
+    expect(flowOf(spare, cfg)).toBe(before);
+    for (let i = 0; i < 6 && flowOf(s, cfg) === before; i++) {
+      const pick = managerPick(s, cfg);
+      expect(pick).toBeTruthy();
+      const [kind, id] = pick!.split(':');
+      if (kind === 'src') buySource(s, cfg, id);
+      else if (kind === 'farm') buyFarm(s, cfg, id);
+      else throw new Error('Unexpected city purchase: ' + pick);
+    }
+    expect(flowOf(s, cfg)).toBeGreaterThan(before);
+  });
+
   it('test_events_ask_only_employers_the_player_works_for', () => {
     const t = { every: [1, 1] as const, life: 3, worthSeconds: 4, max: 2 };
     const st = createEvents(t);
