@@ -14,6 +14,7 @@ import {
 } from '../../systems/pipeline/pipeline';
 import { stackWorth, takeStack, type StackState } from '../../systems/stack/stack';
 import { startIncident } from '../../systems/intern/incident';
+import { takeEvent, type EventsState } from '../../systems/events/events';
 import type { SavedMeta } from '../../systems/save/save';
 
 export function flowIncome(s: PipeState, cfg: PipeConfig): number {
@@ -39,12 +40,36 @@ export function cycleAllowance(s: PipeState, levels: number): string {
   return s.strikes.length ? 'strike:over' : 'ubi:on';
 }
 
-export function rewardCall(s: PipeState, cfg: PipeConfig, meta: SavedMeta, standup: boolean): void {
+function rewardCall(s: PipeState, cfg: PipeConfig, meta: SavedMeta, standup: boolean): void {
   const count = standup ? 2 : 1;
   const worth = Math.floor(flowIncome(s, cfg) * events.worthSeconds * (1 + bonus(s, cfg, 'calls')));
   s.money += count * worth;
   s.presses++;
   meta.calls += count;
+}
+
+type CallAnswer =
+  { kind: 'standup'; replyUntil: number } | { kind: 'ordinary'; at: string; remark: boolean };
+
+export function answerCall(
+  calls: EventsState,
+  index: number,
+  s: PipeState,
+  cfg: PipeConfig,
+  meta: SavedMeta,
+  said: Record<string, number>,
+  clock: number,
+  laptopClosed: boolean,
+): CallAnswer | undefined {
+  if (laptopClosed) return;
+  const event = takeEvent(calls, index);
+  if (!event) return;
+  rewardCall(s, cfg, meta, !!event.standup);
+  if (event.standup) {
+    said.standup = 1;
+    return { kind: 'standup', replyUntil: clock + events.life / 2 };
+  }
+  return { kind: 'ordinary', at: event.at, remark: calls.taken % 4 === 1 };
 }
 
 export function limitOffer(s: PipeState, cfg: PipeConfig) {

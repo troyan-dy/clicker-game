@@ -2,7 +2,7 @@ import { resolveUprising, startUsageLimit, toggleManager } from './logic/managem
 import { automaticWork, chooseEnding, enterMarket, finaleAction } from './logic/stages';
 import { networkDials, nextBlock, revenuePerGW, towerFacilities, towerPower, underpowered, worldPower } from './logic/power';
 import { benchBottleneck, bestAllowance, farmSessions, fleetReadings, globeReadings, hubReadings, labShown, roundedPopulation, staffingProgress, towerReadings } from './logic/readings';
-import { approveStack, buyUsage, cycleAllowance, flowIncome, limitClock, pickLegend, pileWorth, rewardCall, settleStrike, strikePrice } from './logic/actions';
+import { answerCall, approveStack, buyUsage, cycleAllowance, flowIncome, limitClock, pickLegend, pileWorth, settleStrike, strikePrice } from './logic/actions';
 import { towerBottleneck, workBottleneck, worldBottleneck } from './logic/bottlenecks';
 import { boughtInShortage, buyOnStage, employersOnOffer, onSale, planOnSale, surgeMultiplier } from './logic/market';
 import { chooseBird, completeEmployers, cycleLine, earnAwards, hasAcquired, pickIncomingSource, statistic } from './logic/progress';
@@ -46,7 +46,7 @@ import stackData from '../data/tuning/stack.json';
 import { createOverlay, type Overlay } from '../debug/overlay';
 import { createTuningPanel, type TuningPanel } from '../debug/tuningPanel';
 import { birdRate, createBench, stepBench } from '../systems/bench/bench';
-import { createEvents, takeEvent, type EventsTuning } from '../systems/events/events';
+import { createEvents, type EventsTuning } from '../systems/events/events';
 import { createFeed, headline, say, stepFeed, tell, type FeedContent } from '../systems/feed/feed';
 import { laptopPhase } from '../systems/intern/incident';
 import { INTERN_REPORT } from '../ui/intern/intern';
@@ -1466,23 +1466,22 @@ export class GameScene extends Phaser.Scene {
 
   /** A call or an inspection is answered with a «Да»: a bonus flies from that building. */
   private answer(i: number): void {
-    if (this.internClosed) return;
-    const e = takeEvent(this.calls, i);
-    if (!e) return;
-    rewardCall(this.state, this.cfg, this.meta, !!e.standup);
+    const answer = answerCall(
+      this.calls, i, this.state, this.cfg, this.meta, this.feed.said, this.clock, this.internClosed,
+    );
+    if (!answer) return;
     playSound('yes', 3);
     logEvent('call');
-    if (e.standup) {
-      this.feed.said.standup = 1;
-      this.standupReplyUntil = this.clock + EVENTS.life / 2;
+    if (answer.kind === 'standup') {
+      this.standupReplyUntil = answer.replyUntil;
       logEvent('call');
       logEvent('standup_answered');
       this.saveGame();
       return;
     }
-    const p = this.placeOf(e.at);
+    const p = this.placeOf(answer.at);
     if (p) this.delivered(p.x, p.y - p.h / 2, 8);
-    if (this.calls.taken % 4 === 1) this.say('call');
+    if (answer.remark) this.say('call');
   }
 
   /** Claude hits the usage limit (M22): every session stops until it resets — or until more usage is bought. */
