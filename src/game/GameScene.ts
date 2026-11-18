@@ -156,6 +156,7 @@ import {
 import { BenchView, type BirdKind } from '../view/benchView';
 import { BlueprintView, VISIBLE_SUBAGENTS } from '../view/blueprintView';
 import { GlobeView, type GlobeTopology } from '../view/globeView';
+import { EAST_ASIA, routeRegion, SIBERIA } from '../systems/pipeline/worldRoute';
 import { HubView, type HubTopology } from '../view/hubView';
 import { preloadNodes } from '../view/nodeTextures';
 import { Squares, type Rect } from '../view/squares';
@@ -1209,6 +1210,8 @@ export class GameScene extends Phaser.Scene {
     } else if (what.startsWith('bribe:')) {
       const src = cfg.sources.find((x) => x.id === what.slice(6));
       ok = !!src && this.onSale(src) && buyBribe(s, cfg, src.id);
+    } else if (what === 'route:siberia' || what === 'route:eastasia') {
+      ok = !quiet && this.onWorld && buyModule(s, cfg, 'span', what === 'route:siberia' ? 'siberia' : 'eastasia');
     } else if (what.startsWith('mod:')) {
       // what the towers are built of is sold at the towers, what the planet is girdled with — on the planet
       const m = cfg.modules.find((x) => x.id === what.slice(4));
@@ -1245,7 +1248,8 @@ export class GameScene extends Phaser.Scene {
 
   /** Claude's word on a purchase. Plans, grades and steps in scale are said every time: their lines go in the order of the purchases. */
   private remark(what: string, surged: boolean): void {
-    if (what.startsWith('src:')) this.say(this.stage >= STREET ? 'buy:place' : this.stage >= 3 ? 'buy:employer' : 'buy:src');
+    if (what === 'route:siberia' || what === 'route:eastasia') tell(this.feed, feedData, what === 'route:siberia' ? WORLD.pilotOnline : WORLD.sitesOpen);
+    else if (what.startsWith('src:')) this.say(this.stage >= STREET ? 'buy:place' : this.stage >= 3 ? 'buy:employer' : 'buy:src');
     else if (what.startsWith('mod:')) {
       const kind = this.cfg.modules.find((m) => m.id === what.slice(4))?.kind;
       if (kind === 'hire' || kind === 'block') this.remarkOn(TOWERS.buy[kind], `towers:${kind}`);
@@ -1905,6 +1909,7 @@ export class GameScene extends Phaser.Scene {
     const quarter = (cfg.grid.pilot + cfg.grid.blocks.reduce((n, x) => n + x, 0)) * cfg.grid.unit;
     return {
       spans: owned('span'),
+      route: s.cableRoute,
       nodes: nodesOf(s, cfg),
       asleep: Math.max(0, s.asleep - quarter) / cfg.world.node,
       threads: owned('thread'),
@@ -3087,19 +3092,17 @@ export class GameScene extends Phaser.Scene {
     // the regions the cable has reached: how many of their nodes stand; the one the next node goes to sells it
     const nodeCost = moduleCost(s, mod('node'));
     const canNode = owned('node') < moduleRoom(s, cfg, mod('node'));
-    let before = 0;
     w.regions.forEach((slots, r) => {
-      if (r < reach) {
+      if (routeRegion(s.cableRoute, r) < reach) {
         const [x, y] = this.globe.regionSpot(r);
-        const built = Math.max(0, Math.min(slots, nodes - before));
-        const here = canNode && nodes >= before && nodes < before + slots;
+        const { built, next } = this.globe.regionProgress(r, nodes);
+        const here = canNode && next;
         const name = t.regionNodes(t.regions[r], built, slots);
         // the name of the home region stands aside: the network is written where the cable touches down there
         const at = { x: r === 0 ? x + 96 : x, y: r === 0 ? y + 44 : y };
         if (here) tags.push({ ...at, mid: true, small: true, buy: `mod:${mod('node').id}`, can: s.money >= nodeCost, html: `${name}<br><b>${t.node} · $${short(nodeCost)}</b>` });
         else tags.push({ ...at, mid: true, small: true, html: name });
       }
-      before += slots;
     });
     // the network at home: what it asks for and what it earns; over it — what it is inventing
     const [nx, ny] = this.globe.netSpot();
@@ -3109,24 +3112,42 @@ export class GameScene extends Phaser.Scene {
     if (chip && labOf(s, cfg) >= 1) tags.push({ x: ix, y: iy - 34, mid: true, alarm: true, buy: 'chip', can: true, html: `${TOWERS.proposal(s.chips + 1, chip.name)}<br><b>${TOWERS.enter}</b>` });
     else if (chip) tags.push({ x: ix, y: iy, mid: true, small: true, html: TOWERS.inventing(chip.name, Math.floor(labOf(s, cfg) * 100)) });
     // the map sells the span that is laid next: where it leads
-    const span = this.globe.spanSpot();
-    if (span && spans < mod('span').max) {
-      const cost = moduleCost(s, mod('span'));
-      tags.push({ x: span[0], y: span[1], mid: true, small: true, buy: `mod:${mod('span').id}`, can: s.money >= cost, html: `${t.span(t.to[spans])}<br><b>$${short(cost)}</b>` });
+    const spanCost = moduleCost(s, mod('span'));
+    const destination = t.to[routeRegion(s.cableRoute, Math.min(spans + 1, w.regions.length)) - 1];
+    let spanRows: ShopRow[];
+    if (spans === 0) {
+      const routes = [
+        { region: SIBERIA, buy: 'route:siberia', note: t.siberianPilot(gw(w.node * g.watt)) },
+        { region: EAST_ASIA, buy: 'route:eastasia', note: t.eastSites(w.regions[EAST_ASIA], Math.round((1 - (mod('node').eastSitePrice ?? 1)) * 100)) },
+      ];
+      spanRows = routes.map(({ region, buy, note }) => {
+        const [x, y] = this.globe.regionSpot(region);
+        const title = t.span(t.to[region - 1]);
+        tags.push({ x: x + (region === EAST_ASIA ? 40 : 0), y, mid: true, small: true, buy, can: s.money >= spanCost, html: `${title}<br><b>$${short(spanCost)}</b>` });
+        return this.row(t.regions[region], note, '', buy, spanCost);
+      });
+    } else {
+      const span = this.globe.spanSpot();
+      if (span && spans < mod('span').max) {
+        tags.push({ x: span[0], y: span[1], mid: true, small: true, buy: `mod:${mod('span').id}`, can: s.money >= spanCost, html: `${t.span(destination)}<br><b>$${short(spanCost)}</b>` });
+      }
+      let benefit = spans >= w.regions.length - 1 ? t.ringNote : t.spanNote;
+      if (spans === 1 && s.cableRoute === 'eastasia') benefit = t.siberianPilot(gw(w.node * g.watt));
+      spanRows = [this.worldRow('span', mod('span').name, `${destination} · ${Math.min(spans + 1, w.regions.length)} ${OF} ${w.regions.length} · ${benefit}`, '', t.spansDone)];
     }
     const [mx, my] = this.globe.marsSpot();
     tags.push({ x: mx, y: my, mid: true, small: true, html: t.mars(owned('ark') > 0 && (!this.departing || this.landed) ? this.people(w.node) : '0') });
 
     const add = `+${this.people(w.node)} ${TOWERS.places} · +${gw(w.node * g.watt)}`;
+    const crew = s.cableRoute === 'eastasia' && spans === 1 && nodes >= w.regions[0] && canNode ? ` · ${t.eastCrew}` : '';
     const wire = wireOf(s, cfg);
-    const closing = spans >= w.regions.length - 1;
     const shelves: ShopShelf[] = [
-      { title: t.shelves.nodes, hot: neck === 'pods' && owned('node') < moduleRoom(s, cfg, mod('node')), rows: [this.worldRow('node', mod('node').name, `${add} · ${t.ofNodes(Math.min(all, nodes + 1), all)}`, '', t.nodesDone)] },
+      { title: t.shelves.nodes, hot: neck === 'pods' && canNode, rows: [this.worldRow('node', mod('node').name, `${add} · ${t.ofNodes(Math.min(all, nodes + 1), all)}${crew}`, '', t.nodesDone)] },
       {
         title: t.shelves.cable,
         hot: neck === 'wire' || (neck === 'pods' && owned('node') >= moduleRoom(s, cfg, mod('node'))),
         rows: [
-          this.worldRow('span', mod('span').name, `${t.to[Math.min(spans, t.to.length - 1)]} · ${Math.min(spans + 1, w.regions.length)} ${OF} ${w.regions.length} · ${closing ? t.ringNote : t.spanNote}`, '', t.spansDone),
+          ...spanRows,
           this.worldRow('thread', mod('thread').name, `${t.carries} ${gw(wire)} → ${gw(wire * 2)}`, '', [mod('thread').name, t.threadDone]),
         ],
       },

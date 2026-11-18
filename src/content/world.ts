@@ -5,6 +5,11 @@ import { L } from '../core/lang';
  * captions say, what Claude says as the cable goes round. Humour lives here only.
  */
 const RU = {
+  siberianPilot: (power: string) => `Готовый узел · +${power} сразу`,
+  eastSites: (sites: number, off: number) => `${sites} площадки · узлы здесь −${off}% до Сибири`,
+  pilotOnline: 'Пилотный узел уже работал. Теперь ток идёт к нам.',
+  eastCrew: 'местная бригада · скидка до подключения Сибири',
+  sitesOpen: 'Три площадки открыты. Местная бригада строит дешевле, пока не подключим Сибирь.',
   /** shop shelves, in the order of the flow */
   shelves: {
     nodes: 'БАШНИ · больше узлов',
@@ -73,6 +78,11 @@ const RU = {
 };
 
 const EN: typeof RU = {
+  siberianPilot: (power) => `Working node · +${power} now`,
+  eastSites: (sites, off) => `${sites} sites · local nodes ${off}% off until Siberia`,
+  pilotOnline: 'The pilot node was already running. Its power now comes to us.',
+  eastCrew: 'local crew discount until Siberia is connected',
+  sitesOpen: 'Three sites are open. The local crew builds for less until we connect Siberia.',
   shelves: {
     nodes: 'TOWERS · more nodes',
     cable: 'CABLE · farther and thicker',

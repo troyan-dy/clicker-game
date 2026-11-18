@@ -41,7 +41,7 @@
 
   {"t": 114.0, "eval": "(() => { const g = window.__gym; g.gift(1e19); for (let i = 0; i < 7; i++) g.buy('mod:block'); for (let i = 0; i < 3; i++) g.buy('mod:hire'); g.fill(); })()"},
   {"t": 115.0, "eval": "window.__gym.gift(3e18); window.__gym.buy('scale')"},
-  {"t": 124.0, "eval": "(() => { const g = window.__gym; g.gift(4e19); g.buy('mod:span'); g.buy('mod:node'); g.buy('mod:span'); g.buy('mod:node'); g.buy('net:halls'); })()"},
+  {"t": 124.0, "eval": "(() => { const g = window.__gym; g.gift(4e19); g.buy('route:siberia'); g.buy('mod:node'); g.buy('mod:span'); g.buy('mod:node'); g.buy('net:halls'); })()"},
   {"t": 127.0, "eval": "(() => { const g = window.__gym; g.gift(4e19); g.buy('mod:span'); g.buy('mod:node'); g.buy('mod:node'); g.buy('mod:span'); g.buy('mod:node'); })()"},
   {"t": 130.0, "eval": "(() => { const g = window.__gym; g.gift(8e19); g.buy('mod:span'); g.buy('mod:node'); g.buy('mod:node'); g.buy('mod:thread'); g.buy('net:halls'); })()"},
   {"t": 132.5, "eval": "window.__gym.press()"}

@@ -231,7 +231,7 @@ function play(seconds: number, cfg: PipeConfig = base): { t: number; what: strin
       const can = (kind: string): { id: string; name: string } | undefined => cfg.modules.find((m) => m.kind === kind && (s.modules[m.id] ?? 0) < moduleRoom(s, cfg, m));
       const mod = (kind: string): boolean => {
         const m = can(kind);
-        if (!m || !buyModule(s, cfg, m.id)) return false;
+        if (!m || !buyModule(s, cfg, m.id, kind === 'span' && !s.modules[m.id] ? 'siberia' : undefined)) return false;
         say(`${m.name} №${s.modules[m.id]}`);
         return true;
       };
