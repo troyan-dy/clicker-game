@@ -56,6 +56,8 @@ npm run build    # the build in dist/
 npm run test:coverage  # unit tests and the 100% game logic coverage check
 ```
 
+Changes reach `master` through a pull request. GitHub checks the tests, 100% game logic coverage per file, and the build. After merge, those checks run on `master` before GitHub Pages updates the live game at the same URL.
+
 The pictures of this page are made from the game itself: `npm run build:gym && node tools/readme.mjs`.
 
 Author: [github.com/troyan-dy](https://github.com/troyan-dy). Credits and licences are in [CREDITS.md](CREDITS.md).
