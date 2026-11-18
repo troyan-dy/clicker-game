@@ -1,6 +1,7 @@
 import './blueprint.css';
 import { L } from '../../core/lang';
 import { LOCALE, steady } from '../format';
+import { InternLaptop } from '../intern/intern';
 import type { ShopShelf } from '../terminal/terminal';
 
 export interface BlueprintTag {
@@ -73,6 +74,7 @@ export interface BlueprintModel {
 }
 
 export interface BlueprintUi {
+  laptop: InternLaptop;
   render(model: BlueprintModel): void;
   /** the pull-back has happened: captions, shop and money appear; `now` — at once, a saved game opens here */
   show(now?: boolean): void;
@@ -168,6 +170,7 @@ export function createBlueprint(layer: HTMLElement, over: HTMLElement): Blueprin
   };
 
   return {
+    laptop: new InternLaptop(over),
     extra: q('.bl-extra'),
     show(now = false) {
       for (const el of [root, overRoot]) {

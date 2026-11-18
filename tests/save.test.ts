@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { laptopPhase, startIncident, stepIncident } from '../src/systems/intern/incident';
 import autoData from '../src/data/balance/auto.json';
 import chipData from '../src/data/balance/chips.json';
 import farmData from '../src/data/balance/farms.json';
@@ -28,6 +29,7 @@ import {
   createPipe,
   payOf,
   screenOf,
+  stepPipe,
   type Farm,
   type Line,
   type Module,
@@ -71,6 +73,28 @@ function grown() {
 }
 
 describe('save', () => {
+  it('resumes the laptop outage and issues one credit across reloads', () => {
+    const state = grown();
+    const meta = { ...freshMeta(), legends: ['intern'], intern: startIncident(75) };
+    const save = { at: 0, state, meta, feed: { shown: [], said: {} }, won: false, seconds: 0 };
+    expect(stepIncident(meta.intern, 3)).toBe(0);
+    const outage = unpackSave(packSave(save), cfg)!.meta.intern!;
+    expect(laptopPhase(outage.elapsed)).toBe('closed');
+    const before = state.money;
+    stepPipe(state, cfg, 1, true);
+    expect(state.money).toBe(before);
+    expect(stepIncident(outage, 2.5)).toBe(75);
+    const restored = unpackSave(packSave({ ...save, meta: { ...meta, intern: outage } }), cfg)!.meta.intern!;
+    expect(laptopPhase(restored.elapsed)).toBe('restored');
+    expect(stepIncident(restored, 3)).toBe(0);
+    expect(laptopPhase(restored.elapsed)).toBe('done');
+    stepPipe(state, cfg, 1);
+    expect(state.money).toBeGreaterThan(before);
+    const old = unpackSave(packSave({ ...save, meta: { ...freshMeta(), legends: ['intern'] } }), cfg)!;
+    expect(old.meta.legends).toContain('intern');
+    expect(old.meta.intern).toBeUndefined();
+  });
+
   it('test_save_round_trip_keeps_the_whole_game', () => {
     const s = grown();
     s.allowance = 2;

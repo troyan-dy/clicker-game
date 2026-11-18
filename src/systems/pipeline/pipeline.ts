@@ -901,6 +901,7 @@ export function stepPipe(
   s: PipeState,
   cfg: PipeConfig,
   dt: number,
+  processingDown = false,
 ): { arrived: number; here: number; subagents: number; done: string[]; came: number; lay: number } {
   const t = cfg.tuning;
   /** `done` — employers where a unit was just taken by a squad, or that the robots have just taken whole */
@@ -966,7 +967,7 @@ export function stepPipe(
     const moved = stepGrid(s, cfg, dt);
     out.came = moved.came;
     out.lay = moved.into;
-    const tasks = s.limited > 0 ? 0 : inflowOf(s, cfg) * dt;
+    const tasks = s.limited > 0 || processingDown ? 0 : inflowOf(s, cfg) * dt;
     pay(s, cfg, true, tasks);
     s.backlog = 0;
     s.subAcc += tasks;
@@ -988,6 +989,9 @@ export function stepPipe(
   s.inflowAcc -= out.arrived;
   s.backlog += out.arrived;
   if (s.backlog >= cap) s.inflowAcc = Math.min(s.inflowAcc, 1); // the boss waits
+
+  // The intern shut the lid: incoming work still queues while processing waits.
+  if (processingDown) return out;
 
   // Claude in the player's terminal
   const rate = claudeRate(s, cfg);
