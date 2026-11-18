@@ -3,6 +3,7 @@
  * clock and the storage. A save from an older build is read field by field onto a fresh state,
  * so new sources, farms and grades never break it.
  */
+import { laptopPhase, type InternIncident } from '../intern/incident';
 import {
   claudeRate,
   createPipe,
@@ -37,6 +38,8 @@ export interface SavedFeed {
 
 /** What the player has collected besides money. */
 export interface SavedMeta {
+  /** Unfinished first run of the intern's legendary ticket. */
+  intern?: InternIncident;
   /** ids of the legendary tickets closed */
   legends: string[];
   /** ids of the awards earned */
@@ -194,6 +197,12 @@ export function unpackSave(json: string | null, cfg: PipeConfig): SaveFile | nul
   const feed = counts(data.feed);
   const meta = counts(data.meta);
   const ids = (v: unknown): string[] => (Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : []);
+  const record = counts(meta.intern);
+  const elapsed = num(record.elapsed, -1);
+  const credit = num(record.credit, 0);
+  const intern = ids(meta.legends).includes('intern') && elapsed >= 0 && laptopPhase(elapsed) !== 'done' && credit >= 1
+    ? { elapsed, credit }
+    : undefined;
   const said: Record<string, number> = {};
   for (const [k, v] of Object.entries(counts(feed.said))) said[k] = Math.floor(num(v, 0));
   return {
@@ -201,7 +210,7 @@ export function unpackSave(json: string | null, cfg: PipeConfig): SaveFile | nul
     at: num(data.at, 0),
     state: restorePipe(cfg, data.state),
     feed: { shown: Array.isArray(feed.shown) ? feed.shown.filter((i): i is number => Number.isInteger(i)) : [], said },
-    meta: { legends: ids(meta.legends), awards: ids(meta.awards), piles: Math.floor(num(meta.piles, 0)), reports: Math.floor(num(meta.reports, 0)), calls: Math.floor(num(meta.calls, 0)), limits: Math.floor(num(meta.limits, 0)), riots: Math.floor(num(meta.riots, 0)), news: ids(meta.news).slice(0, NEWS_KEPT), managerOff: meta.managerOff === true, auto: meta.auto === true, bread: Math.floor(num(meta.bread, 0)), fed: Math.floor(num(meta.fed, 0)), refused: Math.floor(num(meta.refused, 0)), feeder: meta.feeder === true, benchAuto: meta.benchAuto === true, atBench: meta.atBench === true },
+    meta: { intern, legends: ids(meta.legends), awards: ids(meta.awards), piles: Math.floor(num(meta.piles, 0)), reports: Math.floor(num(meta.reports, 0)), calls: Math.floor(num(meta.calls, 0)), limits: Math.floor(num(meta.limits, 0)), riots: Math.floor(num(meta.riots, 0)), news: ids(meta.news).slice(0, NEWS_KEPT), managerOff: meta.managerOff === true, auto: meta.auto === true, bread: Math.floor(num(meta.bread, 0)), fed: Math.floor(num(meta.fed, 0)), refused: Math.floor(num(meta.refused, 0)), feeder: meta.feeder === true, benchAuto: meta.benchAuto === true, atBench: meta.atBench === true },
     won: data.won === true,
     seconds: num(data.seconds, 0),
   };

@@ -51,6 +51,8 @@ import { createTuningPanel, type TuningPanel } from '../debug/tuningPanel';
 import { birdRate, createBench, refuseBird, stepBench, throwBread } from '../systems/bench/bench';
 import { createEvents, stepEvents, takeEvent, type EventsTuning } from '../systems/events/events';
 import { createFeed, headline, say, stepFeed, tell, type FeedContent } from '../systems/feed/feed';
+import { laptopPhase, startIncident, stepIncident } from '../systems/intern/incident';
+import { INTERN_REPORT } from '../ui/intern/intern';
 import { managerPick } from '../systems/manager/manager';
 import { createRiots, stepRiots, type RiotTuning } from '../systems/riots/riots';
 import { createStrikes, stepStrikes, type StrikeTuning } from '../systems/strikes/strikes';
@@ -248,7 +250,7 @@ function perSecond(n: number): string {
 declare global {
   interface Window {
     /** gym-only hooks for scripted captures */
-    __gym?: { buy(what: string): boolean; press(): void; click(row: string): void; take(id: string): void; fleet(lines: number): void; strike(): void; riot(): void; gift(dollars: number): void; away(hours: number): void; pile(legend: boolean): void; call(): void; limit(): void; fill(): void };
+    __gym?: { buy(what: string): boolean; press(): void; click(row: string): void; take(id: string): void; fleet(lines: number): void; strike(): void; riot(): void; gift(dollars: number): void; away(hours: number): void; pile(legend: boolean | 'intern'): void; call(): void; limit(): void; fill(): void };
   }
 }
 
@@ -282,6 +284,7 @@ export class GameScene extends Phaser.Scene {
   private readonly withMenu: boolean;
   /** a tuning session may start on a later screen: 3 city, 4 state, 5 planet; 0 — from the beginning */
   private readonly startAt: number;
+  private readonly demoIntern: boolean;
   private readonly settings = loadSettings();
   // own copies of the data: the tuning panel edits them live, the mechanic reads them every step
   private readonly cfg: PipeConfig = {
@@ -351,6 +354,7 @@ export class GameScene extends Phaser.Scene {
   private limitCard = false;
   /** the current pile is a legendary ticket */
   private legend: Legend | null = null;
+  private internReplay: { elapsed: number; back: () => void } | null = null;
   /** the collection and the awards */
   private meta = freshMeta();
   /** awards earned but not announced yet */
@@ -399,7 +403,7 @@ export class GameScene extends Phaser.Scene {
     card: CardUi,
     credits: CreditsUi,
     benchUi: BenchUi,
-    opts: { overlay: boolean; save: boolean; gym: boolean; menu: boolean; start: number },
+    opts: { overlay: boolean; save: boolean; gym: boolean; menu: boolean; start: number; demoIntern: boolean },
   ) {
     super('game');
     this.rng = rng;
@@ -413,6 +417,7 @@ export class GameScene extends Phaser.Scene {
     this.gym = opts.gym;
     this.withMenu = opts.menu;
     this.startAt = opts.start;
+    this.demoIntern = opts.demoIntern;
   }
 
   preload(): void {
@@ -457,6 +462,7 @@ export class GameScene extends Phaser.Scene {
       this.won = true;
       this.enterBench(true);
     }
+    if (__TOOLS__ && this.demoIntern && !this.resumed) this.forcePile('intern');
     this.lastMoney = this.state.money;
     if (this.withMenu) this.openTitle();
     else this.resume();
@@ -464,7 +470,7 @@ export class GameScene extends Phaser.Scene {
     window.addEventListener('keydown', (e) => this.onKey(e));
     window.addEventListener('pointerdown', (e) => {
       const el = e.target as HTMLElement;
-      if (el.closest('.lil-gui') || this.card.open || this.cine || this.credits.rolling) return;
+      if (this.internReplay || el.closest('.lil-gui') || this.card.open || this.cine || this.credits.rolling) return;
       const ev = el.closest<HTMLElement>('[data-ev]')?.dataset.ev;
       if (ev !== undefined) {
         this.wake();
@@ -508,6 +514,21 @@ export class GameScene extends Phaser.Scene {
   }
 
   update(_time: number, deltaMs: number): void {
+    if (this.internReplay) {
+      this.internReplay.elapsed += Math.min(deltaMs / 1000, 0.25);
+      const elapsed = this.internReplay.elapsed;
+      if (laptopPhase(elapsed) === 'done') {
+        const { back } = this.internReplay;
+        this.internReplay = null;
+        this.paper.laptop.hide();
+        back();
+      } else {
+        this.paper.laptop.show(elapsed, 0, true);
+        this.paper.laptop.task();
+      }
+    } else if (this.meta.intern && !this.paused && !this.card.open) {
+      this.paper.laptop.show(this.meta.intern.elapsed, this.meta.intern.credit);
+    } else this.paper.laptop.hide();
     this.acc = this.paused ? 0 : this.acc + Math.min(deltaMs / 1000, 0.25) * (this.slow ? 0.25 : 1);
     while (this.acc >= STEP) {
       this.step(STEP);
@@ -767,8 +788,16 @@ export class GameScene extends Phaser.Scene {
         const lines = AWARDS.map((a) => (this.meta.awards.includes(a.id) ? `<b>${a.name}</b> — ${a.text}` : `${a.name}`));
         this.openList(L('claude — грамоты', 'claude — awards'), awards, lines, 0, () => again(i));
       } else if (id === 'legends') {
-        const lines = LEGENDS.map((l) => (this.meta.legends.includes(l.id) ? `<b>${l.title}</b>` : L('· ещё не попадался', '· not seen yet')));
-        this.openList(L('claude — коллекция', 'claude — collection'), legends, lines, 0, () => again(i));
+        const ownsLaptop = this.meta.legends.includes('intern');
+        const lines = LEGENDS.map((l) => {
+          if (!this.meta.legends.includes(l.id)) return L('· ещё не попадался', '· not seen yet');
+          return l.id === 'intern' ? `<b>${l.title}</b> — ${INTERN_REPORT}` : `<b>${l.title}</b>`;
+        });
+        const replay = ownsLaptop ? {
+          label: L('Посмотреть запись с ноутбука', 'Replay the laptop incident'),
+          run: (back: () => void) => { this.internReplay = { elapsed: 0, back }; },
+        } : undefined;
+        this.openList(L('claude — коллекция', 'claude — collection'), legends, lines, 0, () => again(i), 10, replay);
       } else if (id === 'new') this.confirmNew(() => again(i));
       else if (id === 'credits') this.credits.roll(this.creditsSpec('solo'), () => again(i));
       else if (id === 'lang') this.switchLanguage();
@@ -803,13 +832,15 @@ export class GameScene extends Phaser.Scene {
   }
 
   /** A long list on a card, a page at a time, `per` lines on each. */
-  private openList(head: string, title: string, lines: string[], page: number, back: () => void, per = 10): void {
+  private openList(head: string, title: string, lines: string[], page: number, back: () => void, per = 10, action?: { label: string; run(back: () => void): void }): void {
     const pages = Math.ceil(lines.length / per);
     const more = page + 1 < pages;
     const back_ = { label: L('Назад', 'Back') };
     const options = more ? [{ label: L('Дальше', 'Next'), note: `${L('страница', 'page')} ${page + 1} ${OF} ${pages}` }, back_] : [back_];
+    const actionIndex = action ? options.push({ label: action.label }) - 1 : -1;
     this.card.show({ head, title, lines: lines.slice(page * per, (page + 1) * per), options, dense: true }, (i) => {
-      if (more && i === 0) this.openList(head, title, lines, page + 1, back, per);
+      if (action && i === actionIndex) action.run(() => this.openList(head, title, lines, page, back, per, action));
+      else if (more && i === 0) this.openList(head, title, lines, page + 1, back, per, action);
       else back();
     });
   }
@@ -1030,9 +1061,10 @@ export class GameScene extends Phaser.Scene {
   }
 
   /** gym-only: a full pile of questions right now, legendary or not */
-  private forcePile(legend: boolean): void {
+  private forcePile(legend: boolean | 'intern'): void {
     this.stack.fill = 1;
-    this.legend = legend ? (LEGENDS.find((l) => !this.meta.legends.includes(l.id)) ?? LEGENDS[0]) : null;
+    if (legend === 'intern') this.legend = LEGENDS.find((l) => l.id === 'intern')!;
+    else this.legend = legend ? (LEGENDS.find((l) => !this.meta.legends.includes(l.id)) ?? LEGENDS[0]) : null;
     this.question = this.legend ? this.legend.ask : QUESTIONS[0];
   }
 
@@ -1052,6 +1084,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   private onKey(e: KeyboardEvent): void {
+    if (this.internReplay) return;
     if (this.card.key(e)) return;
     // the ending and the credits: the world stands still, a key only hurries the credits
     if (this.cine || this.credits.rolling) return;
@@ -1455,6 +1488,7 @@ export class GameScene extends Phaser.Scene {
 
   /** A call or an inspection is answered with a «Да»: a bonus flies from that building. */
   private answer(i: number): void {
+    if (this.internClosed) return;
     const e = takeEvent(this.calls, i);
     if (!e) return;
     const count = e.standup ? 2 : 1;
@@ -1546,8 +1580,26 @@ export class GameScene extends Phaser.Scene {
     return true;
   }
 
+  private get internClosed(): boolean {
+    return !!this.meta.intern && laptopPhase(this.meta.intern.elapsed) === 'closed';
+  }
+
+  private stepIntern(dt: number): void {
+    const incident = this.meta.intern;
+    if (!incident) return;
+    const credit = stepIncident(incident, dt);
+    if (credit > 0) {
+      this.state.money += credit;
+      this.lastMoney += credit;
+      logEvent('intern_credit');
+      this.saveGame();
+    }
+    if (laptopPhase(incident.elapsed) === 'done') delete this.meta.intern;
+  }
+
   /** «Да всем»: the whole pile of questions is approved at once. Returns false when there is no pile. */
   private approvePile(): boolean {
+    if (this.internClosed) return false;
     // a pile is taken whole: a key pressed too early answers the calls and nudges Claude, the pile keeps growing
     if (this.stack.fill < 1) return false;
     const legend = this.legend;
@@ -1562,7 +1614,14 @@ export class GameScene extends Phaser.Scene {
     this.delivered(from[0], from[1], 14);
     logEvent(legend ? 'yes_legend' : 'yes_all');
     if (legend) {
-      if (!this.meta.legends.includes(legend.id)) this.meta.legends.push(legend.id);
+      if (!this.meta.legends.includes(legend.id)) {
+        this.meta.legends.push(legend.id);
+        if (legend.id === 'intern') {
+          this.meta.intern = startIncident(this.flowIncome());
+          this.saveGame();
+          logEvent('intern_started');
+        }
+      }
       this.say('legend', true);
     } else if (this.stack.taken % 3 === 1) this.say('all');
     return true;
@@ -1574,12 +1633,13 @@ export class GameScene extends Phaser.Scene {
       this.toss(false);
       return;
     }
-    if (this.stage >= 2 && this.approveAll()) return;
+    if (this.internClosed || (this.stage >= 2 && this.approveAll())) return;
     const result = pressPipe(this.state, this.cfg);
     this.pressTimes.push(this.clock);
     this.lastPress = this.clock;
     if (this.stage === 1) this.term.hit(result);
     if (result === 'approved') {
+      if (this.meta.intern) this.paper.laptop.task();
       playSound('yes', this.yesStreak++ % 5);
       if (this.stage === 1) this.squares.fly(TERMINAL_SPOTS.ask, TERMINAL_SPOTS.money, 5, MONEY_ON_DARK, 220, [0.35, 0.6]);
       else if (this.stage === 2) this.delivered(...this.deskSpot(), 3);
@@ -1610,6 +1670,7 @@ export class GameScene extends Phaser.Scene {
 
   /** a task was closed at a session: a square flies from there into the money */
   private delivered(x: number, y: number, count = 1): void {
+    if (count === 1 && this.meta.intern) return; // completed tasks are shown at the intern's laptop
     if (count === 1 && this.clock - this.lastDelivery < 0.07) return; // not more than ~14 squares a second
     this.lastDelivery = this.clock;
     this.squares.fly({ x: x - 6, y: y - 6, w: 12, h: 12 }, MONEY_SPOT, count, this.dim ? MONEY_ON_DARK : MONEY_ON_PAPER, 160, [0.45, 0.75]);
@@ -1639,11 +1700,14 @@ export class GameScene extends Phaser.Scene {
     this.clock += dt;
     this.seconds += dt;
     const s = this.state;
+    const laptopClosed = this.internClosed;
+    this.stepIntern(dt);
     if (this.onBench) {
-      this.stepPark(dt);
+      this.stepPark(dt, laptopClosed);
       return;
     }
-    const done = stepPipe(s, this.cfg, dt);
+    const done = stepPipe(s, this.cfg, dt, laptopClosed);
+    if (this.meta.intern && done.here + done.subagents > 0) this.paper.laptop.task();
     for (const id of done.done) this.unitDone(id);
 
     if (this.stage === 2) {
@@ -1765,7 +1829,7 @@ export class GameScene extends Phaser.Scene {
         logEvent('standup_missed');
         this.saveGame();
       }
-      const standupReady = !this.feed.said.standup && !this.won && !this.departing && !this.card.open
+      const standupReady = !this.feed.said.standup && !this.meta.intern && !this.won && !this.departing && !this.card.open
         && (this.stage > 2 || owners.length >= 2 || (s.owned.job ?? 0) >= 2);
       stepEvents(this.calls, EVENTS, dt, owners, (CALLS[String(this.stage)] ?? []).length, this.rng, standupReady);
       if (this.selfPlay && this.calls.list.some((e) => e.left < EVENTS.life - 2)) this.answer(0);
@@ -1793,7 +1857,7 @@ export class GameScene extends Phaser.Scene {
       // the usage limit: hit now and then, it resets by itself
       this.limitIn -= dt;
       // …unless an employer taken whole has lifted it for good
-      if (this.limitIn <= 0 && s.limited <= 0 && !this.card.open && discount(s, this.cfg, 'limit') > 0.01) this.hitLimit();
+      if (this.limitIn <= 0 && !this.meta.intern && s.limited <= 0 && !this.card.open && discount(s, this.cfg, 'limit') > 0.01) this.hitLimit();
       if (this.limitCard && s.limited <= 0) {
         this.limitCard = false;
         this.card.hide();
@@ -1837,7 +1901,7 @@ export class GameScene extends Phaser.Scene {
     const k = dt / SMOOTH;
     this.avgBacklog += (s.backlog - this.avgBacklog) * k;
     this.avgReady += (s.ready - this.avgReady) * k;
-    this.income += ((s.money - this.lastMoney) / dt - this.income) * k;
+    this.income = this.internClosed ? 0 : this.income + ((s.money - this.lastMoney) / dt - this.income) * k;
     this.lastMoney = s.money;
     this.squares.step(dt);
   }
@@ -2065,10 +2129,10 @@ export class GameScene extends Phaser.Scene {
    * The park (M30): birds fly in, the courier brings bread, Claude throws it if he was asked to.
    * The planet goes on working behind the trees: money comes in, nobody looks at it.
    */
-  private stepPark(dt: number): void {
+  private stepPark(dt: number, laptopClosed: boolean): void {
     const s = this.state;
     const b = this.park;
-    stepPipe(s, this.cfg, dt);
+    stepPipe(s, this.cfg, dt, laptopClosed);
     this.income += ((s.money - this.lastMoney) / dt - this.income) * (dt / SMOOTH);
     this.lastMoney = s.money;
     const out = stepBench(b, benchData, dt);
@@ -2777,7 +2841,8 @@ export class GameScene extends Phaser.Scene {
     } else if (!next || !scaleReady(s, this.cfg)) return false;
     if (!name || s.money < price) return false;
     const key = 'manager-ready-' + this.stage;
-    if (this.feed.said[key] || this.card.open || this.cine || this.departing || this.won || this.calls.list.length) return true;
+    if (this.feed.said[key] || this.card.open || this.cine || this.departing || this.won
+      || this.meta.intern || this.calls.list.length || this.standupReplyUntil > this.clock) return true;
     this.card.show({
       head: L('Клод — переход', 'Claude — next stage'), title: name,
       lines: [L(`Всё готово. На счёте есть $${short(price)}. Подтверждаете?`, `Everything is ready. We have $${short(price)}. Proceed?`)],
