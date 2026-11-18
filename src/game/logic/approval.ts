@@ -16,7 +16,8 @@ export function approvePending(calls: number, answerFirst: () => void, sign: () 
   return takePile() || calls > 0 || signed || admitted;
 }
 
-export function signResearch(state: PipeState, cfg: PipeConfig) {
+export function signResearch(state: PipeState, cfg: PipeConfig, laptopClosed: boolean) {
+  if (laptopClosed) return undefined;
   const chip = takeChip(state, cfg);
   if (chip) state.presses++;
   return chip;

@@ -1538,7 +1538,7 @@ export class GameScene extends Phaser.Scene {
   /** The «Да» under an invention of the network: from now on it runs on the next generation of hardware. False — nothing waited for a signature. */
   private signChip(): boolean {
     const n = this.state.chips + 1;
-    const chip = signResearch(this.state, this.cfg);
+    const chip = signResearch(this.state, this.cfg, this.internClosed);
     if (!chip) return false;
     playSound('all');
     this.paper.toast(`${TOWERS.signed}: № ${n}`, TOWERS.signedSub(chip.name));

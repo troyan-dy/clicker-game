@@ -53,6 +53,7 @@ English and Russian. The game takes the language of the browser; the last line o
 npm install
 npm run dev      # the game at http://localhost:5173/
 npm run build    # the build in dist/
+npm run test:coverage  # unit tests and the 100% game logic coverage check
 ```
 
 The pictures of this page are made from the game itself: `npm run build:gym && node tools/readme.mjs`.

@@ -97,7 +97,6 @@ export interface BlueprintUi {
   extra: HTMLElement;
 }
 
-// one digit after the comma, always: the income line is centred, a dropped «,0» would move it
 const esc = (s: string): string => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
 
 /**

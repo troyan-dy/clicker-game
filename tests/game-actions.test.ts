@@ -35,11 +35,13 @@ it('opens the volunteer gate only once and counts research approval only when si
   expect(openVolunteerGate(state, cfg, cfg.grid.screen)).toBe(true);
   expect(openVolunteerGate(state, cfg, cfg.grid.screen)).toBe(false);
   expect(state.presses).toBe(1);
-  expect(signResearch(state, cfg)).toBeUndefined();
+  expect(signResearch(state, cfg, false)).toBeUndefined();
   state.noAsk = true;
   state.scale = cfg.grid.screen - 2;
   state.lab = cfg.chips[0].need;
-  expect(signResearch(state, cfg)?.id).toBe(cfg.chips[0].id);
+  expect(signResearch(state, cfg, true)).toBeUndefined();
+  expect(state).toMatchObject({ presses: 1, chips: 0, lab: cfg.chips[0].need });
+  expect(signResearch(state, cfg, false)?.id).toBe(cfg.chips[0].id);
   expect(state).toMatchObject({ presses: 2, chips: 1, gate: true });
 });
 

@@ -261,7 +261,7 @@ export class GlobeView {
     const r = globe.radius * AT.k + 12;
     if (t.nodes > 0) {
       s.lineStyle(1 + (3 * t.nodes) / all, EDGE, 0.12 + (0.2 * t.nodes) / all);
-      dashed(s, circle(AT.x, AT.y, r, 72), 9);
+      dashed(s, ellipse(AT.x, AT.y, r, r, 0, Math.PI * 2, 72), 9);
     }
     // the planet next door, and — once the tower has left — the way it took
     s.lineStyle(1.5, EDGE, 0.5).strokeCircle(MARS.x, MARS.y, MARS.r);
@@ -415,10 +415,6 @@ export class GlobeView {
 }
 
 /** A node of towers as the planet shows it: three small walls; built ones have a red light each. */
-function circle(cx: number, cy: number, radius: number, n: number): Pt[] {
-  return ellipse(cx, cy, radius, radius, 0, Math.PI * 2, n);
-}
-
 function tower(g: Phaser.GameObjects.Graphics, x: number, y: number, built: boolean): void {
   for (const [dx, h] of [[-7, 12], [0, 17], [7, 12]] as const) {
     if (built) {

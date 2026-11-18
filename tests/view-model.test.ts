@@ -1,9 +1,20 @@
 import { expect, it } from 'vitest';
 import { deskScreen } from '../src/data/layout/blueprint';
+import { HUBS } from '../src/data/layout/hubs';
+import { cfg } from './fixtures/pipe';
 import { canChoose, initialChoice, moveChoice } from '../src/ui/logic/cardChoice';
 import { terminalState } from '../src/ui/logic/terminalState';
 import { along, curve, ellipse, length } from '../src/view/logic/geometry';
 import { NODES, orderedNodes, regionProgress } from '../src/view/logic/globeNodes';
+
+it('maps each employer and session farm to its own market', () => {
+  for (const [stage, hub] of Object.entries(HUBS)) {
+    const employers = cfg.sources.filter(source => source.screen === Number(stage));
+    expect(Object.keys(hub.lots).sort()).toEqual(employers.map(source => source.id).sort());
+    const farms = cfg.farms.filter(farm => farm.screen === Number(stage));
+    expect(Object.values(hub.farms).flatMap(node => node.ids).sort()).toEqual(farms.map(farm => farm.id).sort());
+  }
+});
 
 it('selects valid dialog actions and skips disabled entries in either direction', () => {
   const options = [{ label: 'a', off: true }, { label: 'b' }, { label: 'c', off: true }, { label: 'd' }];

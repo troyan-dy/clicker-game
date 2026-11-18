@@ -50,7 +50,14 @@ export default defineConfig(({ mode }) => ({
   test: {
     coverage: {
       provider: 'v8',
-      include: ['src/systems/**/*.ts', 'src/core/**/*.ts', 'src/content/**/*.ts', 'src/ui/format.ts', 'src/ui/logic/**/*.ts', 'src/view/logic/**/*.ts', 'src/data/layout/blueprint.ts', 'src/game/logic/**/*.ts'],
+      include: ['src/**/*.ts'],
+      // New modules enter the check automatically. The scene and view adapters drive Phaser, DOM and CSS.
+      exclude: [
+        '**/*.d.ts', 'src/main.ts', 'src/game/GameScene.ts', 'src/debug/**', 'src/gyms/**',
+        'src/data/palette.ts', // colours for the HelloScene graphics demo
+        'src/ui/{hud,scale,bench/bench,blueprint/blueprint,card/card,credits/credits,intern/intern,terminal/terminal}.ts',
+        'src/view/{benchView,blueprintView,globeView,HelloScene,hubView,nodeTextures,squares,towerView,walkers}.ts',
+      ],
       reporter: ['text', 'json', 'json-summary'],
       thresholds: { perFile: true, lines: 100, functions: 100, statements: 100, branches: 100 },
     },
