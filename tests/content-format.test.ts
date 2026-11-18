@@ -31,7 +31,9 @@ it.each(['ru', 'en'])('keeps the numbers, units and status of each %s dashboard 
   expect(b.status(false)).toBe(ru ? 'автокормление: выкл' : 'auto-feeding: off');
   expect(w.rows.carries(3, true)).toBe(ru ? 'ниток 3 · пояс замкнут' : 'strands: 3 · the belt is closed');
   expect(w.rows.carries(3, false)).toBe(ru ? 'ниток 3' : 'strands: 3');
-  expect([1, 3, 5].map(t.build)).toEqual(ru ? ['+1 капсула', '+3 капсулы', '+5 капсул'] : ['+1 capsule', '+3 capsules', '+5 capsules']);
+  expect([1, 3, 5, 11, 21, 24].map(t.build)).toEqual(ru
+    ? ['+1 капсула', '+3 капсулы', '+5 капсул', '+11 капсул', '+21 капсула', '+24 капсулы']
+    : ['+1 capsule', '+3 capsules', '+5 capsules', '+11 capsules', '+21 capsules', '+24 capsules']);
 });
 
 it.each(['ru', 'en'])('selects every public story collection for the %s run', async lang => {

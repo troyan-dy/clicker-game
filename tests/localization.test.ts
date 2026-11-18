@@ -77,6 +77,12 @@ it.each(['ru', 'en'])('keeps game IDs and unlock rules stable while translating 
   expect(NEWS).toEqual(news.map((n,i) => lang === 'ru' ? n : { ...n, text: newsEn[i] }));
   expect(words('auto','subagent')).toEqual(lang === 'ru' ? {} : { name: 'Subagent', note: 'its own session, ¼ of your limit' });
   expect(words('plans','unknown')).toEqual({});
+  const { createGameConfig } = await import('../src/game/logic/config');
+  const config = createGameConfig();
+  expect(config.auto.subagent.name).toBe(lang === 'ru' ? 'Сабагент' : 'Subagent');
+  const originalRate = config.plans[0].rate;
+  config.plans[0].rate += 1;
+  expect(createGameConfig().plans[0].rate).toBe(originalRate);
   expect(promptAt(-1).ask).toBe(TICKETS[0].asks[0]);
   let index = 0;
   for (const ticket of TICKETS) {

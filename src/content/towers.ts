@@ -1,4 +1,5 @@
 import { L } from '../core/lang';
+import { plural } from '../ui/format';
 
 /**
  * The words of the towers (M28, the seventh screen): what the table, the shop and the captions say, what
@@ -59,7 +60,7 @@ const RU = {
   park: (n: string): string => `парк · без дела ${n}`,
   net: 'нейросеть',
   inventing: (name: string, pct: number): string => `изобретает: ${name} · ${pct}%`,
-  build: (n: number): string => `+${n} ${n === 1 ? 'капсула' : n < 5 ? 'капсулы' : 'капсул'}`,
+  build: (n: number): string => `+${n} ${plural(n, ['капсула', 'капсулы', 'капсул'])}`,
   /** the corner of the page: what a capsule stands for, and how far the chapter has got */
   hint: (asleep: string, all: string): string => `на схеме одна капсула — миллион человек · в капсулах ${asleep} из ${all}`,
   /** the first volunteers at the gate, and an invention waiting for a signature */
