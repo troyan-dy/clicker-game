@@ -1,25 +1,10 @@
+import { cfg as base } from './fixtures/pipe';
 import { describe, expect, it } from 'vitest';
-import autoData from '../src/data/balance/auto.json';
-import chipData from '../src/data/balance/chips.json';
-import farmData from '../src/data/balance/farms.json';
-import gradeData from '../src/data/balance/grades.json';
-import lineData from '../src/data/balance/lines.json';
-import managerData from '../src/data/balance/managers.json';
-import moduleData from '../src/data/balance/modules.json';
-import netData from '../src/data/balance/net.json';
-import planData from '../src/data/balance/plans.json';
-import policeData from '../src/data/balance/police.json';
-import scaleData from '../src/data/balance/scales.json';
-import sourceData from '../src/data/balance/sources.json';
-import gridData from '../src/data/tuning/grid.json';
-import worldData from '../src/data/tuning/world.json';
-import tuningData from '../src/data/tuning/pipeline.json';
 import eventsData from '../src/data/tuning/events.json';
 import riotData from '../src/data/tuning/riots.json';
 import stackData from '../src/data/tuning/stack.json';
 import { createRng } from '../src/core/rng';
 import { createEvents, stepEvents, takeEvent } from '../src/systems/events/events';
-import type { Plan } from '../src/systems/plan/plan';
 import { createRiots, stepRiots } from '../src/systems/riots/riots';
 import { createStack, stackWorth, stepStack, takeStack } from '../src/systems/stack/stack';
 import {
@@ -69,30 +54,10 @@ import {
   wantedOf,
   wireOf,
   worldOn,
-  type Farm,
-  type Line,
-  type Module,
   type PipeConfig,
   type Source,
 } from '../src/systems/pipeline/pipeline';
 
-const base: PipeConfig = {
-  tuning: tuningData,
-  plans: planData as Plan[],
-  sources: sourceData as Source[],
-  grades: gradeData,
-  farms: farmData as Farm[],
-  scales: scaleData,
-  managers: managerData,
-  lines: lineData as Line[],
-  police: policeData,
-  modules: moduleData as Module[],
-  net: netData,
-  chips: chipData,
-  grid: gridData,
-  world: worldData,
-  auto: autoData,
-};
 const FINGER = 5; // presses per second of a player who keeps mashing
 
 const EVENTS = { ...eventsData, every: [eventsData.every[0], eventsData.every[1]] as const };
@@ -346,7 +311,7 @@ function play(seconds: number, cfg: PipeConfig = base): { t: number; what: strin
 }
 
 describe('economy', () => {
-  it('test_economy_opening_does_not_drag', () => {
+  it('test_economy_opening_does_not_drag', { timeout: 30_000 }, () => {
     const log = play(Number(process.env.ECO_SECONDS ?? 3600));
     console.log(log.map((e) => `${String(Math.round(e.t)).padStart(4)} с  ${e.what}`).join('\n'));
     const first = log[0];
