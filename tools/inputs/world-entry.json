@@ -1,6 +1,6 @@
 [
-  {"t": 2.0, "eval": "(() => { const g = window.__gym; g.press(); g.gift(1e19); for (let i = 0; i < 19; i++) g.buy('mod:block'); for (let i = 0; i < 8; i++) g.buy('mod:hire'); })()"},
+  {"t": 2.0, "eval": "(() => { const g = window.__gym; g.press(); g.gift(7e18); for (const item of ['mod:block', 'mod:hire', 'net:copies', 'net:think']) while (g.buy(item)) {} })()"},
   {"t": 3.0, "eval": "window.__gym.fill()"},
-  {"t": 6.0, "eval": "window.__gym.gift(3e18); window.__gym.buy('scale')"},
-  {"t": 14.0, "eval": "window.__gym.buy('route:siberia'); window.__gym.buy('mod:node')"}
+  {"t": 6.0, "eval": "if (!window.__gym.buy('scale')) throw Error('World entry failed')"},
+  {"t": 14.0, "eval": "(() => { const g = window.__gym; for (const item of ['net:halls', 'net:halls', 'net:halls', 'mod:thread', 'mod:node']) if (!g.buy(item)) throw Error('Fork setup failed: ' + item); g.fill(); })()"}
 ]
