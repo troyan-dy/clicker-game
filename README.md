@@ -49,6 +49,8 @@ English and Russian. The game takes the language of the browser; the last line o
 
 ## Build it yourself
 
+Working with a coding agent? Start with [AGENTS.md](AGENTS.md). If your tool does not load it automatically, attach it as project instructions.
+
 ```
 npm install
 npm run dev      # the game at http://localhost:5173/

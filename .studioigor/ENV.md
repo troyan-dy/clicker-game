@@ -28,7 +28,7 @@ VERIFIED: yes
 ## Agent integrations
 - документация Phaser 4 для агента лежит в пакете: `node_modules/phaser/skills/<тема>/SKILL.md` и `node_modules/phaser/docs/` — читать перед кодом новой подсистемы (проверено: game-setup, input, graphics)
 - кадры игры: `tools/capture.mjs` (Playwright, расписание ввода, ошибки консоли → exit 1, `window.__metrics` → metrics.json) — проверено на сцене hello
-- браузер для агента: расширение Claude in Chrome уже подключено в сессии; Playwright MCP не ставился — команда `claude` недоступна в PATH этой среды (VS Code)
+- интерактивный просмотр — в доступном браузере; для воспроизводимых кадров используй CAPTURE ниже (Playwright без расширений и MCP)
 - редактора у веб-стека нет: весь проект — код в репозитории
 - гимы: `http://localhost:5173/?gym=<имя>` (agree — M01, hello — проверка окружения); `&debug=1` включает оверлей; клавиша P пишет настройки в `.studioigor/captures/tuning/` через dev-сервер
 - эскизы интерфейса: `node tools/shot.mjs <файл.html> <out.png>`
