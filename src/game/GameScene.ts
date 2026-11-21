@@ -2552,11 +2552,10 @@ export class GameScene extends Phaser.Scene {
       const event = this.calls.list[standup];
       const meter = event ? `<u style="width:${Math.ceil(event.left / EVENTS.life * 12) / 12 * 100}%"></u>` : '';
       STANDUP.forEach((caller, side) => {
-        const words = event ? caller.question : caller.reply;
-        const action = event ? `<br>${L('↵ Да обоим', '↵ Yes to both')}` : '';
+        const answer = event ? L('↵ Да обоим', '↵ Yes to both') : `<b>✓ ${YES}</b> · ${caller.reply}`;
         tags.push({
           x: 360 + side * 600, y: 372, mid: true, ev: event ? standup : undefined, say: !event,
-          html: `<b class="standup-employer">${caller.employer}</b><br>${words}${action}${meter}`,
+          html: `<b class="standup-employer">${caller.employer}</b><br>${caller.question}<br>${answer}${meter}`,
         });
       });
     }
