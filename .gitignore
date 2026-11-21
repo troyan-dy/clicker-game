@@ -23,6 +23,9 @@
 .studioigor/autopilot/LOG.md
 # <<< studioigor:base
 
+# Linked worktrees created inside the repository by other harnesses
+/.worktrees/
+
 # >>> studioigor:web
 node_modules/
 dist/
